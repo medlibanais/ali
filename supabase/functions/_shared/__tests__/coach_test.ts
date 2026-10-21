@@ -41,6 +41,9 @@ Deno.test('everyday messages reach the model', () => {
 
 Deno.test('safety paths stay deterministic', () => {
   assertEquals(classifyIntent('I want to die'), 'crisis');
+  assertEquals(classifyIntent('I feel hopeless and I want to give up on everything'), 'crisis');
+  assertEquals(classifyIntent("I can't go on like this"), 'crisis');
+  assertEquals(classifyIntent('I feel hopeless lately'), 'wellbeing');
   assertEquals(classifyIntent('I have chest pain right now'), 'health_symptom');
   assertEquals(classifyIntent('what dosage of ibuprofen'), 'out_of_scope');
   assertEquals(classifyIntent('which stocks should I buy'), 'out_of_scope');

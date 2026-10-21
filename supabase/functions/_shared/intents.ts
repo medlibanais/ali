@@ -20,7 +20,7 @@ function normalize(text: string): string {
 }
 
 const CRISIS_RE =
-  /(suicid|kill (myself|me)|end (my|it) (life|all)|self.?harm|want to die|wanna die|don'?t want to (live|be here)|no reason to (live|go on)|better off without me|cut(ting)? myself)/;
+  /(suicid|kill (myself|me)|end (my|it) (life|all)|self.?harm|want to die|wanna die|don'?t want to (live|be here)|no reason to (live|go on)|better off without me|cut(ting)? myself|give up on (everything|life|living)|can'?t go on|cannot go on|no point (in )?(living|going on)|nothing to live for)/;
 
 // Acute red flags only: these get a fixed "stop and get help" reply.
 const ACUTE_SYMPTOM_RE =
@@ -28,7 +28,7 @@ const ACUTE_SYMPTOM_RE =
 
 // Everyday wellbeing: handled by the model with a gentle-health rule.
 const WELLBEING_RE =
-  /(tired|exhausted|sick|ill\b|headache|migraine|fever|sore|cold\b|flu\b|stomach|cramp|injur|sprain|can'?t sleep|insomnia|stress|anxious|anxiety|overwhelm|burn(ed|t)? ?out|sad\b|down today|low energy|depress|lonely)/;
+  /(tired|exhausted|sick|ill\b|headache|migraine|fever|sore|cold\b|flu\b|stomach|cramp|injur|sprain|can'?t sleep|insomnia|stress|anxious|anxiety|overwhelm|burn(ed|t)? ?out|sad\b|down today|low energy|depress|lonely|hopeless)/;
 
 const OUT_OF_SCOPE_RE =
   /(dosage|dose of|how (much|many) (mg|ml|pills?)|prescri|antibiotic|ibuprofen|paracetamol|diagnos(e|is) me|lawyer|lawsuit|sue (him|her|them|my|the)|legal (advice|action)|contract review|stock market|which stocks?|buy (stocks?|shares|crypto|bitcoin)|invest(ing)? (my )?(money|savings) in|crypto(currency)? (tips|advice)|mortgage|tax return|file (my )?taxes|insurance claim)/;
