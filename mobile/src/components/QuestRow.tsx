@@ -2,16 +2,17 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Quest } from '../api/types';
 import {
-  borderWidth,
   colors,
   PILLAR_LABELS,
+  pillarPastels,
   radius,
+  softSurface,
   spacing,
   themed,
-  withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
-import { CheckGlyph, PillarGlyph } from './icons';
+import { CheckGlyph, StarGlyph } from './icons';
+import { PressableScale } from './Motion';
 import Txt from './Txt';
 
 export interface QuestRowProps {
@@ -36,18 +37,16 @@ export function QuestRow({
 }: QuestRowProps) {
   useTheme();
   const pillarColor = colors.pillar[quest.pillar];
+  const pastel = pillarPastels(quest.pillar);
   const dimmed = quest.skipped === true;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       onPress={onPress ? () => onPress(quest) : undefined}
       disabled={!onPress || dimmed}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && onPress && styles.pressed,
-        dimmed && styles.dimmed,
-      ]}
+      pressedScale={0.98}
+      style={[styles.row, dimmed && styles.dimmed]}
     >
       {onComplete && !quest.completed && !dimmed ? (
         <Pressable
@@ -58,8 +57,8 @@ export function QuestRow({
           hitSlop={11}
           style={({ pressed }) => [
             styles.check,
-            { borderColor: pillarColor },
-            pressed && { backgroundColor: withAlpha(pillarColor, 0.2) },
+            { borderColor: pastel.base },
+            pressed && { backgroundColor: pastel.tint },
           ]}
         />
       ) : (
@@ -79,7 +78,7 @@ export function QuestRow({
           <View
             style={[
               styles.tag,
-              { backgroundColor: withAlpha(pillarColor, 0.12) },
+              { backgroundColor: pastel.tint },
             ]}
           >
             <Txt
@@ -88,7 +87,7 @@ export function QuestRow({
               style={styles.tagText}
             >
               {showPillarLabel
-                ? `${PILLAR_LABELS[quest.pillar]}, ${DIFFICULTY_LABELS[quest.difficulty]}`
+                ? `${PILLAR_LABELS[quest.pillar]} · ${DIFFICULTY_LABELS[quest.difficulty]}`
                 : DIFFICULTY_LABELS[quest.difficulty]}
             </Txt>
           </View>
@@ -110,13 +109,13 @@ export function QuestRow({
           ) : null}
         </View>
       </View>
-      <View style={styles.right}>
-        <PillarGlyph pillar={quest.pillar} size={18} />
-        <Txt variant="caption" color={colors.inkSoft} style={styles.xp}>
-          {quest.xp_reward} XP
+      <View style={styles.xpPill}>
+        <StarGlyph size={15} />
+        <Txt variant="label" color={colors.ink} style={styles.xp}>
+          {`+${quest.xp_reward} XP`}
         </Txt>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -125,26 +124,21 @@ const styles = themed(() =>
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.md,
-      backgroundColor: colors.card,
-      borderWidth: borderWidth.hairline,
-      borderColor: colors.line,
-      borderRadius: radius.md,
-      marginBottom: spacing.sm,
-    },
-    pressed: {
-      opacity: 0.96,
+      paddingVertical: spacing.md + 2,
+      paddingHorizontal: spacing.lg,
+      ...softSurface(1),
+      borderRadius: radius.md + 2,
+      marginBottom: spacing.md,
     },
     dimmed: {
       opacity: 0.55,
     },
     check: {
-      width: 22,
-      height: 22,
-      borderWidth: borderWidth.hairline,
+      width: 24,
+      height: 24,
+      borderWidth: 2,
       borderColor: colors.inkFaint,
-      borderRadius: radius.xs,
+      borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
@@ -159,12 +153,14 @@ const styles = themed(() =>
     },
     metaRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
       marginTop: spacing.xs,
     },
     tag: {
-      borderRadius: radius.xs,
-      paddingHorizontal: spacing.sm,
+      marginBottom: 2,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm + 2,
       paddingVertical: 2,
       marginRight: spacing.sm,
     },
@@ -172,16 +168,20 @@ const styles = themed(() =>
       backgroundColor: colors.paperAlt,
     },
     tagText: {
-      fontSize: 11,
-      letterSpacing: 0.3,
+      fontSize: 12,
+      lineHeight: 16,
     },
-    right: {
+    xpPill: {
+      flexDirection: 'row',
       alignItems: 'center',
       marginLeft: spacing.md,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+      backgroundColor: colors.paperAlt,
     },
     xp: {
-      marginTop: spacing.xs,
-      fontSize: 11,
+      marginLeft: 5,
     },
   }),
 );

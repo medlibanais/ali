@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
-import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
+import { radius, softSurface, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 export interface CardProps {
@@ -19,13 +19,11 @@ export function Card({ children, style, padded = true }: CardProps) {
 const styles = themed(() =>
   StyleSheet.create({
     card: {
-      backgroundColor: colors.card,
-      borderWidth: borderWidth.hairline,
-      borderColor: colors.line,
-      borderRadius: radius.md,
+      ...softSurface(1),
+      borderRadius: radius.lg,
     },
     padded: {
-      padding: spacing.lg,
+      padding: spacing.xl - 4,
     },
   }),
 );

@@ -19,7 +19,10 @@ import {
   PILLAR_LABELS,
   PILLARS,
   Pillar,
+  pillarPastels,
+  radius,
   spacing,
+  themed,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
@@ -66,6 +69,11 @@ export function QuestsScreen({ navigation }: Props) {
   }, [dispatch, date]);
 
   const initialLoading = loading && date === null;
+  const dayQuests = quests.filter((q) => !q.skipped);
+  const doneCount = dayQuests.filter((q) => q.completed).length;
+  const xpLeft = dayQuests
+    .filter((q) => !q.completed)
+    .reduce((sum, q) => sum + q.xp_reward, 0);
 
   const visible = useMemo(() => {
     const active = quests.filter((q) => !q.skipped && !q.completed);
@@ -91,9 +99,27 @@ export function QuestsScreen({ navigation }: Props) {
 
   return (
     <Screen scroll>
+      <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
+        {`${doneCount} of ${dayQuests.length} done · ${xpLeft} XP left today`}
+      </Txt>
       <Txt variant="title" style={styles.title}>
         Today&apos;s quests
       </Txt>
+      <View style={styles.progressTrack}>
+        {PILLARS.map((pillar) => {
+          const share = dayQuests.length
+            ? dayQuests.filter((q) => q.pillar === pillar && q.completed).length /
+              dayQuests.length
+            : 0;
+          return share > 0 ? (
+            <View
+              key={pillar}
+              style={{ flex: share, backgroundColor: pillarPastels(pillar).base }}
+            />
+          ) : null;
+        })}
+        <View style={{ flex: Math.max(0.0001, 1 - doneCount / Math.max(1, dayQuests.length)) }} />
+      </View>
 
       {initialLoading ? (
         <QuestsSkeleton />
@@ -111,6 +137,11 @@ export function QuestsScreen({ navigation }: Props) {
                 label={option.label}
                 selected={filter === option.value}
                 onPress={() => setFilter(option.value)}
+                dotColor={
+                  option.value === 'all'
+                    ? undefined
+                    : pillarPastels(option.value).base
+                }
               />
             ))}
           </ScrollView>
@@ -146,8 +177,8 @@ export function QuestsScreen({ navigation }: Props) {
                   pressed && styles.pressed,
                 ]}
               >
-                <Txt variant="label">
-                  {`Completed, ${completed.length}`}
+                <Txt variant="bodySemi" color={colors.inkSoft}>
+                  {`Completed · ${completed.length}`}
                 </Txt>
                 <View
                   style={completedOpen ? styles.chevronUp : styles.chevronDown}
@@ -168,28 +199,46 @@ export function QuestsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  title: {
+const styles = themed(() => StyleSheet.create({
+  kicker: {
     marginTop: spacing.lg,
-    marginBottom: spacing.lg,
   },
-  filterScroll: {
+  title: {
+    marginTop: 2,
+  },
+  progressTrack: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
+    backgroundColor: colors.paperAlt,
+  },
+  // flexGrow 0: inside the screen's flexGrow column a horizontal
+  // ScrollView otherwise grows to fill the height, stretching the chips.
+  filterScroll: {
+    flexGrow: 0,
+    marginBottom: spacing.md,
     marginHorizontal: -24,
   },
   filterContent: {
     paddingHorizontal: 24,
-    gap: spacing.sm,
     flexDirection: 'row',
+    alignItems: 'center',
   },
   completedSection: {
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
   },
   completedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.paperAlt,
+    marginBottom: spacing.md,
   },
   chevronUp: {
     transform: [{ rotate: '-90deg' }],
@@ -206,6 +255,6 @@ const styles = StyleSheet.create({
   skeletonBlock: {
     marginBottom: spacing.md,
   },
-});
+}));
 
 export default QuestsScreen;

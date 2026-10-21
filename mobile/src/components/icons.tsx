@@ -113,13 +113,11 @@ export function HealthGlyph({ size = 20, color = colors.pillar.health }: IconPro
   useTheme();
   return (
     <Svg {...baseProps(size)}>
-      <Polyline
-        points="3,12 7.5,12 10,6 14,18 16.5,12 21,12"
+      <Path
+        d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.5 2.3c0 5.2-7.5 9.6-7.5 9.6Z"
         stroke={color}
         strokeWidth={STROKE}
-        strokeLinecap="round"
         strokeLinejoin="round"
-        fill="none"
       />
     </Svg>
   );
@@ -129,8 +127,13 @@ export function FamilyGlyph({ size = 20, color = colors.pillar.family }: IconPro
   useTheme();
   return (
     <Svg {...baseProps(size)}>
-      <Circle cx={9.2} cy={12} r={5.2} stroke={color} strokeWidth={STROKE} />
-      <Circle cx={14.8} cy={12} r={5.2} stroke={color} strokeWidth={STROKE} />
+      <Path
+        d="M4.5 11 12 4.8l7.5 6.2M6.5 9.5v9.2h11V9.5M10 18.7v-4.6h4v4.6"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }
@@ -155,18 +158,15 @@ export function FunGlyph({ size = 20, color = colors.pillar.fun }: IconProps) {
   useTheme();
   return (
     <Svg {...baseProps(size)}>
+      <Circle cx={12} cy={12} r={8.2} stroke={color} strokeWidth={STROKE} />
       <Path
-        d="M12 3.5 18.8 10 12 20.5 5.2 10z"
-        stroke={color}
-        strokeWidth={STROKE}
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M5.2 10h13.6M12 3.5v17"
+        d="M8.6 13.6c.8 1.4 2 2.1 3.4 2.1s2.6-.7 3.4-2.1"
         stroke={color}
         strokeWidth={STROKE}
         strokeLinecap="round"
       />
+      <Circle cx={9.3} cy={10} r={0.9} fill={color} />
+      <Circle cx={14.7} cy={10} r={0.9} fill={color} />
     </Svg>
   );
 }
@@ -282,6 +282,22 @@ export function BellGlyph({ size = 22, color = colors.inkSoft }: IconProps) {
         stroke={color}
         strokeWidth={STROKE}
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** Filled star used on XP pills and the level badge. */
+export function StarGlyph({ size = 14, color = colors.gold }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Path
+        d="m12 3.2 2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7L12 3.2Z"
+        fill={color}
+        stroke={color}
+        strokeWidth={1.2}
         strokeLinejoin="round"
       />
     </Svg>

@@ -1,12 +1,8 @@
 import React from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  ViewStyle,
-} from 'react-native';
-import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
+import { ActivityIndicator, StyleSheet, ViewStyle } from 'react-native';
+import { colors, radius, softShadow, spacing, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { PressableScale } from './Motion';
 import Txt from './Txt';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
@@ -32,16 +28,16 @@ export function Button({
   const isDisabled = disabled || loading;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       onPress={isDisabled ? undefined : onPress}
-      style={({ pressed }) => [
+      disabled={isDisabled}
+      style={[
         styles.base,
         variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'ghost' && styles.ghost,
-        pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
       ]}
@@ -64,32 +60,29 @@ export function Button({
           {title}
         </Txt>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = themed(() =>
   StyleSheet.create({
     base: {
-      minHeight: 48,
-      borderRadius: radius.sm,
+      minHeight: 52,
+      borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.lg,
     },
     primary: {
       backgroundColor: colors.accent,
+      ...softShadow(2),
+      shadowColor: colors.accent,
     },
     secondary: {
-      backgroundColor: 'transparent',
-      borderWidth: borderWidth.hairline,
-      borderColor: colors.accent,
+      backgroundColor: withAlpha(colors.accent, 0.1),
     },
     ghost: {
       backgroundColor: 'transparent',
-    },
-    pressed: {
-      opacity: 0.96,
     },
     disabled: {
       opacity: 0.45,

@@ -177,12 +177,13 @@ function buildPrompt(dreamBody: string | null, personality: string[]): string {
     .filter(Boolean);
   const body = (dreamBody ?? '').replace(/[^\p{L}\p{N} ,.'-]/gu, '').slice(0, 80);
   const parts = [
-    'Turn this photo into a polished 3D animated character portrait of the same person, in the style of a modern animated feature film.',
+    'Turn this photo into a soft 3D cartoon character of the same person, in the friendly style of a modern 3D animated family film: rounded shapes, smooth matte skin, big expressive friendly eyes, gentle features.',
     'Keep their identity: same face shape, skin tone, eye color, hairstyle and hair color, facial hair, glasses, and any head covering such as a hijab or cap.',
-    'Show them as the best version of themselves a few years from now: healthy, rested, glowing skin, upright posture, warm confident smile.',
+    'Show them as the best version of themselves a few years from now: healthy, rested, warm confident smile.',
     traits.length > 0 ? `Their expression feels ${traits.join(', ')}.` : '',
     body ? `Physique hint: ${body}.` : '',
-    'Head and shoulders, centered, facing the camera, soft studio light, clean warm gradient background, no text, no logos, modest everyday clothing.',
+    'Relaxed, natural pose, never stiff or blocky: waist-up, body slightly turned, one hand raised in a friendly wave.',
+    'Centered with space around the head for a circular crop, soft diffused studio light, plain warm cream background, no text, no logos, modest everyday clothing.',
   ];
   return parts.filter(Boolean).join(' ');
 }
