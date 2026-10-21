@@ -280,8 +280,9 @@ export function OnboardingScreen({ navigation }: Props) {
     const result = await dispatch(submitOnboarding(buildPayload()));
     setSubmitting(false);
     if (submitOnboarding.fulfilled.match(result)) {
-      // Next step: design the Future Self avatar.
-      navigation.navigate('AvatarCreator', { fromOnboarding: true });
+      // Next step: the Future Self avatar, generated from a photo (the
+      // hand-built SVG creator is one tap away from there).
+      navigation.navigate('AiAvatar', { fromOnboarding: true });
     } else {
       const message =
         result.payload ?? 'Could not save your answers. Try again.';

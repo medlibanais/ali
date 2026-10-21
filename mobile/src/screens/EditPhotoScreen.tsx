@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Linking, Platform, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ProfileAvatar from '../components/ProfileAvatar';
@@ -15,6 +17,7 @@ import {
   setAvatarMode,
 } from '../lib/profilePhoto';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
+import type { AppStackParamList } from '../navigation/types';
 import { fetchProfile } from '../store/slices/userSlice';
 import { colors, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -25,11 +28,14 @@ export function EditPhotoScreen() {
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { profile, loading } = useAppSelector((state) => state.user);
   const [busy, setBusy] = useState<Busy>(null);
 
   const mode = profile?.avatar_mode ?? 'avatar';
   const hasPhoto = Boolean(profile?.avatar_url ?? profile?.photo_url);
+  const hasAiAvatar = Boolean(profile?.ai_avatar_url);
 
   const handleError = (error: unknown) => {
     if (error instanceof PhotoError && error.code === 'cancelled') return;
@@ -59,8 +65,12 @@ export function EditPhotoScreen() {
     }
   };
 
-  const switchMode = async (next: 'avatar' | 'photo') => {
+  const switchMode = async (next: 'avatar' | 'photo' | 'ai') => {
     if (next === mode || busy) return;
+    if (next === 'ai' && !hasAiAvatar) {
+      navigation.navigate('AiAvatar');
+      return;
+    }
     if (next === 'photo' && !hasPhoto) {
       toast.showToast({ message: 'Add a photo first, then switch modes.' });
       return;
@@ -118,11 +128,22 @@ export function EditPhotoScreen() {
           <ProfileAvatar profile={profile} size={140} mood="happy" animated={false} />
         )}
         <Txt variant="caption" color={colors.inkFaint} style={styles.previewNote}>
-          {mode === 'photo' ? 'Showing your photo' : 'Showing your avatar'}
+          {mode === 'ai'
+            ? 'Showing your AI avatar'
+            : mode === 'photo'
+              ? 'Showing your photo'
+              : 'Showing your avatar'}
         </Txt>
       </View>
 
       <Card padded={false} style={styles.card}>
+        <Button
+          title={hasAiAvatar ? 'Use my AI avatar' : 'Create an AI avatar'}
+          variant={mode === 'ai' ? 'primary' : 'ghost'}
+          onPress={() => switchMode('ai')}
+          loading={busy === 'mode' && mode !== 'ai'}
+          style={styles.modeButton}
+        />
         <Button
           title="Use my avatar"
           variant={mode === 'avatar' ? 'primary' : 'ghost'}

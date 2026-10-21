@@ -8,7 +8,8 @@ export interface UserProfile {
   avatar_url: string | null;
   photo_url: string | null;
   avatar_config: Record<string, unknown> | null;
-  avatar_mode: 'avatar' | 'photo';
+  avatar_mode: 'avatar' | 'photo' | 'ai';
+  ai_avatar_url: string | null;
   timezone: string;
   invite_code: string | null;
   stats_visibility: 'friends' | 'private';
@@ -86,7 +87,8 @@ export const fetchProfile = createAsyncThunk<
       avatar_url: p?.photo_url ?? null,
       photo_url: p?.photo_url ?? null,
       avatar_config: (p?.avatar_config as Record<string, unknown>) ?? null,
-      avatar_mode: (p?.avatar_mode as 'avatar' | 'photo') ?? 'avatar',
+      avatar_mode: (p?.avatar_mode as UserProfile['avatar_mode']) ?? 'avatar',
+      ai_avatar_url: p?.ai_avatar_url ?? null,
       timezone: p?.timezone ?? 'UTC',
       invite_code: p?.invite_code ?? null,
       stats_visibility: (p?.stats_visibility as 'friends' | 'private') ?? 'friends',
