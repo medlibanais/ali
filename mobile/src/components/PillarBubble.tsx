@@ -6,18 +6,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Txt from './Txt';
 import { PillarGlyph } from './icons';
-import { radius, spacing, themed } from '../theme/tokens';
+import { colors, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 export type PillarId = 'health' | 'family' | 'work' | 'fun' | 'spirituality';
-
-export const BUBBLE_COLORS: Record<PillarId, string> = {
-  health: '#e07a5f',
-  family: '#81b29a',
-  work: '#3d5a80',
-  fun: '#f2cc8f',
-  spirituality: '#9d8189',
-};
 
 const LABELS: Record<PillarId, string> = {
   health: 'HEALTH',
@@ -27,13 +19,13 @@ const LABELS: Record<PillarId, string> = {
   spirituality: 'SPIRIT',
 };
 
-const BUBBLE_BG = '#26221C';
-const TRACK = 'rgba(255,255,255,0.08)';
-
 export interface PillarBubbleProps {
   pillar: PillarId;
   score: number; // 0-100
   size?: number;
+  /** Quest progress for this pillar today, shown under the score. */
+  done?: number;
+  total?: number;
   expanded: boolean;
   onPress: (pillar: PillarId) => void;
 }
@@ -42,28 +34,35 @@ export function PillarBubble({
   pillar,
   score,
   size = 76,
+  done,
+  total,
   expanded,
   onPress,
 }: PillarBubbleProps) {
   useTheme();
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
-  const color = BUBBLE_COLORS[pillar];
+  const color = colors.pillar[pillar];
 
-  const strokeWidth = 4;
-  const radius_ = (size - strokeWidth * 2 - 4) / 2;
+  const strokeWidth = 5;
+  const radius_ = (size - strokeWidth) / 2 - 1;
   const circumference = 2 * Math.PI * radius_;
   const progress = (clamped / 100) * circumference;
+  const showCount = total !== undefined && total > 0;
+  const small = size < 70;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${LABELS[pillar]}, ${clamped} percent`}
-      accessibilityState={{ expanded }}
+      accessibilityLabel={
+        `${LABELS[pillar]}, ${clamped} percent` +
+        (showCount ? `, ${done ?? 0} of ${total} quests done` : '')
+      }
+      accessibilityState={{ selected: expanded }}
       onPress={() => onPress(pillar)}
+      hitSlop={Math.max(0, (44 - size) / 2)}
       style={({ pressed }) => [
         styles.pressable,
-        { width: Math.max(size, 44), height: Math.max(size, 44) },
-        clamped < 50 && styles.dimmed,
+        { width: size, height: size },
         pressed && styles.pressed,
       ]}
     >
@@ -74,46 +73,58 @@ export function PillarBubble({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: BUBBLE_BG,
+            backgroundColor: expanded ? withAlpha(color, 0.14) : colors.card,
           },
-          expanded && { borderColor: color, borderWidth: 2 },
+          expanded && styles.lifted,
         ]}
       >
-        <Svg width={size} height={size}>
+        <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           <Circle
             cx={size / 2}
             cy={size / 2}
             r={radius_}
-            stroke={TRACK}
+            stroke={withAlpha(color, 0.16)}
             strokeWidth={strokeWidth}
             fill="none"
           />
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius_}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={`${progress} ${circumference - progress}`}
-            strokeDashoffset={circumference / 4}
-            strokeLinecap="round"
-          />
+          {clamped > 0 ? (
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius_}
+              stroke={color}
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeDasharray={`${progress} ${circumference - progress}`}
+              strokeDashoffset={circumference / 4}
+              strokeLinecap="round"
+            />
+          ) : null}
         </Svg>
         <View style={styles.content} pointerEvents="none">
-          <PillarGlyph pillar={pillar} size={16} color={color} />
+          <PillarGlyph pillar={pillar} size={small ? 14 : 16} color={color} />
           <Txt
-            variant="caption"
-            color="rgba(255,255,255,0.62)"
-            style={styles.label}
+            variant="bodySemi"
+            color={colors.ink}
+            style={[styles.score, small && styles.scoreSmall]}
           >
-            {LABELS[pillar]}
+            {`${clamped}%`}
           </Txt>
-          <Txt variant="bodySemi" color="#FDFBF6" style={styles.score}>
-            {clamped}
-          </Txt>
+          {showCount ? (
+            <Txt variant="caption" color={colors.inkFaint} style={styles.count}>
+              {`${done ?? 0}/${total}`}
+            </Txt>
+          ) : null}
         </View>
       </View>
+      <Txt
+        variant="caption"
+        color={expanded ? color : colors.inkSoft}
+        style={styles.label}
+        numberOfLines={1}
+      >
+        {LABELS[pillar]}
+      </Txt>
     </Pressable>
   );
 }
@@ -122,10 +133,6 @@ const styles = themed(() =>
   StyleSheet.create({
     pressable: {
       alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dimmed: {
-      opacity: 0.6,
     },
     pressed: {
       opacity: 0.85,
@@ -133,21 +140,40 @@ const styles = themed(() =>
     circle: {
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden',
+      shadowColor: colors.ink,
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    lifted: {
+      transform: [{ scale: 1.08 }],
     },
     content: {
       ...StyleSheet.absoluteFillObject,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    label: {
-      fontSize: 8,
-      letterSpacing: 1.1,
-      marginTop: 2,
-    },
     score: {
       fontSize: 15,
       lineHeight: 18,
+      marginTop: 1,
+    },
+    scoreSmall: {
+      fontSize: 13,
+      lineHeight: 15,
+    },
+    count: {
+      fontSize: 10,
+      lineHeight: 12,
+    },
+    label: {
+      position: 'absolute',
+      bottom: -16,
+      width: 80,
+      textAlign: 'center',
+      fontSize: 10,
+      letterSpacing: 1.1,
     },
   }),
 );

@@ -5,11 +5,9 @@ import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { sanitizeAvatarConfig } from '../avatar/types';
 import { VALID_OPTION_IDS } from '../avatar/options';
-import Card from '../components/Card';
 import ConfettiLite from '../components/ConfettiLite';
 import EmptyState from '../components/EmptyState';
 import Hairline from '../components/Hairline';
-import PillarBar from '../components/PillarBar';
 import PillarOrbit from '../components/PillarOrbit';
 import type { PillarId } from '../components/PillarBubble';
 import QuestRow from '../components/QuestRow';
@@ -17,7 +15,7 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
-import { BellGlyph, PillarGlyph } from '../components/icons';
+import { BellGlyph, ChevronGlyph, PillarGlyph } from '../components/icons';
 import type { Quest } from '../api/types';
 import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
@@ -42,7 +40,7 @@ import {
   colors,
   PILLAR_LABELS,
   PILLARS,
-  Pillar,
+  radius,
   spacing,
   themed,
 } from '../theme/tokens';
@@ -52,6 +50,9 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Today'>,
   NativeStackScreenProps<AppStackParamList>
 >;
+
+// Quests listed under the orbit before "See all quests".
+const UP_NEXT_LIMIT = 4;
 
 function greeting(firstName: string | null | undefined): string {
   const hour = new Date().getHours();
@@ -71,10 +72,9 @@ function dateLine(): string {
 function TodaySkeleton() {
   return (
     <View style={styles.skeletonWrap}>
-      <Skeleton width={120} height={120} borderRadius={60} style={styles.skeletonCenter} />
       <Skeleton width={220} height={24} style={styles.skeletonCenter} />
-      <Skeleton width={200} height={200} borderRadius={100} style={styles.skeletonCenter} />
-      <Skeleton height={150} style={styles.skeletonBlock} />
+      <Skeleton width={280} height={280} borderRadius={140} style={styles.skeletonCenter} />
+      <Skeleton height={56} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
@@ -228,6 +228,10 @@ export function TodayScreen({ navigation }: Props) {
     profile?.avatar_config,
     VALID_OPTION_IDS,
   );
+  const photoUrl =
+    profile?.avatar_mode === 'photo'
+      ? profile.photo_url ?? profile.avatar_url ?? null
+      : null;
   const orbitScores: Record<PillarId, number> = {
     health: questsState.pillarScores.health ?? 0,
     family: questsState.pillarScores.family ?? 0,
@@ -235,19 +239,34 @@ export function TodayScreen({ navigation }: Props) {
     fun: questsState.pillarScores.fun ?? 0,
     spirituality: questsState.pillarScores.spirituality ?? 0,
   };
-  const grouped: { pillar: Pillar; items: Quest[] }[] = PILLARS.map(
-    (pillar) => ({
-      pillar,
-      items: activeQuests
-        .filter((q) => q.pillar === pillar)
-        .sort((a, b) => (a.priority ?? 1) - (b.priority ?? 1)),
+  const orbitProgress = Object.fromEntries(
+    PILLARS.map((pillar) => {
+      const items = activeQuests.filter((q) => q.pillar === pillar);
+      return [
+        pillar,
+        { done: items.filter((q) => q.completed).length, total: items.length },
+      ];
     }),
-  ).filter((group) => group.items.length > 0);
+  ) as Record<PillarId, { done: number; total: number }>;
 
-  const visibleGroups =
+  // Quests shown under the orbit: today's open quests (all pillars, or the
+  // tapped one), most important first, then what is already done.
+  const inScope = activeQuests.filter(
+    (q) => expandedPillar === null || q.pillar === expandedPillar,
+  );
+  const byPriority = (a: Quest, b: Quest) =>
+    (a.priority ?? 1) - (b.priority ?? 1);
+  const openQuests = inScope.filter((q) => !q.completed).sort(byPriority);
+  const doneQuests = inScope.filter((q) => q.completed).sort(byPriority);
+  const listed = [...openQuests, ...doneQuests].slice(
+    0,
+    expandedPillar === null ? UP_NEXT_LIMIT : inScope.length,
+  );
+  const hiddenCount = inScope.length - listed.length;
+  const scopeLabel =
     expandedPillar === null
-      ? []
-      : grouped.filter((g) => g.pillar === expandedPillar);
+      ? 'Up next'
+      : `${PILLAR_LABELS[expandedPillar]} today`;
 
   return (
     <Screen
@@ -267,9 +286,14 @@ export function TodayScreen({ navigation }: Props) {
         <>
           <View style={styles.header}>
             <View style={styles.headerTop}>
-              <Txt variant="title" style={styles.headerTitle}>
-                {greeting(profile?.first_name)}
-              </Txt>
+              <View style={styles.headerTitle}>
+                <Txt variant="caption" color={colors.inkFaint}>
+                  {dateLine()}
+                </Txt>
+                <Txt variant="title" style={styles.greeting}>
+                  {greeting(profile?.first_name)}
+                </Txt>
+              </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
@@ -288,18 +312,15 @@ export function TodayScreen({ navigation }: Props) {
                 ) : null}
               </Pressable>
             </View>
-            <Txt variant="caption" color={colors.inkFaint}>
-              {dateLine()}
-            </Txt>
-            <Txt variant="body" color={colors.inkSoft} style={styles.scoreLine}>
-              {`Life score ${Math.round(score)} · ${pluralize(gamification.currentStreak, 'day')} streak`}
-            </Txt>
           </View>
 
           <View style={styles.orbitWrap}>
             <PillarOrbit
               avatarConfig={avatarConfig}
+              photoUrl={photoUrl}
+              name={profile?.first_name}
               scores={orbitScores}
+              progress={orbitProgress}
               expandedPillar={expandedPillar}
               onPillarPress={(id) =>
                 setExpandedPillar((cur) => (cur === id ? null : id))
@@ -307,107 +328,127 @@ export function TodayScreen({ navigation }: Props) {
             />
           </View>
 
-          <Card style={styles.statsCard} padded={false}>
-            <View style={styles.statRow}>
-              <View style={styles.statCell}>
-                <Txt variant="label">Streak</Txt>
-                <Txt variant="heading" color={colors.gold} style={styles.statValue}>
-                  {streakLabel(gamification.currentStreak)}
-                </Txt>
-                <Txt variant="caption" color={colors.inkFaint}>
-                  {bestStreakLabel(gamification.bestStreak)}
-                </Txt>
-                {gamification.currentStreak > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Use a streak freeze"
-                    onPress={confirmFreeze}
-                    style={({ pressed }) => [
-                      styles.freezeChip,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Txt variant="caption" color={colors.accent}>
-                      Freeze (1/week)
-                    </Txt>
-                  </Pressable>
-                ) : null}
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statCell}>
-                <Txt variant="label">Level</Txt>
-                <Txt variant="heading" style={styles.statValue}>
-                  {`${gamification.level}, ${gamification.currentTitle ?? titleForLevel(gamification.level)}`}
-                </Txt>
-              </View>
+          <View style={styles.statStrip}>
+            <View style={styles.statCell}>
+              <Txt variant="bodySemi" color={colors.accent}>
+                {`${Math.round(score)}`}
+              </Txt>
+              <Txt variant="caption" color={colors.inkFaint}>
+                Life score
+              </Txt>
             </View>
-          </Card>
-
-          <Card style={styles.pillarCard}>
-            <Txt variant="label" style={styles.cardLabel}>
-              Pillars today
-            </Txt>
-            {PILLARS.map((pillar) => (
-              <PillarBar
-                key={pillar}
-                pillar={pillar}
-                value={questsState.pillarScores[pillar] ?? 0}
-              />
-            ))}
-          </Card>
-
-          {expandedPillar === null ? (
-            <Txt
-              variant="body"
-              color={colors.inkFaint}
-              align="center"
-              style={styles.hint}
+            <View style={styles.statDivider} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                gamification.currentStreak > 0
+                  ? `${streakLabel(gamification.currentStreak)}. Tap to use a streak freeze`
+                  : streakLabel(gamification.currentStreak)
+              }
+              disabled={gamification.currentStreak === 0}
+              onPress={confirmFreeze}
+              style={({ pressed }) => [styles.statCell, pressed && styles.pressed]}
             >
-              Tap a pillar to see today&apos;s quests.
+              <Txt variant="bodySemi" color={colors.gold} numberOfLines={1}>
+                {streakLabel(gamification.currentStreak)}
+              </Txt>
+              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+                {gamification.currentStreak > 0
+                  ? 'Tap to freeze'
+                  : bestStreakLabel(gamification.bestStreak)}
+              </Txt>
+            </Pressable>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <Txt variant="bodySemi" numberOfLines={1}>
+                {`Level ${gamification.level}`}
+              </Txt>
+              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+                {gamification.currentTitle ?? titleForLevel(gamification.level)}
+              </Txt>
+            </View>
+          </View>
+
+          <View style={styles.questHeader}>
+            <View style={styles.questHeaderTitle}>
+              {expandedPillar ? (
+                <PillarGlyph pillar={expandedPillar} size={18} />
+              ) : null}
+              <Txt
+                variant="label"
+                style={[styles.questHeaderText, expandedPillar && styles.questHeaderTextIcon]}
+              >
+                {scopeLabel}
+              </Txt>
+            </View>
+            <Txt variant="caption" color={colors.inkFaint}>
+              {`${doneQuests.length} of ${inScope.length} done`}
             </Txt>
+          </View>
+
+          {expandedPillar !== null ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setExpandedPillar(null)}
+              style={({ pressed }) => [styles.clearFilter, pressed && styles.pressed]}
+            >
+              <Txt variant="caption" color={colors.accent}>
+                Show all pillars
+              </Txt>
+            </Pressable>
+          ) : null}
+
+          {inScope.length === 0 ? (
+            <EmptyState
+              title={
+                expandedPillar === null
+                  ? 'No quests yet today'
+                  : `No ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests today`
+              }
+              body={
+                expandedPillar === null
+                  ? 'Pull down to refresh, or ask your coach for a quest.'
+                  : 'This pillar has no quests scheduled today. Another pillar might.'
+              }
+            />
           ) : (
             <>
-              <View style={styles.questHeader}>
-                <Txt variant="label">
-                  {`Today's ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests`}
+              {openQuests.length === 0 ? (
+                <Txt
+                  variant="body"
+                  color={colors.inkSoft}
+                  align="center"
+                  style={styles.allDone}
+                >
+                  {expandedPillar === null
+                    ? 'Everything is done for today. Your future self thanks you.'
+                    : `All ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests are done.`}
                 </Txt>
-                <Txt variant="caption" color={colors.inkFaint}>
-                  {`${activeQuests.filter((q) => q.pillar === expandedPillar && q.completed).length} of ${activeQuests.filter((q) => q.pillar === expandedPillar).length} done`}
-                </Txt>
-              </View>
-
-              {visibleGroups.length === 0 ? (
-                <EmptyState
-                  title={`No ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests today`}
-                  body="This pillar has no quests scheduled today. Another pillar might."
+              ) : null}
+              {listed.map((quest) => (
+                <QuestRow
+                  key={quest.quest_id}
+                  quest={quest}
+                  onPress={openQuest}
+                  onComplete={handleComplete}
+                  showPillarLabel={expandedPillar === null}
                 />
-              ) : (
-                visibleGroups.map((group) => {
-                  const done = group.items.filter((q) => q.completed).length;
-                  return (
-                    <View key={group.pillar} style={styles.group}>
-                      <View style={styles.groupHeader}>
-                        <PillarGlyph pillar={group.pillar} size={18} />
-                        <Txt variant="bodySemi" style={styles.groupTitle}>
-                          {PILLAR_LABELS[group.pillar]}
-                        </Txt>
-                        <Txt variant="caption" color={colors.inkFaint}>
-                          {`${done} of ${group.items.length}`}
-                        </Txt>
-                      </View>
-                      {group.items.map((quest) => (
-                        <QuestRow
-                          key={quest.quest_id}
-                          quest={quest}
-                          onPress={openQuest}
-                        />
-                      ))}
-                    </View>
-                  );
-                })
-              )}
+              ))}
             </>
           )}
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('Quests')}
+            style={({ pressed }) => [styles.allQuests, pressed && styles.pressed]}
+          >
+            <Txt variant="bodySemi" color={colors.accent}>
+              {hiddenCount > 0
+                ? `See all quests (${hiddenCount} more)`
+                : 'See all quests'}
+            </Txt>
+            <ChevronGlyph color={colors.accent} />
+          </Pressable>
 
           {questsState.error ? (
             <Txt variant="caption" color={colors.danger} style={styles.error}>
@@ -467,49 +508,36 @@ const styles = themed(() =>
     justifyContent: 'center',
     backgroundColor: colors.accent,
   },
-  scoreLine: {
-    marginTop: spacing.sm,
+  greeting: {
+    marginTop: spacing.xs,
   },
   orbitWrap: {
     alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  hint: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  statsCard: {
     marginTop: spacing.xl,
   },
-  statRow: {
+  statStrip: {
     flexDirection: 'row',
+    marginTop: spacing.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
   },
   statCell: {
     flex: 1,
-    padding: spacing.lg,
-  },
-  statValue: {
-    marginTop: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    minHeight: 44,
   },
   statDivider: {
     width: 1,
+    marginVertical: spacing.sm,
     backgroundColor: colors.line,
   },
-  freezeChip: {
-    marginTop: spacing.xs,
-    minHeight: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   pressed: {
-    opacity: 0.96,
-  },
-  pillarCard: {
-    marginTop: spacing.md,
-  },
-  cardLabel: {
-    marginBottom: spacing.lg,
-    textTransform: 'uppercase',
+    opacity: 0.7,
   },
   questHeader: {
     marginTop: spacing.xl,
@@ -518,17 +546,32 @@ const styles = themed(() =>
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  group: {
-    marginBottom: spacing.lg,
-  },
-  groupHeader: {
+  questHeaderTitle: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  questHeaderText: {
+    textTransform: 'uppercase',
+  },
+  questHeaderTextIcon: {
+    marginLeft: spacing.sm,
+  },
+  clearFilter: {
+    alignSelf: 'flex-start',
+    minHeight: 32,
+    justifyContent: 'center',
+    marginTop: -spacing.sm,
     marginBottom: spacing.sm,
   },
-  groupTitle: {
-    marginLeft: spacing.sm,
-    flex: 1,
+  allDone: {
+    marginBottom: spacing.md,
+  },
+  allQuests: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: spacing.sm,
   },
   error: {
     marginTop: spacing.md,
