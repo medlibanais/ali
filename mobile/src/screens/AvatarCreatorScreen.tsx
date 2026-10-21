@@ -32,6 +32,17 @@ import { saveAvatarConfig } from '../store/slices/userSlice';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
+// Choices that only show below the shoulders. Picking one of these
+// categories switches the preview to full body so the change is visible.
+const BODY_KEYS: ReadonlySet<keyof AvatarConfig> = new Set<keyof AvatarConfig>([
+  'bodyBuild',
+  'height',
+  'pose',
+  'pantsColor',
+  'shoes',
+  'shoesColor',
+]);
+
 type Props = NativeStackScreenProps<
   AppStackParamList & OnboardingStackParamList,
   'AvatarCreator'
@@ -197,7 +208,10 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               key={c.key}
               label={c.label}
               selected={c.key === categoryKey}
-              onPress={() => setCategoryKey(c.key)}
+              onPress={() => {
+                setCategoryKey(c.key);
+                if (BODY_KEYS.has(c.key)) setPreviewMode('full-body');
+              }}
             />
           ))}
         </ScrollView>
@@ -205,6 +219,9 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
 
       <FlatList
         data={category.options}
+        // FlatList only re-renders rows when data or extraData change; the
+        // rows depend on the current config (thumbnails, selected state).
+        extraData={{ config, level }}
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -237,6 +254,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                     size={56}
                     mood="neutral"
                     animated={false}
+                    mode={BODY_KEYS.has(category.key) ? 'full-body' : 'head'}
                   />
                 </View>
               )}
