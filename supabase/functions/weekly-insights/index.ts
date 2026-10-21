@@ -5,6 +5,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callGroq } from '../_shared/llm.ts';
+import { deliver } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -220,6 +221,43 @@ RULES: only claims supported by the data above. Name real weekdays/pillars/numbe
     insights,
   });
 
+  // SRS FR-6.2: best/worst pillar, week-over-week change, streak, forecast.
+  const ranked = [...PILLARS].sort((a, b) => pillarTotals[b] - pillarTotals[a]);
+  const prevStart = new Date(weekStart.getTime() - 7 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const [{ data: prevReport }, { data: gam }] = await Promise.all([
+    admin
+      .from('weekly_reports')
+      .select('completion_rate, total_xp, report')
+      .eq('user_id', userId)
+      .eq('week_start', prevStart)
+      .maybeSingle(),
+    admin
+      .from('gamification')
+      .select('current_streak, best_streak')
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ]);
+  const prevPillars = (prevReport?.report?.pillar_scores ?? null) as
+    | Record<string, number>
+    | null;
+  const avgOverall = Math.round(
+    scores.reduce((s: number, r: { overall: number }) => s + r.overall, 0) /
+      scores.length,
+  );
+  // Forecast: this week's average nudged by its trend (second half vs first).
+  const half = Math.floor(scores.length / 2);
+  const firstHalf = scores.slice(0, Math.max(1, half));
+  const secondHalf = scores.slice(half);
+  const mean = (rows: { overall: number }[]) =>
+    rows.reduce((s, r) => s + r.overall, 0) / Math.max(1, rows.length);
+  const trend = mean(secondHalf) - mean(firstHalf);
+  const predictedScore = Math.max(
+    0,
+    Math.min(100, Math.round(avgOverall + trend / 2)),
+  );
+
   await admin.from('weekly_reports').upsert({
     user_id: userId,
     week_start: from,
@@ -230,7 +268,34 @@ RULES: only claims supported by the data above. Name real weekdays/pillars/numbe
       pillar_scores: pillarTotals,
       by_weekday: byWeekday,
       completions_count: completions.length,
+      average_score: avgOverall,
+      best_pillar: ranked[0],
+      worst_pillar: ranked[ranked.length - 1],
+      current_streak: gam?.current_streak ?? 0,
+      best_streak: gam?.best_streak ?? 0,
+      vs_previous_week: prevReport
+        ? {
+            completion_rate: completionRate - prevReport.completion_rate,
+            total_xp: totalXp - prevReport.total_xp,
+            pillar_scores: prevPillars
+              ? Object.fromEntries(
+                  PILLARS.map((p) => [p, pillarTotals[p] - (prevPillars[p] ?? 0)]),
+                )
+              : null,
+          }
+        : null,
+      forecast: {
+        predicted_score: predictedScore,
+        focus_pillars: ranked.slice(-2).reverse(),
+      },
     },
+  });
+
+  await deliver(admin, userId, {
+    type: 'weekly_report',
+    title: 'Your weekly report is ready',
+    body: `${completionRate}% of quests done, ${totalXp} XP. ${insights[0]?.suggestion ?? ''}`.trim(),
+    data: { week_start: from },
   });
 
   return `ok:${insights.length}`;

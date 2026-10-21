@@ -12,9 +12,9 @@ PrayerLock/
 │   ├── src/screens/   20 screens
 │   └── src/store/     Redux Toolkit (auth/theme/session state)
 ├── supabase/
-│   ├── migrations/    9 versioned SQL migrations (schema, RLS, RPCs, cron)
-│   ├── functions/     Edge Functions (coach, generate-quests, notify-friend,
-│   │                  weekly-insights, delete-account)
+│   ├── migrations/    10 versioned SQL migrations (schema, RLS, RPCs, cron)
+│   ├── functions/     Edge Functions (coach, coach-nudges, generate-quests,
+│   │                  notify-friend, weekly-insights, delete-account)
 │   └── seed.sql       100 predefined quests + 15-badge catalog
 ├── tests/e2e.ps1      16-assertion end-to-end suite (3 flows + RLS proofs)
 ├── preview.html       Static avatar art preview (open in a browser)
@@ -86,21 +86,36 @@ powershell -File tests\e2e.ps1
   breathing/blink, level-locked items, randomize + undo/redo.
   Optional real photo (crop/compress/upload to Storage) with mode toggle.
 - **Quests:** 15/day (10 predefined + 5 AI "Coach picks" personalized by
-  goals/hobbies/religion), no consecutive-day repeats, 3 skips/day,
-  10-second undo, XP fully server-side (base + time + streak bonus, 500/day cap).
+  goals/hobbies/religion), no consecutive-day repeats, 3 skips/day (a
+  skipped quest returns the next day), 10-second undo (server allows 15 s
+  for latency; undo also rolls back that day's streak bump), XP fully
+  server-side: base + 5 before 6 PM local + streak bonus (+10/streak day,
+  max +100, once per day), 500/day cap.
+- **Daily Life Score:** average of the five pillar percentages; skipped
+  quests leave the denominator.
 - **Coach:** Groq LLM with intent routing — crisis, health symptoms and
   out-of-scope (medical/legal/financial) are deterministic safety paths;
-  everything else gets your real goals/scores/streak injected. 20 msgs/day
-  server-side, thumbs feedback, regenerate, quick replies.
+  everything else gets your real goals/scores/streak/missed quests
+  injected, plus the last 20 messages. 20 msgs/day server-side, 500-char
+  input, 200-char replies, thumbs feedback, regenerate, quick replies.
+- **Notifications:** in-app notification center (bell on Today, 3 s
+  banner, mark read, clear all) + push. Hourly coach nudges: missed quest
+  at 6 PM, streak at risk, neglected pillar (<30% over 3 days), repeated
+  misses (3 days in a row); level-ups, badges and titles land instantly.
+  Max 3 pushes/day, 8 AM-10 PM local by default, opt-out per type.
 - **Friends:** username search, requests with realtime inbox, accept/decline,
   unfriend/block, invite links with auto-connect, weekly XP leaderboard,
   privacy toggle, push via Expo (quiet hours + opt-outs enforced).
 - **Insights:** 12 charts (radar overlays, trend lines, XP bars w/ cap,
   stacked pillars, donut, 12-week heatmap, weekday performance, hour
   histogram, streak timeline, funnel, level journey) + weekly AI pattern
-  insights (Sunday cron).
+  insights and report (Sunday cron): best/worst pillar, change vs the
+  previous week, streak, next-week score forecast and focus pillars.
 - **Gamification:** level curve `500·N` per level (one shared TS+SQL formula,
-  23 unit tests), 5 titles, 15 badges evaluated server-side, streak freeze
+  23 unit tests), 5 level titles + 5 pillar titles (Fitness Warrior, Family
+  First, Deep Worker, Adventurer, Prayer Master) with unlock dates and
+  progress, all 15 badges evaluated server-side (AI quests are classified
+  by title for prayer/workout/parents/deep-work badges), streak freeze
   (1/week).
 
 ## Known flags

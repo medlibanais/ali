@@ -28,6 +28,7 @@ export type MainTabParamList = {
 export type AppStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Achievements: undefined;
+  Notifications: undefined;
   NotificationSettings: undefined;
   TermsOfService: undefined;
   PrivacyPolicy: undefined;

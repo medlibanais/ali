@@ -1,17 +1,15 @@
-// notify-friend: push delivery for friend events via the Expo push API
-// (works with ExponentPushToken; FCM/APNs sit behind it on device).
-// Respects per-user preferences: push_enabled, type toggles, quiet hours,
-// and the max-per-day cap. Never notifies blocked pairs.
+// notify-friend: friend events into the notification center + push
+// (see _shared/push.ts for opt-outs, quiet hours and the daily cap).
+// Never notifies blocked pairs.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { deliver } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
-
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 type NotifyType = 'friend_request' | 'friend_accepted' | 'friend_streak_milestone';
 
@@ -95,71 +93,14 @@ Deno.serve(async (req: Request) => {
       if (block) return json({ delivered: false, reason: 'blocked' }, 200);
     }
 
-    // Preferences: push on + type toggle on.
-    const { data: prefs } = await admin
-      .from('notification_preferences')
-      .select('*')
-      .eq('user_id', recipientId)
-      .maybeSingle();
-    const pushOn = prefs?.push_enabled !== false;
-    const typeOn =
-      type === 'friend_request' || type === 'friend_accepted'
-        ? prefs?.friend_requests !== false
-        : true;
-    if (!pushOn || !typeOn) {
-      return json({ delivered: false, reason: 'opted_out' }, 200);
-    }
-
-    // Quiet hours in the recipient's timezone.
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('timezone')
-      .eq('id', recipientId)
-      .maybeSingle();
-    const tz = profile?.timezone ?? 'UTC';
-    const { data: hourRow } = await admin
-      .rpc('hour_in_tz', { p_tz: tz })
-      .maybeSingle();
-    const hour = (hourRow as unknown as number) ?? new Date().getUTCHours();
-    const quietStart = parseInt((prefs?.quiet_start ?? '22:00').slice(0, 2), 10);
-    const quietEnd = parseInt((prefs?.quiet_end ?? '08:00').slice(0, 2), 10);
-    const inQuiet =
-      quietStart > quietEnd
-        ? hour >= quietStart || hour < quietEnd
-        : hour >= quietStart && hour < quietEnd;
-    if (inQuiet) {
-      return json({ delivered: false, reason: 'quiet_hours' }, 200);
-    }
-
-    const { data: tokens } = await admin
-      .from('device_tokens')
-      .select('token')
-      .eq('user_id', recipientId);
-    const list = (tokens ?? []).map((t: { token: string }) => t.token);
-    if (list.length === 0) {
-      return json({ delivered: false, reason: 'no_devices' }, 200);
-    }
-
-    const messages = list.map((to: string) => ({
-      to,
+    // Center + push with type opt-outs, quiet hours and the daily cap.
+    const result = await deliver(admin, recipientId, {
+      type,
       title,
       body: message,
-      sound: 'default',
-      data: { type },
-    }));
-
-    const pushResponse = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(messages),
+      data: otherId ? { other_user_id: otherId } : {},
     });
-    const pushBody = await pushResponse.json();
-    const tickets = pushBody?.data ?? [];
-    const sent = tickets.filter(
-      (t: { status?: string }) => t.status === 'ok',
-    ).length;
-
-    return json({ delivered: sent > 0, sent, total: list.length }, 200);
+    return json(result, 200);
   } catch (e) {
     return json(
       { error: 'internal', message: e instanceof Error ? e.message : 'error' },

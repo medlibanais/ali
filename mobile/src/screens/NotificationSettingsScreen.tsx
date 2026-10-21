@@ -17,6 +17,8 @@ interface Prefs {
   quest_reminders: boolean;
   streak_risk: boolean;
   coach_messages: boolean;
+  low_pillar: boolean;
+  behavior_patterns: boolean;
   weekly_report: boolean;
   quiet_start: string;
   quiet_end: string;
@@ -29,6 +31,8 @@ const DEFAULT_PREFS: Prefs = {
   quest_reminders: true,
   streak_risk: true,
   coach_messages: true,
+  low_pillar: true,
+  behavior_patterns: true,
   weekly_report: true,
   quiet_start: '22:00',
   quiet_end: '08:00',
@@ -37,9 +41,11 @@ const DEFAULT_PREFS: Prefs = {
 
 const TYPE_ROWS: { key: keyof Prefs; label: string }[] = [
   { key: 'friend_requests', label: 'Friend requests' },
-  { key: 'quest_reminders', label: 'Quest reminders' },
+  { key: 'quest_reminders', label: 'Missed quest at 6 PM' },
   { key: 'streak_risk', label: 'Streak at risk' },
-  { key: 'coach_messages', label: 'Coach messages' },
+  { key: 'low_pillar', label: 'Neglected pillar' },
+  { key: 'behavior_patterns', label: 'Patterns the coach notices' },
+  { key: 'coach_messages', label: 'Level-ups' },
   { key: 'weekly_report', label: 'Weekly report' },
 ];
 
@@ -114,6 +120,8 @@ export function NotificationSettingsScreen() {
           quest_reminders: next.quest_reminders,
           streak_risk: next.streak_risk,
           coach_messages: next.coach_messages,
+          low_pillar: next.low_pillar,
+          behavior_patterns: next.behavior_patterns,
           weekly_report: next.weekly_report,
           quiet_start: next.quiet_start,
           quiet_end: next.quiet_end,

@@ -33,6 +33,8 @@ export interface DailyQuestsResponse {
 export interface CompleteQuestResponse {
   quest_id: string;
   xp_awarded: number;
+  time_bonus?: number;
+  streak_bonus?: number;
   total_xp: number;
   level: number;
   level_up: boolean;

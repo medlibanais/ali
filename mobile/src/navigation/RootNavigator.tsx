@@ -22,6 +22,8 @@ import QuestDetailScreen from '../screens/QuestDetailScreen';
 import TimezonePickerScreen from '../screens/TimezonePickerScreen';
 import EditPhotoScreen from '../screens/EditPhotoScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import { useNotificationBanner } from '../features/notifications/api';
 import MainTabs from './MainTabs';
 import type {
   AppStackParamList,
@@ -100,6 +102,7 @@ function OnboardingNavigator() {
 
 function AppNavigator() {
   useTheme();
+  useNotificationBanner();
   return (
     <AppStack.Navigator screenOptions={titledOptions}>
       <AppStack.Screen
@@ -113,9 +116,14 @@ function AppNavigator() {
         options={{ title: 'Achievements' }}
       />
       <AppStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notifications' }}
+      />
+      <AppStack.Screen
         name="NotificationSettings"
         component={NotificationSettingsScreen}
-        options={{ title: 'Notifications' }}
+        options={{ title: 'Notification settings' }}
       />
       <AppStack.Screen
         name="TermsOfService"

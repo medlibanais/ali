@@ -94,7 +94,9 @@ export const fetchGamification = createAsyncThunk<
     if (gamRes.error) throw gamRes.error;
     const g = gamRes.data;
 
-    const today = new Date().toISOString().slice(0, 10);
+    // xp_today_date is the user's local date; compare against local, not UTC.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
     const xpToday = g?.xp_today_date === today ? g?.xp_today ?? 0 : 0;
 
     const achievements: Achievement[] = (

@@ -2,7 +2,7 @@
 // Two entry modes:
 //   - on-demand: authenticated user generates for their own today
 //   - nightly:   cron secret generates tomorrow's quests for all users
-// On success it converts up to AI_TARGET uncompleted predefined quests of
+// On success it converts up to AI_TARGET untouched predefined quests of
 // the day into AI ones, keeping the day at ~15 quests with a real mix.
 // JSON output is schema-validated; one retry; failures log 'fallback'.
 
@@ -264,18 +264,36 @@ async function generateForUser(
     return `failed:${insertError.message}`;
   }
 
-  // Convert the mix: drop the same number of uncompleted predefined quests
-  // so the day stays at ~15 with real AI representation.
+  // Convert the mix: drop the same number of untouched predefined quests
+  // so the day stays at ~15 with real AI representation. Completed or
+  // skipped quests stay (deleting one would erase its completion while
+  // its XP remains). Carried-over skips (priority 0) stay too. On nightly
+  // runs the day has no predefined quests yet; assign_daily_quests fills
+  // around the AI quests when the user opens the app.
   const aiCount = inserted?.length ?? 0;
   const { data: predefinedToday } = await admin
     .from('quests')
-    .select('id')
+    .select('id, skipped, priority, quest_completions(id, undone_at)')
     .eq('user_id', userId)
     .eq('assigned_date', target)
     .eq('is_ai_generated', false)
-    .order('priority', { ascending: false })
-    .limit(aiCount);
-  const dropIds = (predefinedToday ?? []).map((q: { id: string }) => q.id);
+    .order('priority', { ascending: false });
+  const dropIds = (
+    (predefinedToday ?? []) as {
+      id: string;
+      skipped: boolean;
+      priority: number;
+      quest_completions: { id: string; undone_at: string | null }[];
+    }[]
+  )
+    .filter(
+      (q) =>
+        !q.skipped &&
+        q.priority > 0 &&
+        !(q.quest_completions ?? []).some((c) => c.undone_at === null),
+    )
+    .slice(0, aiCount)
+    .map((q) => q.id);
   if (dropIds.length > 0) {
     await admin.from('quests').delete().in('id', dropIds);
   }

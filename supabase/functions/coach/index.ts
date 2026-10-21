@@ -15,7 +15,8 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 20;
 const INPUT_MAX = 500;
-const OUTPUT_MAX_CHARS = 300;
+const OUTPUT_MAX_CHARS = 200; // SRS FR-5.1: 200-character replies
+const HISTORY_TURNS = 20; // SRS FR-5.1: last 20 messages as context
 
 const BANNED_RE =
   /(you should|you must|you failed|you are weak|you'?re lazy|shame on you|take \d+\s?(mg|ml)|i diagnose|you have (adhd|depression|covid|flu|diabetes))/i;
@@ -113,7 +114,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- context for the LLM (and for the UI badge) ----
-    const [goalsRes, gamRes, scoreRes, badgesRes, historyRes] =
+    const weekAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 7 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const [goalsRes, gamRes, scoreRes, badgesRes, historyRes, weekRes] =
       await Promise.all([
         admin.from('user_goals').select('*').eq('user_id', user.id).maybeSingle(),
         admin.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
@@ -134,7 +138,13 @@ Deno.serve(async (req: Request) => {
           .select('role, content')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })
-          .limit(5),
+          .limit(HISTORY_TURNS),
+        admin
+          .from('quests')
+          .select('skipped, quest_completions(id, undone_at)')
+          .eq('user_id', user.id)
+          .gte('assigned_date', weekAgo)
+          .lt('assigned_date', today),
       ]);
 
     const goals = goalsRes.data ?? {};
@@ -143,6 +153,17 @@ Deno.serve(async (req: Request) => {
     const level: number = gam.level ?? 1;
     const dailyScore: number = score.overall ?? 0;
     const streak: number = gam.current_streak ?? 0;
+    // Missed this week: past days' quests neither completed nor skipped.
+    const missedThisWeek = (
+      (weekRes.data ?? []) as {
+        skipped: boolean;
+        quest_completions: { id: string; undone_at: string | null }[];
+      }[]
+    ).filter(
+      (q) =>
+        !q.skipped &&
+        !(q.quest_completions ?? []).some((c) => c.undone_at === null),
+    ).length;
 
     const contextUsed = {
       user_level: level,
@@ -164,6 +185,7 @@ Deno.serve(async (req: Request) => {
         gam,
         score,
         (badgesRes.data ?? []).map((b: { badge_id: string }) => b.badge_id),
+        missedThisWeek,
       );
       const history: ChatTurn[] = (historyRes.data ?? [])
         .reverse()
@@ -232,11 +254,12 @@ function buildSystemPrompt(
   gam: Record<string, unknown>,
   score: Record<string, unknown>,
   badges: string[],
+  missedThisWeek: number,
 ): string {
   const pillarLine = `Health ${score.health ?? 0}%, Family ${score.family ?? 0}%, Work ${score.work ?? 0}%, Fun ${score.fun ?? 0}%, Spirituality ${score.spirituality ?? 0}%`;
   return `You are ${firstName}'s Future Self. You already live the life they are building toward: ${goals.workouts_per_week ?? 3} workouts a week, ${goals.sleep_target_hours ?? 8}h sleep, ${goals.deep_work_hours_per_week ?? 20}h deep work toward "${goals.career_goal ?? 'their goal'}", strong family bonds, and a steady spiritual practice${goals.religion ? ` (${goals.religion})` : ''}.
 
-Their reality today: level ${gam.level ?? 1}, daily score ${score.overall ?? 0}%, streak ${gam.current_streak ?? 0} days, pillars: ${pillarLine}. Recent badges: ${badges.length ? badges.join(', ') : 'none yet'}.
+Their reality today: level ${gam.level ?? 1}, daily score ${score.overall ?? 0}%, streak ${gam.current_streak ?? 0} days, missed quests this week: ${missedThisWeek}, pillars: ${pillarLine}. Recent badges: ${badges.length ? badges.join(', ') : 'none yet'}.
 
 RULES:
 - Speak as their Future Self: "we", "us", "our" — never "you should".
