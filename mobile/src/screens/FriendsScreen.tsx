@@ -35,7 +35,7 @@ import {
   type SearchHit,
   type UserSearchResult,
 } from '../features/friends/api';
-import { displayName, friendsOnly, rankLeaderboard } from '../features/friends/logic';
+import { displayName, friendsOnly, inviteMessage, rankLeaderboard } from '../features/friends/logic';
 import { pluralize, streakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
@@ -132,11 +132,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
 
   const shareInvite = async () => {
     const code = myProfile?.invite_code ?? '';
-    const link = `prayerlock://add-friend?code=${code}`;
     try {
-      await Share.share({
-        message: `Become who you want to be with me on PrayerLock. Add me with my code ${code}: ${link}`,
-      });
+      await Share.share({ message: inviteMessage(code) });
     } catch {
       toast.showToast({ message: 'Sharing is not available on this device.' });
     }

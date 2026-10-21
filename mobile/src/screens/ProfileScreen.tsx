@@ -28,10 +28,12 @@ import {
   HelpGlyph,
   PencilGlyph,
   SettingsGlyph,
+  ShareGlyph,
   ShieldCheckGlyph,
   SparklesGlyph,
   UserGlyph,
 } from '../components/icons';
+import ShareProfileSheet from '../features/share/ShareProfileSheet';
 import { bestStreakLabel } from '../lib/format';
 import { levelProgress, xpToNextLevel } from '../lib/levels';
 import { supabase } from '../lib/supabase';
@@ -159,6 +161,7 @@ export function ProfileScreen({ navigation }: Props) {
   const questsState = useAppSelector((state) => state.quests);
   const [exporting, setExporting] = useState(false);
   const [openSection, setOpenSection] = useState<SectionKey | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     dispatch(fetchProfile());
@@ -359,17 +362,31 @@ export function ProfileScreen({ navigation }: Props) {
                   {`Level ${gamification.level} · ${title}`}
                 </Txt>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => navigation.navigate('AvatarCreator')}
-                hitSlop={8}
-                style={({ pressed }) => [styles.inline, pressed && styles.pressed]}
-              >
-                <Txt variant="label" color={colors.accent} style={styles.editText}>
-                  Edit profile
-                </Txt>
-                <PencilGlyph size={15} />
-              </Pressable>
+              <View style={styles.identityActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('AvatarCreator')}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.inline, pressed && styles.pressed]}
+                >
+                  <Txt variant="label" color={colors.accent} style={styles.editText}>
+                    Edit profile
+                  </Txt>
+                  <PencilGlyph size={15} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Share profile"
+                  onPress={() => setSharing(true)}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.inline, pressed && styles.pressed]}
+                >
+                  <Txt variant="label" color={colors.accent} style={styles.editText}>
+                    Share
+                  </Txt>
+                  <ShareGlyph size={16} />
+                </Pressable>
+              </View>
             </View>
           </FadeInUp>
 
@@ -598,6 +615,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </>
       )}
+      <ShareProfileSheet visible={sharing} onClose={() => setSharing(false)} />
     </Screen>
   );
 }
@@ -641,6 +659,12 @@ const styles = themed(() =>
     },
     editText: {
       marginRight: 6,
+    },
+    identityActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      columnGap: spacing.lg,
+      rowGap: spacing.xs,
     },
     growth: {
       marginTop: spacing.xl,

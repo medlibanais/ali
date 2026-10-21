@@ -100,7 +100,7 @@ function OnboardingNavigator() {
       <OnboardingStack.Screen
         name="AvatarCreator"
         component={AvatarCreatorScreen}
-        options={{ title: 'Your future self' }}
+        options={{ title: 'Your future self', headerShown: false }}
       />
     </OnboardingStack.Navigator>
   );
@@ -154,7 +154,7 @@ function AppNavigator() {
       <AppStack.Screen
         name="AvatarCreator"
         component={AvatarCreatorScreen}
-        options={{ title: 'Your avatar' }}
+        options={{ title: 'Your avatar', headerShown: false }}
       />
       <AppStack.Screen
         name="AiAvatar"

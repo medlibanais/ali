@@ -8,6 +8,7 @@ export type BodyBuild = 'slim' | 'athletic' | 'average' | 'curvy' | 'broad';
 export type BodyHeight = 'short' | 'medium' | 'tall';
 export type BodyPose = 'standing' | 'hip' | 'arms-crossed' | 'wave';
 export type ShoeStyle = 'sneakers' | 'boots' | 'sandals' | 'barefoot';
+export type BottomsStyle = 'pants' | 'joggers' | 'shorts' | 'skirt';
 
 export interface AvatarConfig {
   face: string; // 8 face shapes
@@ -27,6 +28,7 @@ export interface AvatarConfig {
   bodyBuild: BodyBuild;
   height: BodyHeight;
   pose: BodyPose;
+  bottoms: BottomsStyle;
   pantsColor: string; // palette key
   shoes: ShoeStyle;
   shoesColor: string; // palette key
@@ -50,6 +52,7 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   bodyBuild: 'average',
   height: 'medium',
   pose: 'standing',
+  bottoms: 'pants',
   pantsColor: 'navy',
   shoes: 'sneakers',
   shoesColor: 'charcoal',

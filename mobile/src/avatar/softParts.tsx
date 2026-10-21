@@ -33,7 +33,7 @@ export interface PartKit {
 
 // ---------------------------------------------------------------- head
 
-interface FaceShape {
+export interface FaceShape {
   rx: number;
   ry: number;
   /** Bezier handle factors: upper half (forehead) and lower half (jaw). */

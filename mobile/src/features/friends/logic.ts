@@ -91,3 +91,12 @@ export function inviteResultText(reason: string | undefined): string {
   if (reason === 'already_connected') return 'You are already connected.';
   return 'That code is not valid.';
 }
+
+/** Deep link that opens the app on "add friend" with the code filled in. */
+export function inviteLink(code: string): string {
+  return `prayerlock://add-friend?code=${encodeURIComponent(code)}`;
+}
+
+export function inviteMessage(code: string): string {
+  return `Become who you want to be with me on PrayerLock. Add me with my code ${code}: ${inviteLink(code)}`;
+}

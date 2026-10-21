@@ -86,7 +86,14 @@ export const CATEGORIES: Category[] = [
       { id: 'arms-crossed', label: 'Arms crossed', minLevel: 5 },
       { id: 'wave', label: 'Waving', minLevel: 8 },
     ] },
-  { key: 'pantsColor', label: 'Pants color', kind: 'color',
+  { key: 'bottoms', label: 'Bottoms', kind: 'shape',
+    options: [
+      { id: 'pants', label: 'Pants' },
+      { id: 'joggers', label: 'Joggers' },
+      { id: 'shorts', label: 'Shorts' },
+      { id: 'skirt', label: 'Skirt' },
+    ] },
+  { key: 'pantsColor', label: 'Bottoms color', kind: 'color',
     options: OUTFIT_COLORS.map((c) => ({ id: c.id, label: c.label, swatch: c.value })) },
   { key: 'shoes', label: 'Shoes', kind: 'shape',
     options: [
@@ -127,6 +134,7 @@ const ALL: string[] = [
   'slim', 'athletic', 'average', 'curvy', 'broad',
   'short', 'medium', 'tall',
   'standing', 'hip', 'arms-crossed', 'wave',
+  'pants', 'joggers', 'shorts', 'skirt',
   'sneakers', 'boots', 'sandals', 'barefoot',
   ...BG_STYLES.map((o) => o.id),
 ];
@@ -150,3 +158,34 @@ export function optionLocked(option: OptionItem, level: number): boolean {
 }
 
 export const TOTAL_OPTIONS = ALL.length;
+
+/**
+ * Editor tabs: related categories share a tab (a style and its color),
+ * and each tab says which view of the avatar shows its choices best.
+ */
+export interface EditorGroup {
+  key: string;
+  label: string;
+  categories: (keyof AvatarConfig)[];
+  view: 'head' | 'full-body';
+}
+
+export const EDITOR_GROUPS: EditorGroup[] = [
+  { key: 'face', label: 'Face', categories: ['face', 'skin'], view: 'head' },
+  { key: 'hair', label: 'Hairstyle', categories: ['hair', 'hairColor'], view: 'head' },
+  { key: 'eyes', label: 'Eyes', categories: ['eyes', 'brows'], view: 'head' },
+  { key: 'mouth', label: 'Nose & mouth', categories: ['nose', 'mouth'], view: 'head' },
+  { key: 'beard', label: 'Beard', categories: ['facialHair'], view: 'head' },
+  { key: 'extras', label: 'Glasses & hats', categories: ['glasses', 'headwear'], view: 'head' },
+  { key: 'outfit', label: 'Outfit', categories: ['outfit', 'outfitColor'], view: 'full-body' },
+  { key: 'bottoms', label: 'Bottoms', categories: ['bottoms', 'pantsColor'], view: 'full-body' },
+  { key: 'shoes', label: 'Shoes', categories: ['shoes', 'shoesColor'], view: 'full-body' },
+  { key: 'body', label: 'Body', categories: ['bodyBuild', 'height', 'pose'], view: 'full-body' },
+  { key: 'bg', label: 'Background', categories: ['bg'], view: 'head' },
+];
+
+export function categoryFor(key: keyof AvatarConfig): Category {
+  const found = CATEGORIES.find((c) => c.key === key);
+  if (!found) throw new Error(`Unknown avatar category ${key}`);
+  return found;
+}
