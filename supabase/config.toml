@@ -391,6 +391,17 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# The coach and avatar functions check the caller themselves
+# (auth.getUser() with the request's token), so the gateway JWT check is
+# off for them. The gateway check can reject valid sessions on projects
+# that use the newer asymmetric JWT signing keys, and then both features
+# fail with a 401 before any of our code runs.
+[functions.coach]
+verify_jwt = false
+
+[functions.generate-avatar]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

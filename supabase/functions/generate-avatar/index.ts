@@ -5,7 +5,7 @@
 // the SVG avatar in place, so the client can always fall back.
 // Key comes ONLY from Edge Function env (FAL_KEY) — never from the client.
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +17,9 @@ const BUCKET = 'profile-photos';
 const DAILY_LIMIT = 5; // generations per rolling 24 h (cost control)
 const MAX_INPUT_CHARS = 1_400_000; // ~1 MB JPEG as base64
 const PROVIDER_TIMEOUT_MS = 55_000;
+const DOWNLOAD_TIMEOUT_MS = 15_000;
+// Overridable so local runs can point at a mock; production uses fal.ai.
+const DEFAULT_FAL_BASE_URL = 'https://fal.run';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -32,7 +35,12 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const falKey = Deno.env.get('FAL_KEY');
     const model = Deno.env.get('AVATAR_MODEL') ?? 'fal-ai/flux-pro/kontext';
-    if (!falKey) return json({ error: 'not_configured' }, 503);
+    if (!falKey) {
+      console.error('generate-avatar not configured: FAL_KEY is not set');
+      return json({ error: 'not_configured' }, 503);
+    }
+    const falBaseUrl = (Deno.env.get('FAL_BASE_URL') || DEFAULT_FAL_BASE_URL)
+      .replace(/\/+$/, '');
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -87,7 +95,7 @@ Deno.serve(async (req: Request) => {
     const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
     let resultUrl = '';
     try {
-      const response = await fetch(`https://fal.run/${model}`, {
+      const response = await fetch(`${falBaseUrl}/${model}`, {
         method: 'POST',
         headers: {
           Authorization: `Key ${falKey}`,
@@ -106,14 +114,30 @@ Deno.serve(async (req: Request) => {
       if (!response.ok) {
         const text = await response.text();
         await logAttempt(admin, user.id, false, started, `fal_${response.status}: ${text.slice(0, 200)}`);
-        return json({ error: 'generation_failed' }, 502);
+        console.error('generate-avatar provider error', response.status, text.slice(0, 200));
+        // 401/403: the FAL_KEY is wrong or out of credit; 422: fal rejected
+        // the input (often its content filter). Both are worth telling apart.
+        const error = response.status === 401 || response.status === 403
+          ? 'provider_auth'
+          : response.status === 422
+            ? 'rejected'
+            : 'generation_failed';
+        return json({ error }, 502);
       }
       const result = await response.json();
       resultUrl = result?.images?.[0]?.url ?? '';
+      // fal flags NSFW output with a black image instead of failing.
+      if (result?.has_nsfw_concepts?.[0] === true) {
+        await logAttempt(admin, user.id, false, started, 'nsfw_filtered');
+        return json({ error: 'rejected' }, 502);
+      }
     } catch (e) {
       const aborted = e instanceof DOMException && e.name === 'AbortError';
       await logAttempt(admin, user.id, false, started, aborted ? 'timeout' : String(e).slice(0, 200));
-      return json({ error: aborted ? 'timeout' : 'generation_failed' }, 504);
+      return json(
+        { error: aborted ? 'timeout' : 'generation_failed' },
+        aborted ? 504 : 502,
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -123,12 +147,20 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- copy into our Storage (provider URLs are not permanent) ----
-    const imageResponse = await fetch(resultUrl);
-    if (!imageResponse.ok) {
-      await logAttempt(admin, user.id, false, started, `download_${imageResponse.status}`);
+    let bytes: Uint8Array;
+    try {
+      const imageResponse = await fetch(resultUrl, {
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+      });
+      if (!imageResponse.ok) {
+        await logAttempt(admin, user.id, false, started, `download_${imageResponse.status}`);
+        return json({ error: 'generation_failed' }, 502);
+      }
+      bytes = new Uint8Array(await imageResponse.arrayBuffer());
+    } catch (e) {
+      await logAttempt(admin, user.id, false, started, `download: ${String(e).slice(0, 180)}`);
       return json({ error: 'generation_failed' }, 502);
     }
-    const bytes = new Uint8Array(await imageResponse.arrayBuffer());
     const path = `${user.id}/ai-avatar.jpg`;
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
@@ -189,7 +221,8 @@ function buildPrompt(dreamBody: string | null, personality: string[]): string {
 }
 
 async function logAttempt(
-  admin: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  admin: SupabaseClient<any, any, any>,
   userId: string,
   ok: boolean,
   started: number,

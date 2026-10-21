@@ -3,7 +3,8 @@
 // deterministic; everything else goes to Groq with the user's goals, today's
 // quests, a 7-day trend and the conversation injected (prompt lives in
 // _shared/coachText.ts). 20 messages/day, enforced here — never trust the
-// client counter.
+// client counter, and count it across all of the user's conversations so
+// starting a new chat does not reset it.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -11,7 +12,7 @@ import {
   isDeterministic,
   safetyResponse,
 } from '../_shared/intents.ts';
-import { callGroq, type ChatTurn } from '../_shared/llm.ts';
+import { callGroq, type ChatTurn, hasGroqKey } from '../_shared/llm.ts';
 import {
   buildSystemPrompt,
   type CoachContext,
@@ -33,6 +34,7 @@ const corsHeaders = {
 const DAILY_LIMIT = 20;
 const INPUT_MAX = 500;
 const HISTORY_TURNS = 20; // SRS FR-5.1: last 20 messages as context
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -57,15 +59,34 @@ Deno.serve(async (req: Request) => {
     if (userError || !user) return json({ error: 'invalid_session' }, 401);
 
     let message = '';
+    let requestedConversation: string | null = null;
     try {
       const body = await req.json();
       message = typeof body?.message === 'string' ? body.message.trim() : '';
+      if (body?.conversation_id != null) {
+        if (
+          typeof body.conversation_id !== 'string' ||
+          !UUID_RE.test(body.conversation_id)
+        ) {
+          return json({ error: 'invalid_conversation' }, 400);
+        }
+        requestedConversation = body.conversation_id;
+      }
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
     if (message.length === 0) return json({ error: 'empty_message' }, 400);
     if (message.length > INPUT_MAX) {
       return json({ error: 'message_too_long', max: INPUT_MAX }, 400);
+    }
+
+    // Safety replies are rule-based and always work. Anything that needs the
+    // model fails loudly when the key is missing, instead of quietly
+    // answering with canned text that looks like a broken coach.
+    const intent = classifyIntent(message);
+    if (!isDeterministic(intent) && !hasGroqKey()) {
+      console.error('coach not configured: GROQ_API_KEY is not set');
+      return json({ error: 'not_configured' }, 503);
     }
 
     // Service client for rate limiting + writes (user already authenticated).
@@ -89,28 +110,44 @@ Deno.serve(async (req: Request) => {
     const dayStart = bounds?.day_start ?? `${today}T00:00:00Z`;
     const dayEnd = bounds?.day_end ?? `${today}T23:59:59.999Z`;
 
-    const { data: conversation } = await admin
-      .from('conversations')
-      .select('id')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // The client names the chat it is showing (it can start new ones);
+    // otherwise use the newest. Ownership is checked because this client
+    // bypasses RLS.
+    const ownConversations = () =>
+      admin.from('conversations').select('id').eq('user_id', user.id);
+    const { data: conversation, error: conversationError } =
+      requestedConversation
+        ? await ownConversations().eq('id', requestedConversation).maybeSingle()
+        : await ownConversations()
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+    if (conversationError) {
+      console.error('coach conversation lookup', conversationError.message);
+      return json({ error: 'storage_failed' }, 500);
+    }
+    if (requestedConversation && !conversation) {
+      return json({ error: 'conversation_not_found' }, 404);
+    }
 
     let conversationId = conversation?.id as string | undefined;
     if (!conversationId) {
-      const { data: created } = await admin
+      const { data: created, error: createError } = await admin
         .from('conversations')
         .insert({ user_id: user.id })
         .select('id')
         .single();
-      conversationId = created?.id;
+      if (createError || !created) {
+        console.error('coach conversation create', createError?.message);
+        return json({ error: 'storage_failed' }, 500);
+      }
+      conversationId = created.id as string;
     }
 
     const { count: sentToday } = await admin
       .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('conversation_id', conversationId)
+      .select('id, conversations!inner(user_id)', { count: 'exact', head: true })
+      .eq('conversations.user_id', user.id)
       .eq('role', 'user')
       .gte('created_at', dayStart)
       .lt('created_at', dayEnd);
@@ -259,9 +296,9 @@ Deno.serve(async (req: Request) => {
     };
 
     // ---- intent routing: safety first, LLM second ----
-    const intent = classifyIntent(message);
     let reply: string;
     let model = 'safety-rules';
+    let degraded = false;
 
     if (isDeterministic(intent)) {
       reply = safetyResponse(intent);
@@ -299,25 +336,36 @@ Deno.serve(async (req: Request) => {
       } else {
         // Graceful, still-personal fallback when the model is unreachable.
         reply = fallbackReply(ctx);
+        degraded = true;
         model = `fallback(${llm.ok ? 'filtered' : llm.error ?? 'unknown'})`;
         console.error('coach llm fallback', model);
       }
     }
 
     // ---- persist both messages ----
-    const { data: userRow } = await admin
+    const { data: userRow, error: userInsertError } = await admin
       .from('messages')
       .insert({ conversation_id: conversationId, role: 'user', content: message })
       .select('id, content, created_at')
       .single();
-    const { data: aiRow } = await admin
-      .from('messages')
-      .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
-      .select('id, content, created_at')
-      .single();
+    const { data: aiRow, error: aiInsertError } = userRow
+      ? await admin
+        .from('messages')
+        .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
+        .select('id, content, created_at')
+        .single()
+      : { data: null, error: null };
+    if (!userRow || !aiRow) {
+      console.error(
+        'coach message insert',
+        userInsertError?.message ?? aiInsertError?.message,
+      );
+      return json({ error: 'storage_failed' }, 500);
+    }
 
     return json(
       {
+        conversation_id: conversationId,
         user_message: userRow,
         ai_message: aiRow,
         remaining_today: DAILY_LIMIT - (sentToday ?? 0) - 1,
@@ -325,6 +373,9 @@ Deno.serve(async (req: Request) => {
         suggestions: suggestions(ctx),
         intent,
         model,
+        // True when the model was unreachable and this is the rule-based
+        // stand-in reply, so the app can say so.
+        degraded,
       },
       200,
     );

@@ -303,3 +303,42 @@ export function StarGlyph({ size = 14, color = colors.gold }: IconProps) {
     </Svg>
   );
 }
+
+/** Square with a pen: "new chat" / compose. */
+export function ComposeGlyph({ size = 22, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Path
+        d="M11 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V13"
+        stroke={color}
+        strokeWidth={STROKE + 0.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M17.6 3.9a1.9 1.9 0 0 1 2.7 2.7l-7.6 7.6-3.5.8.8-3.5 7.6-7.6Z"
+        stroke={color}
+        strokeWidth={STROKE + 0.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** Upward arrow used on the chat send button. */
+export function ArrowUpGlyph({ size = 20, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Path
+        d="M12 19.5v-15M5.5 11 12 4.5l6.5 6.5"
+        stroke={color}
+        strokeWidth={STROKE + 0.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

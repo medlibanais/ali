@@ -130,9 +130,36 @@ powershell -File tests\e2e.ps1
   SECURITY/handover notes); formula left exactly as specified until decided.
 - Push delivery requires a physical device (Expo push tokens are stored and
   the notify pipeline is fully tested up to the Expo API).
-- AI avatar needs a fal.ai key: `npx supabase secrets set FAL_KEY=...`
-  (locally: `FAL_KEY` in `supabase/.env.local`). Without it the app says
-  AI avatars are off and offers the hand-built avatar.
+- The coach and the AI avatar need server secrets, a deploy and the
+  migrations (see "Switching on the AI" below). Without a key the app now
+  says which one is missing instead of failing quietly.
+
+## Switching on the AI
+
+Run from the repo root, linked to your project (`npx supabase link`):
+
+```bash
+npx supabase db push                                   # migrations, incl. 0011_ai_avatar
+npx supabase secrets set GROQ_API_KEY=<groq key>       # coach  (console.groq.com/keys)
+npx supabase secrets set FAL_KEY=<fal key>             # avatar (fal.ai/dashboard/keys)
+npx supabase functions deploy coach generate-avatar    # redeploy after every merge
+npx supabase secrets list                              # check both names are there
+```
+
+`coach` and `generate-avatar` run with `verify_jwt = false` (set in
+`supabase/config.toml`) and check the session themselves, so they also work
+on projects that use the newer JWT signing keys. What the app shows when
+something is missing:
+
+| App message | Fix |
+| --- | --- |
+| "...missing its GROQ_API_KEY" / "...missing its FAL_KEY" | `secrets set`, as above |
+| "...function is not deployed" | `functions deploy coach generate-avatar` |
+| "The AI image service refused our key" | the fal key is wrong or out of credit |
+| "The AI could not be reached, so that reply came from your saved plan" | Groq was down or slow; the key is set |
+
+Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
+`FAL_BASE_URL` can point the functions at a mock server for offline tests.
 
 ## Security
 

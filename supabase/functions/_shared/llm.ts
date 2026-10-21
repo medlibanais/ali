@@ -26,6 +26,8 @@ export interface LlmOptions {
 }
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+// Overridable so local runs can point at a mock; production uses Groq.
+const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1';
 const DEFAULT_FALLBACK_MODEL = 'llama-3.3-70b-versatile';
 
 // gpt-oss (and other reasoning models) count hidden reasoning against
@@ -46,8 +48,9 @@ async function attempt(
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
   const reasoning = isReasoningModel(model);
   try {
+    const baseUrl = (Deno.env.get('GROQ_BASE_URL') || DEFAULT_BASE_URL).replace(/\/+$/, '');
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      `${baseUrl}/chat/completions`,
       {
         method: 'POST',
         signal: controller.signal,
@@ -108,6 +111,11 @@ async function attempt(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** False when the GROQ_API_KEY secret is not set on the project. */
+export function hasGroqKey(): boolean {
+  return Boolean(Deno.env.get('GROQ_API_KEY'));
 }
 
 export async function callGroq(
