@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   TextInput,
@@ -20,18 +19,23 @@ import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import {
   friendErrorText as errorText,
+  inviteResultText,
+  useBlockedUsers,
   useBlockUser,
+  useCircle,
   useFriendRequests,
-  useFriends,
   useRedeemInvite,
   useRespondRequest,
   useSendRequest,
+  useUnblockUser,
   useUnfriend,
   useUserSearch,
   type FriendRequest,
   type FriendRow,
+  type SearchHit,
   type UserSearchResult,
 } from '../features/friends/api';
+import { displayName, friendsOnly, rankLeaderboard } from '../features/friends/logic';
 import { pluralize, streakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
@@ -46,7 +50,7 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: 'find', label: 'Find' },
 ];
 
-function userToProfile(u: UserSearchResult | FriendRow) {
+function userToProfile(u: UserSearchResult) {
   return {
     photo_url: u.photo_url,
     avatar_mode: u.avatar_mode,
@@ -54,6 +58,13 @@ function userToProfile(u: UserSearchResult | FriendRow) {
     first_name: u.first_name,
   };
 }
+
+const SEARCH_ACTION: Record<SearchHit['relation'], string> = {
+  none: 'Add',
+  incoming: 'Accept',
+  outgoing: 'Requested',
+  friends: 'Friends',
+};
 
 export function FriendsScreen({ route }: { route?: { params?: { code?: string } } }) {
   useTheme();
@@ -64,41 +75,49 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const [query, setQuery] = useState('');
   const [inviteCode, setInviteCode] = useState(route?.params?.code ?? '');
 
-  const friends = useFriends();
+  const circle = useCircle();
   const requests = useFriendRequests();
   const search = useUserSearch(query);
+  const blocked = useBlockedUsers(section === 'find');
   const sendRequest = useSendRequest();
   const respond = useRespondRequest();
   const unfriend = useUnfriend();
   const block = useBlockUser();
+  const unblock = useUnblockUser();
   const redeem = useRedeemInvite();
+
+  const friends = useMemo(() => friendsOnly(circle.data ?? []), [circle.data]);
+  const leaderboard = useMemo(() => rankLeaderboard(circle.data ?? []), [circle.data]);
+  const privateCount = friends.filter((f) => !f.stats_shared).length;
 
   const incomingCount = (requests.data ?? []).filter(
     (r) => r.direction === 'incoming',
   ).length;
 
-  // Realtime: new/updated requests refresh the inbox instantly.
+  // Realtime: requests to you and answers to your requests refresh
+  // the lists instantly.
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) return;
+      if (!data.user || cancelled) return;
+      const refresh = () => queryClient.invalidateQueries({ queryKey: ['friends'] });
       channel = supabase
         .channel(`friendships:${data.user.id}`)
         .on(
           'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'friendships',
-            filter: `addressee=eq.${data.user.id}`,
-          },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['friends'] });
-          },
+          { event: '*', schema: 'public', table: 'friendships', filter: `addressee=eq.${data.user.id}` },
+          refresh,
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'friendships', filter: `requester=eq.${data.user.id}` },
+          refresh,
         )
         .subscribe();
     });
     return () => {
+      cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
@@ -110,12 +129,6 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
       setInviteCode(route.params.code);
     }
   }, [route?.params?.code]);
-
-  const leaderboard = useMemo(() => {
-    const rows = [...(friends.data ?? [])];
-    rows.sort((a, b) => b.weekly_xp - a.weekly_xp);
-    return rows;
-  }, [friends.data]);
 
   const shareInvite = async () => {
     const code = myProfile?.invite_code ?? '';
@@ -132,42 +145,86 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const redeemCode = async () => {
     const code = inviteCode.trim();
     if (code.length < 4) return;
-    const result = await redeem.mutateAsync(code);
-    if (result.redeemed) {
-      toast.showToast({ message: 'You are connected. Welcome to your circle.' });
-      setInviteCode('');
-    } else {
-      const reason =
-        result.reason === 'own_code'
-          ? 'That is your own code.'
-          : result.reason === 'already_connected'
-            ? 'You are already connected.'
-            : 'That code is not valid.';
-      toast.showToast({ message: reason });
+    try {
+      const result = await redeem.mutateAsync(code);
+      if (result.redeemed) {
+        toast.showToast({ message: 'You are connected. Welcome to your circle.' });
+        setInviteCode('');
+        setSection('friends');
+      } else {
+        toast.showToast({ message: inviteResultText(result.reason) });
+      }
+    } catch (e) {
+      toast.showToast({ message: errorText(e) });
     }
   };
 
+  const onError = (e: unknown) => toast.showToast({ message: errorText(e) });
+
   const confirmUnfriend = (friend: FriendRow) => {
-    Alert.alert('Unfriend', `Remove ${friend.first_name ?? friend.username} from your friends?`, [
+    Alert.alert('Unfriend', `Remove ${displayName(friend)} from your friends?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Unfriend',
         style: 'destructive',
-        onPress: () => unfriend.mutate(friend.friendship_id),
+        onPress: () => unfriend.mutate(friend.friendship_id, { onError }),
       },
     ]);
   };
 
   const confirmBlock = (userId: string, name: string) => {
-    Alert.alert('Block user', `Block ${name}? They will not find you in search.`, [
+    Alert.alert('Block user', `Block ${name}? They will not find you in search or be able to add you.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Block',
         style: 'destructive',
-        onPress: () => block.mutate(userId),
+        onPress: () => block.mutate(userId, { onError }),
       },
     ]);
   };
+
+  const friendOptions = (friend: FriendRow) =>
+    Alert.alert(displayName(friend), `@${friend.username}`, [
+      { text: 'Close', style: 'cancel' },
+      { text: 'Unfriend', style: 'destructive', onPress: () => confirmUnfriend(friend) },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: () => confirmBlock(friend.id, displayName(friend)),
+      },
+    ]);
+
+  const answer = (request: FriendRequest, accept: boolean) =>
+    respond.mutate(
+      { friendshipId: request.friendship_id, accept },
+      {
+        onSuccess: () =>
+          toast.showToast({
+            message: accept
+              ? `You and ${displayName(request.user)} are now friends.`
+              : 'Request declined.',
+          }),
+        onError,
+      },
+    );
+
+  const onSearchAction = (user: SearchHit) => {
+    if (user.relation !== 'none' && user.relation !== 'incoming') return;
+    sendRequest.mutate(user.id, {
+      onSuccess: (row) =>
+        toast.showToast({
+          message:
+            row.status === 'accepted'
+              ? `You and ${displayName(user)} are now friends.`
+              : 'Request sent.',
+        }),
+      onError,
+    });
+  };
+
+  const isBusy = (id: string) =>
+    (respond.isPending && respond.variables?.friendshipId === id) ||
+    (unfriend.isPending && unfriend.variables === id);
 
   return (
     <Screen padded={false} scroll>
@@ -204,12 +261,25 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         {section === 'friends' ? (
           <>
             <Button title="Invite friends" onPress={shareInvite} style={styles.inviteButton} />
-            {friends.isLoading ? (
+            {circle.isLoading ? (
               <View>
                 <Skeleton height={72} style={styles.skeletonBlock} />
                 <Skeleton height={72} style={styles.skeletonBlock} />
               </View>
-            ) : (friends.data ?? []).length === 0 ? (
+            ) : circle.isError ? (
+              <>
+                <EmptyState
+                  title="Could not load your friends"
+                  body="Check your connection and try again."
+                />
+                <Button
+                  title="Try again"
+                  variant="secondary"
+                  onPress={() => circle.refetch()}
+                  style={styles.inviteButton}
+                />
+              </>
+            ) : friends.length === 0 ? (
               <EmptyState
                 title="No friends yet"
                 body="Invite people you trust, or find them by username in the Find tab."
@@ -221,81 +291,66 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                     <Txt variant="label">This week, by XP</Txt>
                   </View>
                   <Hairline />
-                  {leaderboard.map((friend, index) => (
-                    <View key={friend.id}>
+                  {leaderboard.map((row, index) => (
+                    <View key={row.id}>
                       {index > 0 ? <Hairline /> : null}
-                      <View style={styles.row}>
+                      <View style={[styles.row, row.is_me && styles.meRow]}>
                         <Txt variant="bodySemi" color={colors.gold} style={styles.rank}>
-                          {`${index + 1}`}
+                          {`${row.rank}`}
                         </Txt>
-                        <ProfileAvatar profile={userToProfile(friend)} size={44} animated={false} />
+                        <ProfileAvatar profile={userToProfile(row)} size={44} animated={false} />
                         <View style={styles.rowBody}>
                           <Txt variant="bodySemi">
-                            {friend.first_name ?? friend.username}
+                            {row.is_me ? 'You' : displayName(row)}
                           </Txt>
                           <Txt variant="caption" color={colors.inkFaint}>
-                            {friend.stats_shared
-                              ? `Level ${friend.level} · ${streakLabel(friend.current_streak)}`
-                              : 'Stats private'}
+                            {`Level ${row.level ?? 1} · ${streakLabel(row.current_streak ?? 0)}`}
                           </Txt>
                         </View>
                         <Txt variant="bodySemi" color={colors.accent}>
-                          {`${friend.weekly_xp} XP`}
+                          {`${row.weekly_xp ?? 0} XP`}
                         </Txt>
                       </View>
                     </View>
                   ))}
+                  {privateCount > 0 ? (
+                    <>
+                      <Hairline />
+                      <View style={styles.sectionHeader}>
+                        <Txt variant="caption" color={colors.inkFaint}>
+                          {`${pluralize(privateCount, 'friend')} keep${privateCount === 1 ? 's' : ''} stats private`}
+                        </Txt>
+                      </View>
+                    </>
+                  ) : null}
                 </Card>
 
                 <Card padded={false} style={styles.card}>
                   <View style={styles.sectionHeader}>
-                    <Txt variant="label">{`Your friends (${(friends.data ?? []).length})`}</Txt>
+                    <Txt variant="label">{`Your friends (${friends.length})`}</Txt>
                   </View>
                   <Hairline />
-                  {(friends.data ?? []).map((friend, index) => (
+                  {friends.map((friend, index) => (
                     <View key={friend.id}>
                       {index > 0 ? <Hairline /> : null}
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Options for ${friend.first_name ?? friend.username}`}
-                        onLongPress={() =>
-                          Alert.alert(
-                            friend.first_name ?? friend.username,
-                            undefined,
-                            [
-                              { text: 'Close', style: 'cancel' },
-                              {
-                                text: 'Unfriend',
-                                style: 'destructive',
-                                onPress: () => confirmUnfriend(friend),
-                              },
-                              {
-                                text: 'Block',
-                                style: 'destructive',
-                                onPress: () =>
-                                  confirmBlock(
-                                    friend.id,
-                                    friend.first_name ?? friend.username,
-                                  ),
-                              },
-                            ],
-                          )
-                        }
+                        accessibilityLabel={`Options for ${displayName(friend)}`}
+                        onPress={() => friendOptions(friend)}
+                        onLongPress={() => friendOptions(friend)}
                         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
                       >
                         <ProfileAvatar profile={userToProfile(friend)} size={44} animated={false} />
                         <View style={styles.rowBody}>
-                          <Txt variant="bodySemi">
-                            {friend.first_name ?? friend.username}
-                          </Txt>
+                          <Txt variant="bodySemi">{displayName(friend)}</Txt>
                           <Txt variant="caption" color={colors.inkFaint}>
                             {friend.stats_shared
-                              ? `Level ${friend.level} · best ${pluralize(friend.best_streak, 'day')}`
-                              : `@${friend.username}`}
+                              ? `Level ${friend.level ?? 1} · best ${pluralize(friend.best_streak ?? 0, 'day')}`
+                              : `@${friend.username} · stats private`}
                           </Txt>
                         </View>
-                        <Txt variant="caption" color={colors.inkFaint}>
-                          Long-press for options
+                        <Txt variant="bodySemi" color={colors.inkFaint}>
+                          ···
                         </Txt>
                       </Pressable>
                     </View>
@@ -320,9 +375,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                 <View style={styles.row}>
                   <ProfileAvatar profile={userToProfile(request.user)} size={44} animated={false} />
                   <View style={styles.rowBody}>
-                    <Txt variant="bodySemi">
-                      {request.user.first_name ?? request.user.username}
-                    </Txt>
+                    <Txt variant="bodySemi">{displayName(request.user)}</Txt>
                     <Txt variant="caption" color={colors.inkFaint}>
                       {request.direction === 'incoming'
                         ? `@${request.user.username} wants to connect`
@@ -334,26 +387,16 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                   <View style={styles.requestActions}>
                     <Button
                       title="Accept"
-                      onPress={() =>
-                        respond.mutate(
-                          { friendshipId: request.friendship_id, accept: true },
-                          {
-                            onError: (e) =>
-                              toast.showToast({ message: errorText(e) }),
-                          },
-                        )
-                      }
+                      onPress={() => answer(request, true)}
+                      disabled={isBusy(request.friendship_id)}
+                      loading={isBusy(request.friendship_id) && respond.variables?.accept === true}
                       style={styles.acceptButton}
                     />
                     <Button
                       title="Decline"
                       variant="ghost"
-                      onPress={() =>
-                        respond.mutate({
-                          friendshipId: request.friendship_id,
-                          accept: false,
-                        })
-                      }
+                      onPress={() => answer(request, false)}
+                      disabled={isBusy(request.friendship_id)}
                       style={styles.declineButton}
                     />
                   </View>
@@ -361,7 +404,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                   <Button
                     title="Cancel request"
                     variant="ghost"
-                    onPress={() => unfriend.mutate(request.friendship_id)}
+                    onPress={() => unfriend.mutate(request.friendship_id, { onError })}
+                    disabled={isBusy(request.friendship_id)}
                     style={styles.cancelRequest}
                   />
                 )}
@@ -394,35 +438,32 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                 />
               ) : (
                 <Card padded={false} style={styles.card}>
-                  {(search.data ?? []).map((user, index) => (
-                    <View key={user.id}>
-                      {index > 0 ? <Hairline /> : null}
-                      <View style={styles.row}>
-                        <ProfileAvatar profile={userToProfile(user)} size={44} animated={false} />
-                        <View style={styles.rowBody}>
-                          <Txt variant="bodySemi">
-                            {user.first_name ?? user.username}
-                          </Txt>
-                          <Txt variant="caption" color={colors.inkFaint}>
-                            {`@${user.username}`}
-                          </Txt>
+                  {(search.data ?? []).map((user, index) => {
+                    const sending = sendRequest.isPending && sendRequest.variables === user.id;
+                    const actionable = user.relation === 'none' || user.relation === 'incoming';
+                    return (
+                      <View key={user.id}>
+                        {index > 0 ? <Hairline /> : null}
+                        <View style={styles.row}>
+                          <ProfileAvatar profile={userToProfile(user)} size={44} animated={false} />
+                          <View style={styles.rowBody}>
+                            <Txt variant="bodySemi">{displayName(user)}</Txt>
+                            <Txt variant="caption" color={colors.inkFaint}>
+                              {`@${user.username}`}
+                            </Txt>
+                          </View>
+                          <Button
+                            title={SEARCH_ACTION[user.relation]}
+                            variant={actionable ? 'secondary' : 'ghost'}
+                            disabled={!actionable || sending}
+                            loading={sending}
+                            onPress={() => onSearchAction(user)}
+                            style={styles.addButton}
+                          />
                         </View>
-                        <Button
-                          title={sendRequest.isPending ? 'Sending' : 'Add'}
-                          variant="secondary"
-                          onPress={() =>
-                            sendRequest.mutate(user.id, {
-                              onSuccess: () =>
-                                toast.showToast({ message: 'Request sent.' }),
-                              onError: (e) =>
-                                toast.showToast({ message: errorText(e) }),
-                            })
-                          }
-                          style={styles.addButton}
-                        />
                       </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </Card>
               )
             ) : null}
@@ -457,6 +498,34 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
               onPress={shareInvite}
               style={styles.shareButton}
             />
+
+            {(blocked.data ?? []).length > 0 ? (
+              <Card padded={false} style={styles.card}>
+                <View style={styles.sectionHeader}>
+                  <Txt variant="label">{`Blocked (${(blocked.data ?? []).length})`}</Txt>
+                </View>
+                {(blocked.data ?? []).map((user) => (
+                  <View key={user.id}>
+                    <Hairline />
+                    <View style={styles.row}>
+                      <View style={styles.rowBodyFlat}>
+                        <Txt variant="bodySemi">{displayName(user)}</Txt>
+                        <Txt variant="caption" color={colors.inkFaint}>
+                          {`@${user.username}`}
+                        </Txt>
+                      </View>
+                      <Button
+                        title="Unblock"
+                        variant="ghost"
+                        loading={unblock.isPending && unblock.variables === user.id}
+                        onPress={() => unblock.mutate(user.id, { onError })}
+                        style={styles.addButton}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
           </>
         ) : null}
       </View>
@@ -512,6 +581,12 @@ const styles = themed(() =>
       flex: 1,
       marginLeft: spacing.md,
     },
+    rowBodyFlat: {
+      flex: 1,
+    },
+    meRow: {
+      backgroundColor: colors.paperAlt,
+    },
     requestCard: {
       marginBottom: spacing.md,
     },
@@ -555,6 +630,7 @@ const styles = themed(() =>
     },
     codeInput: {
       flex: 1,
+      minWidth: 0,
       borderWidth: borderWidth.hairline,
       borderColor: colors.line,
       borderRadius: radius.sm,
