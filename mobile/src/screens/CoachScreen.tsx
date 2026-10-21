@@ -18,8 +18,10 @@ import { SendGlyph } from '../components/icons';
 import type { ChatMessage } from '../api/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
+  chatErrorCleared,
   DAILY_MESSAGE_LIMIT,
   fetchChatHistory,
+  isPendingMessage,
   MESSAGE_MAX_LENGTH,
   remainingMessages,
   sendChatMessage,
@@ -28,7 +30,7 @@ import {
 import { borderWidth, colors, fonts, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
-const QUICK_REPLIES = [
+const DEFAULT_QUICK_REPLIES = [
   'Am I on track?',
   'Motivate me',
   'What should I do next?',
@@ -102,8 +104,15 @@ function MessageBubble({
   canRegenerate: boolean;
 }) {
   const isUser = message.role === 'user';
+  const pending = isPendingMessage(message);
   return (
-    <View style={[styles.bubbleRow, isUser ? styles.userRow : styles.coachRow]}>
+    <View
+      style={[
+        styles.bubbleRow,
+        isUser ? styles.userRow : styles.coachRow,
+        pending && styles.pendingRow,
+      ]}
+    >
       {!isUser ? (
         <View style={styles.coachAvatarWrap}>
           <ProfileAvatar profile={coachProfile} size={28} animated={false} />
@@ -196,15 +205,24 @@ export function CoachScreen() {
       return;
     }
     setDraft('');
-    const result = await dispatch(sendChatMessage(toSend));
-    if (sendChatMessage.rejected.match(result) && !text) {
-      setDraft(toSend);
-    }
+    // On failure the slice keeps the text and the banner offers a retry.
+    await dispatch(sendChatMessage(toSend));
   };
+
+  const retry = () => {
+    const text = chat.failedText;
+    if (!text) return;
+    dispatch(chatErrorCleared());
+    send(text);
+  };
+
+  const quickReplies = chat.suggestions.length
+    ? chat.suggestions
+    : DEFAULT_QUICK_REPLIES;
 
   const lastUserMessage = [...chat.messages]
     .reverse()
-    .find((m) => m.role === 'user');
+    .find((m) => m.role === 'user' && !isPendingMessage(m));
 
   const regenerate = () => {
     if (lastUserMessage && !chat.sending && remaining > 0) {
@@ -287,10 +305,23 @@ export function CoachScreen() {
         </View>
       ) : null}
       {chat.error ? (
-        <View style={styles.limitBanner}>
-          <Txt variant="caption" color={colors.danger}>
+        <View style={[styles.limitBanner, styles.errorBanner]}>
+          <Txt variant="caption" color={colors.danger} style={styles.errorText}>
             {chat.error}
           </Txt>
+          {chat.failedText ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry sending"
+              onPress={retry}
+              disabled={chat.sending}
+              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+            >
+              <Txt variant="caption" color={colors.accent}>
+                Retry
+              </Txt>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -299,7 +330,7 @@ export function CoachScreen() {
       >
         {remaining > 0 ? (
           <View style={styles.quickReplies}>
-            {QUICK_REPLIES.map((reply) => (
+            {quickReplies.map((reply) => (
               <Chip
                 key={reply}
                 label={reply}
@@ -467,6 +498,21 @@ const styles = themed(() =>
   historyBlockRight: {
     marginBottom: spacing.md,
     alignSelf: 'flex-end',
+  },
+  pendingRow: {
+    opacity: 0.6,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  errorText: {
+    flex: 1,
+  },
+  retryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
   limitBanner: {
     paddingHorizontal: 24,
