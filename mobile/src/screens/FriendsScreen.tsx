@@ -630,6 +630,7 @@ const styles = themed(() =>
     },
     codeInput: {
       flex: 1,
+      minWidth: 0,
       borderWidth: borderWidth.hairline,
       borderColor: colors.line,
       borderRadius: radius.sm,
