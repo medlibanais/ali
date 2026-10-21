@@ -85,6 +85,8 @@ powershell -File tests\e2e.ps1
   accessories, backgrounds), mood reacts to Daily Life Score, idle
   breathing/blink, level-locked items, randomize + undo/redo.
   Optional real photo (crop/compress/upload to Storage) with mode toggle.
+  AI "Future Self" avatar from a selfie (`generate-avatar` Edge Function,
+  fal.ai Flux Kontext, 5/day); the SVG avatar is the fallback.
 - **Quests:** 15/day (10 predefined + 5 AI "Coach picks" personalized by
   goals/hobbies/religion), no consecutive-day repeats, 3 skips/day (a
   skipped quest returns the next day), 10-second undo (server allows 15 s
@@ -125,8 +127,9 @@ powershell -File tests\e2e.ps1
   SECURITY/handover notes); formula left exactly as specified until decided.
 - Push delivery requires a physical device (Expo push tokens are stored and
   the notify pipeline is fully tested up to the Expo API).
-- "Make it look like me" selfie mode needs a vision-capable model key
-  (Gemini free tier) — the current Groq key is text-only.
+- AI avatar needs a fal.ai key: `npx supabase secrets set FAL_KEY=...`
+  (locally: `FAL_KEY` in `supabase/.env.local`). Without it the app says
+  AI avatars are off and offers the hand-built avatar.
 
 ## Security
 

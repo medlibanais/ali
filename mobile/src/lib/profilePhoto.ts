@@ -67,7 +67,12 @@ function base64ToBytes(base64: string): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-export async function pickAndUploadPhoto(
+/**
+ * Pick (camera or gallery), square-crop, resize to 512 px and compress to a
+ * JPEG under ~500 KB. Returns base64 so callers can upload it or send it to
+ * an Edge Function.
+ */
+export async function pickSquarePhoto(
   source: 'camera' | 'gallery',
 ): Promise<string> {
   const granted = await ensurePermission(source);
@@ -84,6 +89,7 @@ export async function pickAndUploadPhoto(
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.9,
+          cameraType: ImagePicker.CameraType.front,
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -114,20 +120,24 @@ export async function pickAndUploadPhoto(
   const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
     encoding: 'base64',
   });
-  const bytes = base64ToBytes(base64);
-  if (bytes.byteLength > 500 * 1024) {
+  // base64 is 4/3 of the byte size.
+  if ((base64.length * 3) / 4 > 500 * 1024) {
     // One more squeeze if the first pass overshoots.
     const tighter = await ImageManipulator.manipulateAsync(
       manipulated.uri,
       [],
       { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG },
     );
-    const b64 = await FileSystem.readAsStringAsync(tighter.uri, {
-      encoding: 'base64',
-    });
-    return upload(base64ToBytes(b64));
+    return FileSystem.readAsStringAsync(tighter.uri, { encoding: 'base64' });
   }
-  return upload(bytes);
+  return base64;
+}
+
+export async function pickAndUploadPhoto(
+  source: 'camera' | 'gallery',
+): Promise<string> {
+  const base64 = await pickSquarePhoto(source);
+  return upload(base64ToBytes(base64));
 }
 
 async function upload(bytes: Uint8Array): Promise<string> {
@@ -173,7 +183,7 @@ export async function removePhoto(): Promise<void> {
   if (error) throw new PhotoError(error.message, 'upload');
 }
 
-export async function setAvatarMode(mode: 'avatar' | 'photo'): Promise<void> {
+export async function setAvatarMode(mode: 'avatar' | 'photo' | 'ai'): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();

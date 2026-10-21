@@ -14,6 +14,7 @@ export type AuthStackParamList = {
 
 export type OnboardingStackParamList = {
   Onboarding: undefined;
+  AiAvatar: { fromOnboarding?: boolean } | undefined;
   AvatarCreator: { fromOnboarding?: boolean } | undefined;
 };
 
@@ -35,6 +36,7 @@ export type AppStackParamList = {
   QuestDetail: { quest: Quest };
   TimezonePicker: undefined;
   AvatarCreator: { fromOnboarding?: boolean } | undefined;
+  AiAvatar: { fromOnboarding?: boolean } | undefined;
   EditPhoto: undefined;
   Friends: { code?: string } | undefined;
 };

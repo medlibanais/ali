@@ -14,6 +14,7 @@ import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import VerifyEmailScreen from '../screens/VerifyEmailScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AvatarCreatorScreen from '../screens/AvatarCreatorScreen';
+import AiAvatarScreen from '../screens/AiAvatarScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
@@ -92,6 +93,11 @@ function OnboardingNavigator() {
         options={{ title: 'About you' }}
       />
       <OnboardingStack.Screen
+        name="AiAvatar"
+        component={AiAvatarScreen}
+        options={{ title: 'Your future self' }}
+      />
+      <OnboardingStack.Screen
         name="AvatarCreator"
         component={AvatarCreatorScreen}
         options={{ title: 'Your future self' }}
@@ -149,6 +155,11 @@ function AppNavigator() {
         name="AvatarCreator"
         component={AvatarCreatorScreen}
         options={{ title: 'Your avatar' }}
+      />
+      <AppStack.Screen
+        name="AiAvatar"
+        component={AiAvatarScreen}
+        options={{ title: 'AI avatar' }}
       />
       <AppStack.Screen
         name="EditPhoto"

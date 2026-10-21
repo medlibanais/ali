@@ -396,13 +396,24 @@ export function ProfileScreen({ navigation }: Props) {
 
           <Card padded={false} style={styles.card}>
             <SettingsRow
+              label="AI avatar from a photo"
+              onPress={() => navigation.navigate('AiAvatar')}
+            />
+            <Hairline />
+            <SettingsRow
               label="Edit avatar"
               onPress={() => navigation.navigate('AvatarCreator')}
             />
             <Hairline />
             <SettingsRow
               label="Profile photo"
-              value={profile?.avatar_mode === 'photo' ? 'Photo' : 'Avatar'}
+              value={
+                profile?.avatar_mode === 'ai'
+                  ? 'AI avatar'
+                  : profile?.avatar_mode === 'photo'
+                    ? 'Photo'
+                    : 'Avatar'
+              }
               onPress={() => navigation.navigate('EditPhoto')}
             />
             <Hairline />
