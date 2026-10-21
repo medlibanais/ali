@@ -247,3 +247,55 @@ export function wowChange(current: DayScore[], previous: DayScore[]): number | n
   if (prev === 0) return null;
   return Math.round(((rate(current) - prev) / prev) * 100);
 }
+
+// ---- Plain-language summary for the simplified Insights screen ----
+
+export interface PeriodSummary {
+  avgScore: number; // average Daily Life Score over days with quests
+  prevAvgScore: number | null; // same for the previous period, null if no data
+  completionRate: number; // 0-100
+  activeDays: number; // days with at least one completion
+  totalDays: number;
+  strongest: { pillar: Pillar; value: number } | null;
+  weakest: { pillar: Pillar; value: number } | null;
+  bestWeekday: number | null; // 0 = Sunday, null when not enough data
+}
+
+
+function avgOverall(days: DayScore[]): number | null {
+  const scored = days.filter((d) => d.assigned > 0);
+  if (scored.length === 0) return null;
+  return Math.round(scored.reduce((s, d) => s + d.overall, 0) / scored.length);
+}
+
+export function summarizePeriod(
+  current: DayScore[],
+  previous: DayScore[],
+): PeriodSummary {
+  const f = funnel(current);
+  const avgs = pillarAverages(current.filter((d) => d.assigned > 0));
+  const ranked = [...avgs].sort((a, b) => b.value - a.value);
+  const hasPillarData = ranked.some((p) => p.value > 0);
+  const weekday = weekdayPerformance(current);
+  const bestValue = Math.max(...weekday);
+  const daysWithData = new Set(
+    current
+      .filter((d) => d.assigned > 0)
+      .map((d) => new Date(`${d.date}T12:00:00Z`).getDay()),
+  ).size;
+  return {
+    avgScore: avgOverall(current) ?? 0,
+    prevAvgScore: avgOverall(previous),
+    completionRate: f.assigned > 0 ? Math.round((100 * f.completed) / f.assigned) : 0,
+    activeDays: current.filter((d) => d.completed > 0).length,
+    totalDays: current.length,
+    strongest: hasPillarData ? ranked[0] : null,
+    weakest:
+      hasPillarData && ranked[ranked.length - 1].value < ranked[0].value
+        ? ranked[ranked.length - 1]
+        : null,
+    bestWeekday: daysWithData >= 3 && bestValue > 0 ? weekday.indexOf(bestValue) : null,
+  };
+}
+
+
