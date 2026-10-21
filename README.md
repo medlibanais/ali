@@ -68,6 +68,9 @@ npx tsc --noEmit
 # bundle check
 npx expo export --platform web
 
+# database rules: friends consent, blocking, privacy, leaderboard (pgTAP)
+npm run db:test
+
 # end-to-end: signup->onboarding->avatar->quest, friends+privacy, forgot
 # password, RLS spot checks (16 assertions)
 powershell -File tests\e2e.ps1

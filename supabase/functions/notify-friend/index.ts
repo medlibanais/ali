@@ -52,29 +52,46 @@ Deno.serve(async (req: Request) => {
     let message = '';
     let otherId: string | null = null;
 
+    // Each type checks that the friendship it describes really exists, so
+    // a signed-in user cannot push messages to arbitrary people.
     if (type === 'friend_request') {
-      recipientId = body?.addressee ?? null;
+      if (!actorId) return json({ error: 'unauthorized' }, 401);
+      const { data: pending } = await admin
+        .from('friendships')
+        .select('id')
+        .eq('status', 'pending')
+        .eq('requester', actorId)
+        .eq('addressee', body?.addressee ?? '')
+        .maybeSingle();
+      if (!pending) return json({ delivered: false, reason: 'no_request' }, 200);
+      recipientId = body.addressee;
       otherId = actorId;
       const requesterName = await displayName(admin, actorId);
       title = 'New friend request';
       message = `${requesterName} wants to grow with you.`;
     } else if (type === 'friend_accepted') {
+      if (!actorId) return json({ error: 'unauthorized' }, 401);
       const { data: friendship } = await admin
         .from('friendships')
-        .select('requester, addressee')
+        .select('requester, addressee, status')
         .eq('id', body?.friendship_id ?? '')
         .maybeSingle();
-      recipientId = friendship?.requester ?? null;
-      otherId = actorId ?? friendship?.addressee ?? null;
+      if (!friendship || friendship.status !== 'accepted' || friendship.addressee !== actorId) {
+        return json({ delivered: false, reason: 'no_friendship' }, 200);
+      }
+      recipientId = friendship.requester;
+      otherId = actorId;
       const name = await displayName(admin, otherId);
       title = 'Request accepted';
       message = `${name} accepted your request. Streaks together now.`;
     } else if (type === 'friend_streak_milestone') {
+      // Sent by the database trigger only.
+      if (!isCron) return json({ error: 'unauthorized' }, 401);
       recipientId = body?.friend_id ?? null;
       otherId = body?.user_id ?? null;
       const name = await displayName(admin, otherId);
       title = 'Friend milestone';
-      message = `${name} just hit a ${body?.streak}-day streak. Keep pace.`;
+      message = `${name} just hit a ${Number(body?.streak) || 0}-day streak. Keep pace.`;
     } else {
       return json({ error: 'unknown_type' }, 400);
     }
