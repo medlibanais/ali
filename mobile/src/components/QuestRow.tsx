@@ -17,6 +17,8 @@ import Txt from './Txt';
 export interface QuestRowProps {
   quest: Quest;
   onPress?: (quest: Quest) => void;
+  /** When set, the checkbox completes the quest in place. */
+  onComplete?: (quest: Quest) => void;
   showPillarLabel?: boolean;
 }
 
@@ -26,7 +28,12 @@ const DIFFICULTY_LABELS: Record<Quest['difficulty'], string> = {
   hard: 'Hard',
 };
 
-export function QuestRow({ quest, onPress, showPillarLabel = false }: QuestRowProps) {
+export function QuestRow({
+  quest,
+  onPress,
+  onComplete,
+  showPillarLabel = false,
+}: QuestRowProps) {
   useTheme();
   const pillarColor = colors.pillar[quest.pillar];
   const dimmed = quest.skipped === true;
@@ -42,9 +49,24 @@ export function QuestRow({ quest, onPress, showPillarLabel = false }: QuestRowPr
         dimmed && styles.dimmed,
       ]}
     >
-      <View style={[styles.check, quest.completed && styles.checkDone]}>
-        {quest.completed ? <CheckGlyph size={14} /> : null}
-      </View>
+      {onComplete && !quest.completed && !dimmed ? (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: false }}
+          accessibilityLabel={`Complete ${quest.title}`}
+          onPress={() => onComplete(quest)}
+          hitSlop={11}
+          style={({ pressed }) => [
+            styles.check,
+            { borderColor: pillarColor },
+            pressed && { backgroundColor: withAlpha(pillarColor, 0.2) },
+          ]}
+        />
+      ) : (
+        <View style={[styles.check, quest.completed && styles.checkDone]}>
+          {quest.completed ? <CheckGlyph size={14} /> : null}
+        </View>
+      )}
       <View style={styles.body}>
         <Txt
           variant="bodySemi"
