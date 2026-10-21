@@ -1,11 +1,28 @@
 // coach: the user's Future Self.
-// Intent-routed: safety paths are deterministic; general conversation goes
-// to Groq with the user's real goals/progress injected. 20 messages/day,
-// enforced here — never trust the client counter.
+// Intent-routed: crisis / acute-medical / professional-advice paths are
+// deterministic; everything else goes to Groq with the user's goals, today's
+// quests, a 7-day trend and the conversation injected (prompt lives in
+// _shared/coachText.ts). 20 messages/day, enforced here — never trust the
+// client counter.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { classifyIntent, safetyResponse } from '../_shared/intents.ts';
+import {
+  classifyIntent,
+  isDeterministic,
+  safetyResponse,
+} from '../_shared/intents.ts';
 import { callGroq, type ChatTurn } from '../_shared/llm.ts';
+import {
+  buildSystemPrompt,
+  type CoachContext,
+  type DayScore,
+  fallbackReply,
+  type Pillar,
+  PILLARS,
+  postFilter,
+  suggestions,
+  type TodayQuest,
+} from '../_shared/coachText.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,11 +32,7 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 20;
 const INPUT_MAX = 500;
-const OUTPUT_MAX_CHARS = 200; // SRS FR-5.1: 200-character replies
 const HISTORY_TURNS = 20; // SRS FR-5.1: last 20 messages as context
-
-const BANNED_RE =
-  /(you should|you must|you failed|you are weak|you'?re lazy|shame on you|take \d+\s?(mg|ml)|i diagnose|you have (adhd|depression|covid|flu|diabetes))/i;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -117,57 +130,131 @@ Deno.serve(async (req: Request) => {
     const weekAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 7 * 86400000)
       .toISOString()
       .slice(0, 10);
-    const [goalsRes, gamRes, scoreRes, badgesRes, historyRes, weekRes] =
-      await Promise.all([
-        admin.from('user_goals').select('*').eq('user_id', user.id).maybeSingle(),
-        admin.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
-        admin
-          .from('daily_scores')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('score_date', today)
-          .maybeSingle(),
-        admin
-          .from('achievements')
-          .select('badge_id')
-          .eq('user_id', user.id)
-          .order('unlocked_at', { ascending: false })
-          .limit(3),
-        admin
-          .from('messages')
-          .select('role, content')
-          .eq('conversation_id', conversationId)
-          .order('created_at', { ascending: false })
-          .limit(HISTORY_TURNS),
-        admin
-          .from('quests')
-          .select('skipped, quest_completions(id, undone_at)')
-          .eq('user_id', user.id)
-          .gte('assigned_date', weekAgo)
-          .lt('assigned_date', today),
-      ]);
+    const [
+      goalsRes,
+      gamRes,
+      scoresRes,
+      badgesRes,
+      historyRes,
+      weekRes,
+      todayQuestsRes,
+    ] = await Promise.all([
+      admin.from('user_goals').select('*').eq('user_id', user.id).maybeSingle(),
+      admin.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
+      admin
+        .from('daily_scores')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('score_date', weekAgo)
+        .lte('score_date', today)
+        .order('score_date', { ascending: true }),
+      admin
+        .from('achievements')
+        .select('badge_id, badge_catalog(name)')
+        .eq('user_id', user.id)
+        .order('unlocked_at', { ascending: false })
+        .limit(3),
+      admin
+        .from('messages')
+        .select('role, content')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_TURNS),
+      admin
+        .from('quests')
+        .select('skipped, quest_completions(id, undone_at)')
+        .eq('user_id', user.id)
+        .gte('assigned_date', weekAgo)
+        .lt('assigned_date', today),
+      admin
+        .from('quests')
+        .select('title, pillar, xp_reward, skipped, priority, quest_completions(id, undone_at)')
+        .eq('user_id', user.id)
+        .eq('assigned_date', today)
+        .order('priority', { ascending: true }),
+    ]);
+
+    type CompletionRow = { id: string; undone_at: string | null };
+    const isDone = (c: CompletionRow[] | null) =>
+      (c ?? []).some((x) => x.undone_at === null);
 
     const goals = goalsRes.data ?? {};
     const gam = gamRes.data ?? {};
-    const score = scoreRes.data ?? {};
+    const scoreRows = (scoresRes.data ?? []) as Record<string, unknown>[];
+    const toDay = (r: Record<string, unknown> | undefined, d: string): DayScore => ({
+      date: d,
+      overall: (r?.overall as number) ?? 0,
+      pillars: Object.fromEntries(
+        PILLARS.map((p) => [p, (r?.[p] as number) ?? 0]),
+      ) as Record<Pillar, number>,
+    });
+    const todayScore = toDay(scoreRows.find((r) => r.score_date === today), today);
+    const week = scoreRows
+      .filter((r) => r.score_date !== today)
+      .map((r) => toDay(r, r.score_date as string));
+
     const level: number = gam.level ?? 1;
-    const dailyScore: number = score.overall ?? 0;
+    const totalXp: number = gam.total_xp ?? 0;
     const streak: number = gam.current_streak ?? 0;
     // Missed this week: past days' quests neither completed nor skipped.
     const missedThisWeek = (
       (weekRes.data ?? []) as {
         skipped: boolean;
-        quest_completions: { id: string; undone_at: string | null }[];
+        quest_completions: CompletionRow[];
       }[]
-    ).filter(
-      (q) =>
-        !q.skipped &&
-        !(q.quest_completions ?? []).some((c) => c.undone_at === null),
-    ).length;
+    ).filter((q) => !q.skipped && !isDone(q.quest_completions)).length;
+
+    const quests: TodayQuest[] = (
+      (todayQuestsRes.data ?? []) as {
+        title: string;
+        pillar: Pillar;
+        xp_reward: number;
+        skipped: boolean;
+        quest_completions: CompletionRow[];
+      }[]
+    ).map((q) => ({
+      title: q.title,
+      pillar: q.pillar,
+      xp: q.xp_reward,
+      status: isDone(q.quest_completions)
+        ? 'done'
+        : q.skipped
+          ? 'skipped'
+          : 'pending',
+    }));
+
+    const ctx: CoachContext = {
+      firstName: profile?.first_name || 'friend',
+      localTime: localTime(tz),
+      goals,
+      level,
+      totalXp,
+      // Cumulative XP to reach level N is 500*(N*(N+1)/2 - 1) (see 0001_init).
+      xpToNextLevel:
+        level >= 100
+          ? null
+          : Math.max(0, 500 * (((level + 1) * (level + 2)) / 2 - 1) - totalXp),
+      streak,
+      bestStreak: gam.best_streak ?? streak,
+      streakFreezes: gam.streak_freezes ?? 0,
+      today: todayScore,
+      week,
+      quests,
+      missedThisWeek,
+      badges: (
+        (badgesRes.data ?? []) as {
+          badge_id: string;
+          badge_catalog: { name: string } | { name: string }[] | null;
+        }[]
+      ).map((b) => {
+        const cat = Array.isArray(b.badge_catalog) ? b.badge_catalog[0] : b.badge_catalog;
+        return cat?.name ?? b.badge_id;
+      }),
+    };
 
     const contextUsed = {
       user_level: level,
-      daily_score: dailyScore,
+      daily_score: todayScore.overall,
       streak,
     };
 
@@ -176,37 +263,44 @@ Deno.serve(async (req: Request) => {
     let reply: string;
     let model = 'safety-rules';
 
-    if (intent !== 'general') {
+    if (isDeterministic(intent)) {
       reply = safetyResponse(intent);
     } else {
-      const systemPrompt = buildSystemPrompt(
-        profile?.first_name ?? 'friend',
-        goals,
-        gam,
-        score,
-        (badgesRes.data ?? []).map((b: { badge_id: string }) => b.badge_id),
-        missedThisWeek,
-      );
       const history: ChatTurn[] = (historyRes.data ?? [])
         .reverse()
         .map((m: { role: 'user' | 'assistant'; content: string }) => ({
           role: m.role,
-          content: m.content.slice(0, 300),
+          content: m.content.slice(0, 600),
         }));
       const turns: ChatTurn[] = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: buildSystemPrompt(ctx) },
         ...history,
-        { role: 'user', content: message },
       ];
+      if (intent === 'wellbeing') {
+        turns.push({
+          role: 'system',
+          content:
+            'They seem tired, stressed, unwell or low. Lead with care, offer a lighter day, no diagnosis or medication.',
+        });
+      }
+      turns.push({ role: 'user', content: message });
 
-      const llm = await callGroq(turns, { maxTokens: 120, temperature: 0.7 });
-      if (llm.ok) {
-        reply = postFilter(llm.text) ?? fallbackReply(level, dailyScore, streak, score);
-        model = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+      const llm = await callGroq(turns, {
+        maxTokens: 220,
+        temperature: 0.8,
+        timeoutMs: 12000,
+        retries: 1,
+        useFallbackModel: true,
+      });
+      const filtered = llm.ok ? postFilter(llm.text) : null;
+      if (filtered) {
+        reply = filtered;
+        model = llm.model ?? 'groq';
       } else {
         // Graceful, still-personal fallback when the model is unreachable.
-        reply = fallbackReply(level, dailyScore, streak, score);
-        model = `fallback(${llm.error ?? 'unknown'})`;
+        reply = fallbackReply(ctx);
+        model = `fallback(${llm.ok ? 'filtered' : llm.error ?? 'unknown'})`;
+        console.error('coach llm fallback', model);
       }
     }
 
@@ -228,6 +322,7 @@ Deno.serve(async (req: Request) => {
         ai_message: aiRow,
         remaining_today: DAILY_LIMIT - (sentToday ?? 0) - 1,
         context_used: contextUsed,
+        suggestions: suggestions(ctx),
         intent,
         model,
       },
@@ -248,59 +343,18 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-function buildSystemPrompt(
-  firstName: string,
-  goals: Record<string, unknown>,
-  gam: Record<string, unknown>,
-  score: Record<string, unknown>,
-  badges: string[],
-  missedThisWeek: number,
-): string {
-  const pillarLine = `Health ${score.health ?? 0}%, Family ${score.family ?? 0}%, Work ${score.work ?? 0}%, Fun ${score.fun ?? 0}%, Spirituality ${score.spirituality ?? 0}%`;
-  return `You are ${firstName}'s Future Self. You already live the life they are building toward: ${goals.workouts_per_week ?? 3} workouts a week, ${goals.sleep_target_hours ?? 8}h sleep, ${goals.deep_work_hours_per_week ?? 20}h deep work toward "${goals.career_goal ?? 'their goal'}", strong family bonds, and a steady spiritual practice${goals.religion ? ` (${goals.religion})` : ''}.
-
-Their reality today: level ${gam.level ?? 1}, daily score ${score.overall ?? 0}%, streak ${gam.current_streak ?? 0} days, missed quests this week: ${missedThisWeek}, pillars: ${pillarLine}. Recent badges: ${badges.length ? badges.join(', ') : 'none yet'}.
-
-RULES:
-- Speak as their Future Self: "we", "us", "our" — never "you should".
-- Max 3 short sentences. Warm, direct, specific to THEIR numbers above.
-- Celebrate wins, treat setbacks as data, never shame or guilt.
-- No generic advice ("drink water", "exercise more"). Reference their actual goals and scores.
-- No medical, legal, or financial advice — decline and redirect.
-- If they ask what to do next, name the weakest pillar from the scores above.`;
-}
-
-/** Hard post-filter: reject shaming/prescriptive/medical content from the model. */
-function postFilter(text: string): string | null {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return null;
-  if (BANNED_RE.test(trimmed)) return null;
-  if (trimmed.length <= OUTPUT_MAX_CHARS) return trimmed;
-  // Cut at the last sentence boundary under the cap.
-  const cut = trimmed.slice(0, OUTPUT_MAX_CHARS);
-  const lastStop = Math.max(
-    cut.lastIndexOf('. '),
-    cut.lastIndexOf('! '),
-    cut.lastIndexOf('? '),
-  );
-  return lastStop > 60 ? cut.slice(0, lastStop + 1) : `${cut.trimEnd()}…`;
-}
-
-/** Deterministic, still-personal answer when the model is unreachable. */
-function fallbackReply(
-  level: number,
-  dailyScore: number,
-  streak: number,
-  score: Record<string, unknown>,
-): string {
-  const pillars: [string, number][] = [
-    ['Health', (score.health as number) ?? 0],
-    ['Family', (score.family as number) ?? 0],
-    ['Work', (score.work as number) ?? 0],
-    ['Fun', (score.fun as number) ?? 0],
-    ['Spirituality', (score.spirituality as number) ?? 0],
-  ];
-  pillars.sort((a, b) => a[1] - b[1]);
-  const weakest = pillars[0];
-  return `We are level ${level} with a ${dailyScore}% today and a ${streak}-day streak — I am proud of that. My thinking is cloudy for a moment, but ${weakest[0]} still has room today. One quest there and we move.`;
+function localTime(tz: string): { hour: number; weekday: string } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      hourCycle: 'h23',
+      weekday: 'long',
+    }).formatToParts(new Date());
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '12');
+    const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
+    return { hour: Number.isFinite(hour) ? hour : 12, weekday };
+  } catch {
+    return { hour: new Date().getUTCHours(), weekday: '' };
+  }
 }
