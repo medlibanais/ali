@@ -12,7 +12,7 @@ insert into public.badge_catalog (badge_id, name, description, rarity, xp_reward
   ('early_riser',     'Early Riser',      'Complete a quest before 8 AM, 7 days in a row.',           'uncommon',  150,  null,           5),
   ('comeback',        'Comeback',         'Complete 5 quests the day after a zero day.',              'uncommon',  150,  null,           6),
   ('ten_day_streak',  'Unstoppable',      'Hold a 10-day streak.',                                    'uncommon',  250,  null,           7),
-  ('prayer_master',   'Prayer Master',    'Complete 30 spirituality quests in one month.',            'rare',      500,  'spirituality', 8),
+  ('prayer_master',   'Prayer Master',    'Complete 30 prayers in one month.',                         'rare',      500,  'spirituality', 8),
   ('fitness_fanatic', 'Fitness Fanatic',  'Complete 50 workout quests in one month.',                 'rare',      400,  'health',       9),
   ('family_first',    'Family First',     'Weekly parents call, 8 weeks in a row.',                   'rare',      350,  'family',       10),
   ('adventurer',      'Adventurer',       'Complete 20 different fun quests.',                        'rare',      400,  'fun',          11),

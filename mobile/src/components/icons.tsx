@@ -272,3 +272,18 @@ export function ChevronGlyph({ size = 16, color = colors.inkFaint }: IconProps) 
     </Svg>
   );
 }
+
+export function BellGlyph({ size = 22, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Path
+        d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5l1.5-1.5ZM10 20.5a2 2 0 0 0 4 0"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

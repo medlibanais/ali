@@ -17,9 +17,10 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
-import { PillarGlyph } from '../components/icons';
+import { BellGlyph, PillarGlyph } from '../components/icons';
 import type { Quest } from '../api/types';
 import { useRedeemInvite } from '../features/friends/api';
+import { useUnreadCount } from '../features/notifications/api';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
 import { registerDeviceForPush } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
@@ -88,6 +89,7 @@ export function TodayScreen({ navigation }: Props) {
   const { profile } = useAppSelector((state) => state.user);
   const questsState = useAppSelector((state) => state.quests);
   const gamification = useAppSelector((state) => state.gamification);
+  const unread = useUnreadCount();
   const [confetti, setConfetti] = useState<{
     key: number;
     color: string;
@@ -189,8 +191,16 @@ export function TodayScreen({ navigation }: Props) {
       const xp = result.payload.xp_awarded;
       const questId = result.payload.quest_id;
       setConfetti({ key: Date.now(), color: colors.pillar[quest.pillar] });
+      // Level-ups and badges ride on the undo toast (their notification
+      // center entries skip the banner so they don't replace it).
+      const extras = [
+        result.payload.level_up ? `Level ${result.payload.level}!` : null,
+        result.payload.new_badges?.length
+          ? `${pluralize(result.payload.new_badges.length, 'new badge')}.`
+          : null,
+      ].filter(Boolean);
       toast.showToast({
-        message: `+${xp} XP. ${quest.title} is done.`,
+        message: [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
         actionLabel: 'Undo',
         countdownSeconds: 10,
         durationMs: 10000,
@@ -256,7 +266,28 @@ export function TodayScreen({ navigation }: Props) {
       ) : (
         <>
           <View style={styles.header}>
-            <Txt variant="title">{greeting(profile?.first_name)}</Txt>
+            <View style={styles.headerTop}>
+              <Txt variant="title" style={styles.headerTitle}>
+                {greeting(profile?.first_name)}
+              </Txt>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
+                }
+                onPress={() => navigation.navigate('Notifications')}
+                style={({ pressed }) => [styles.bell, pressed && { opacity: 0.6 }]}
+              >
+                <BellGlyph />
+                {unread > 0 ? (
+                  <View style={styles.bellBadge}>
+                    <Txt variant="caption" color={colors.onAccent}>
+                      {unread > 9 ? '9+' : `${unread}`}
+                    </Txt>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
             <Txt variant="caption" color={colors.inkFaint}>
               {dateLine()}
             </Txt>
@@ -413,6 +444,28 @@ const styles = themed(() =>
   StyleSheet.create({
   header: {
     marginTop: spacing.lg,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+  },
+  bell: {
+    padding: spacing.sm,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
   },
   scoreLine: {
     marginTop: spacing.sm,
