@@ -1,7 +1,6 @@
 // Profile photo pipeline: pick -> crop -> compress -> upload -> profile row.
 // Photos live in the `profile-photos` bucket under {user_id}/avatar.jpg.
 
-import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Linking } from 'react-native';
@@ -111,24 +110,24 @@ export async function pickSquarePhoto(
   }
 
   // Crop to center square, resize, compress to JPEG (<500KB target).
+  // base64 comes from the manipulator itself so this also works on web,
+  // where expo-file-system cannot read files.
   const manipulated = await ImageManipulator.manipulateAsync(
     asset.uri,
     [{ resize: { width: OUTPUT_SIZE, height: OUTPUT_SIZE } }],
-    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
   );
-
-  const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-    encoding: 'base64',
-  });
+  const base64 = manipulated.base64;
+  if (!base64) throw new PhotoError('Could not read that photo.', 'unknown');
   // base64 is 4/3 of the byte size.
   if ((base64.length * 3) / 4 > 500 * 1024) {
     // One more squeeze if the first pass overshoots.
     const tighter = await ImageManipulator.manipulateAsync(
       manipulated.uri,
       [],
-      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG },
+      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true },
     );
-    return FileSystem.readAsStringAsync(tighter.uri, { encoding: 'base64' });
+    return tighter.base64 ?? '';
   }
   return base64;
 }
