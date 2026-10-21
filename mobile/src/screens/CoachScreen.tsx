@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { Backdrop } from '../components/Backdrop';
 import Chip from '../components/Chip';
 import ProfileAvatar from '../components/ProfileAvatar';
 import EmptyState from '../components/EmptyState';
@@ -60,25 +60,16 @@ function formatTime(iso: string): string {
 }
 
 /** Two soft color washes behind the chat, as in the Figma Coach frame. */
-function Backdrop() {
-  const { width, height } = useWindowDimensions();
+function CoachBackdrop() {
+  const { height } = useWindowDimensions();
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Svg width={width} height={height}>
-        <Defs>
-          <RadialGradient id="coachMint" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={colors.accent} stopOpacity="0.14" />
-            <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="coachLilac" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={colors.pillar.spirituality} stopOpacity="0.14" />
-            <Stop offset="1" stopColor={colors.pillar.spirituality} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={width * 0.05} cy={90} r={230} fill="url(#coachMint)" />
-        <Circle cx={width * 0.98} cy={height * 0.7} r={240} fill="url(#coachLilac)" />
-      </Svg>
-    </View>
+    <Backdrop
+      height={height}
+      blobs={[
+        { x: 0.05, y: 130, r: 230, color: colors.accent, strength: 0.14 },
+        { x: 0.98, y: height * 0.7, r: 240, color: colors.pillar.spirituality, strength: 0.14 },
+      ]}
+    />
   );
 }
 
@@ -294,7 +285,7 @@ export function CoachScreen() {
 
   return (
     <Screen padded={false} keyboardAvoiding>
-      <Backdrop />
+      <CoachBackdrop />
       <View style={styles.header}>
         <View style={styles.headerAvatar}>
           <ProfileAvatar profile={profile} size={52} animated={false} />

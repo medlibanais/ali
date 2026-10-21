@@ -22,6 +22,8 @@ export interface PillarBubbleProps {
   total?: number;
   expanded: boolean;
   onPress: (pillar: PillarId) => void;
+  /** Smaller label for dense rows (Profile's pillar row). */
+  compact?: boolean;
 }
 
 export function PillarBubble({
@@ -32,6 +34,7 @@ export function PillarBubble({
   total,
   expanded,
   onPress,
+  compact = false,
 }: PillarBubbleProps) {
   useTheme();
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
@@ -109,7 +112,7 @@ export function PillarBubble({
       <Txt
         variant="label"
         color={colors.ink}
-        style={styles.label}
+        style={[styles.label, compact && styles.labelCompact]}
         numberOfLines={1}
       >
         {PILLAR_LABELS[pillar]}
@@ -140,7 +143,17 @@ const styles = themed(() =>
       position: 'absolute',
       bottom: -22,
       width: 110,
+      // react-native-web caps a numberOfLines text at its parent's width;
+      // the label is wider than the bubble on purpose.
+      maxWidth: 110,
       textAlign: 'center',
+    },
+    labelCompact: {
+      bottom: -19,
+      width: 84,
+      maxWidth: 84,
+      fontSize: 11,
+      lineHeight: 14,
     },
   }),
 );
