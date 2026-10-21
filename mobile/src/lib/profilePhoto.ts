@@ -109,12 +109,29 @@ export async function pickSquarePhoto(
     );
   }
 
-  // Crop to center square, resize, compress to JPEG (<500KB target).
+  // Center-square crop, resize, compress to JPEG (<500KB target).
   // base64 comes from the manipulator itself so this also works on web,
   // where expo-file-system cannot read files.
+  // The picker's square crop is skipped on web (and by some Android
+  // galleries), so crop here too: resizing a non-square photo to 512x512
+  // would squash the face, which the AI avatar then copies.
+  const side = Math.min(asset.width || 0, asset.height || 0);
+  const crop =
+    side > 0 && asset.width !== asset.height
+      ? [
+          {
+            crop: {
+              originX: Math.floor((asset.width - side) / 2),
+              originY: Math.floor((asset.height - side) / 2),
+              width: side,
+              height: side,
+            },
+          },
+        ]
+      : [];
   const manipulated = await ImageManipulator.manipulateAsync(
     asset.uri,
-    [{ resize: { width: OUTPUT_SIZE, height: OUTPUT_SIZE } }],
+    [...crop, { resize: { width: OUTPUT_SIZE, height: OUTPUT_SIZE } }],
     { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
   );
   const base64 = manipulated.base64;

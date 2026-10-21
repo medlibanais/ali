@@ -363,3 +363,15 @@ export function FlameGlyph({ size = 22, color = colors.accent }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.3.6 1.5 1.8 2.8 2.5 2.8Z" />;
 }
+
+/** Square with a pen: "new chat" in the Coach header (Figma Coach frame). */
+export function ComposeGlyph({ size = 22, color = colors.accent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M11 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V13M17.6 3.9a1.9 1.9 0 0 1 2.7 2.7l-7.6 7.6-3.5.8.8-3.5 7.6-7.6Z" />;
+}
+
+/** Upward arrow on the chat send button. */
+export function ArrowUpGlyph({ size = 20, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 19.5v-15M5.5 11 12 4.5l6.5 6.5" />;
+}
