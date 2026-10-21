@@ -20,7 +20,7 @@ update public.profiles set username = 'dave', first_name = 'Dave'
   where id = '00000000-0000-0000-0000-00000000000d';
 update public.profiles set username = 'erin', first_name = 'Erin'
   where id = '00000000-0000-0000-0000-00000000000e';
-update public.gamification set level = 7, total_xp = 900, current_streak = 4, best_streak = 9
+update public.gamification set level = 7, total_xp = 13500, current_streak = 4, best_streak = 9
   where user_id = '00000000-0000-0000-0000-00000000000b';
 insert into public.daily_scores (user_id, score_date, xp_earned)
   values ('00000000-0000-0000-0000-00000000000b', public.user_today('00000000-0000-0000-0000-00000000000b'), 120);
