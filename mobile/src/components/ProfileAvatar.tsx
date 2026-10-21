@@ -1,5 +1,7 @@
-// ProfileAvatar: shows the user's real photo when avatar_mode is 'photo',
-// otherwise the layered SVG avatar. Use everywhere identity is shown.
+// ProfileAvatar: shows the AI Future Self image when avatar_mode is 'ai',
+// the user's real photo when it is 'photo', otherwise the layered SVG
+// avatar (also the fallback when an image is missing). Use everywhere
+// identity is shown.
 
 import React from 'react';
 import AvatarView from '../avatar/AvatarView';
@@ -11,7 +13,8 @@ export interface ProfileAvatarProps {
   profile: {
     photo_url?: string | null;
     avatar_url?: string | null;
-    avatar_mode?: 'avatar' | 'photo';
+    avatar_mode?: 'avatar' | 'photo' | 'ai';
+    ai_avatar_url?: string | null;
     avatar_config?: Record<string, unknown> | null;
     first_name?: string | null;
   } | null;
@@ -26,6 +29,16 @@ export function ProfileAvatar({
   mood = 'neutral',
   animated = true,
 }: ProfileAvatarProps) {
+  if (profile?.avatar_mode === 'ai' && profile.ai_avatar_url) {
+    return (
+      <Avatar
+        uri={profile.ai_avatar_url}
+        name={profile?.first_name}
+        size={size}
+        ringColor={undefined}
+      />
+    );
+  }
   const photoUrl = profile?.photo_url ?? profile?.avatar_url ?? null;
   if (profile?.avatar_mode === 'photo' && photoUrl) {
     return (
