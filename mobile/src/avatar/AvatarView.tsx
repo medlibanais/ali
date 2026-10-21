@@ -22,6 +22,7 @@ import {
 import { HairBack, HairFront, Headwear } from './parts-hair';
 import { AuraRing, AvatarBackground, Outfit } from './parts-outfit';
 import { Body } from './parts-body';
+import SoftAvatar from './SoftAvatar';
 
 export interface AvatarViewProps {
   config: AvatarConfig;
@@ -29,6 +30,8 @@ export interface AvatarViewProps {
   mood?: Mood;
   animated?: boolean;
   mode?: 'head' | 'full-body';
+  /** 'soft' (default) is the rounded 3D-style character; 'classic' the detailed flat art. */
+  look?: 'soft' | 'classic';
 }
 
 const HEAD_BOX = 200;
@@ -36,13 +39,17 @@ const HEAD_BOX = 200;
 // by y≈434, leaving >20 units of bottom padding.
 const BODY_BOX_H = 460;
 
-export function AvatarView({
+export function AvatarView({ look = 'soft', ...props }: AvatarViewProps) {
+  return look === 'soft' ? <SoftAvatar {...props} /> : <ClassicAvatarView {...props} />;
+}
+
+function ClassicAvatarView({
   config,
   size = 120,
   mood = 'neutral',
   animated = true,
   mode = 'head',
-}: AvatarViewProps) {
+}: Omit<AvatarViewProps, 'look'>) {
   const skin = skinTone(config.skin);
   const hair = hairColor(config.hairColor);
   const outfit = outfitColor(config.outfitColor);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,7 +8,7 @@ import { sanitizeAvatarConfig } from '../avatar/types';
 import { VALID_OPTION_IDS } from '../avatar/options';
 import ConfettiLite from '../components/ConfettiLite';
 import EmptyState from '../components/EmptyState';
-import Hairline from '../components/Hairline';
+import { FadeInUp, PressableScale } from '../components/Motion';
 import PillarOrbit from '../components/PillarOrbit';
 import type { PillarId } from '../components/PillarBubble';
 import QuestRow from '../components/QuestRow';
@@ -20,6 +21,7 @@ import type { Quest } from '../api/types';
 import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
+import { levelProgress } from '../lib/levels';
 import { registerDeviceForPush } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
@@ -38,11 +40,14 @@ import {
 } from '../store/slices/gamificationSlice';
 import {
   colors,
+  fonts,
   PILLAR_LABELS,
   PILLARS,
   radius,
+  softSurface,
   spacing,
   themed,
+  withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
@@ -78,6 +83,37 @@ function TodaySkeleton() {
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
+    </View>
+  );
+}
+
+/**
+ * Soft pillar-tint blobs behind the top of the screen (Figma: pillar tints,
+ * heavily blurred). Radial gradients fade each blob out to nothing.
+ */
+function BackdropBlobs() {
+  const { width } = useWindowDimensions();
+  const blobs = [
+    { id: 'blobHealth', x: 0.05, y: 160, r: 220, color: colors.pillar.health },
+    { id: 'blobSpirit', x: 0.95, y: 260, r: 230, color: colors.pillar.spirituality },
+    { id: 'blobWork', x: 0.35, y: 560, r: 240, color: colors.pillar.work },
+    { id: 'blobFamily', x: 0.9, y: 620, r: 180, color: colors.pillar.family },
+  ];
+  return (
+    <View style={[styles.blobs, { width, left: -(width - Math.min(width, 720)) / 2 }]} pointerEvents="none">
+      <Svg width={width} height={820}>
+        <Defs>
+          {blobs.map((blob) => (
+            <RadialGradient key={blob.id} id={blob.id} cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={blob.color} stopOpacity="0.16" />
+              <Stop offset="1" stopColor={blob.color} stopOpacity="0" />
+            </RadialGradient>
+          ))}
+        </Defs>
+        {blobs.map((blob) => (
+          <Circle key={blob.id} cx={blob.x * width} cy={blob.y} r={blob.r} fill={`url(#${blob.id})`} />
+        ))}
+      </Svg>
     </View>
   );
 }
@@ -224,14 +260,17 @@ export function TodayScreen({ navigation }: Props) {
 
   const score = questsState.dailyLifeScore;
   const activeQuests = questsState.quests.filter((q) => !q.skipped);
+  const doneCount = activeQuests.filter((q) => q.completed).length;
   const avatarConfig = sanitizeAvatarConfig(
     profile?.avatar_config,
     VALID_OPTION_IDS,
   );
   const photoUrl =
-    profile?.avatar_mode === 'photo'
-      ? profile.photo_url ?? profile.avatar_url ?? null
-      : null;
+    profile?.avatar_mode === 'ai'
+      ? profile.ai_avatar_url ?? null
+      : profile?.avatar_mode === 'photo'
+        ? profile.photo_url ?? profile.avatar_url ?? null
+        : null;
   const orbitScores: Record<PillarId, number> = {
     health: questsState.pillarScores.health ?? 0,
     family: questsState.pillarScores.family ?? 0,
@@ -284,41 +323,38 @@ export function TodayScreen({ navigation }: Props) {
         <TodaySkeleton />
       ) : (
         <>
-          <View style={styles.header}>
+          <BackdropBlobs />
+          <FadeInUp style={styles.header}>
             <View style={styles.headerTop}>
               <View style={styles.headerTitle}>
-                <Txt variant="caption" color={colors.inkFaint}>
+                <Txt variant="caption" color={colors.inkSoft}>
                   {dateLine()}
                 </Txt>
                 <Txt variant="title" style={styles.greeting}>
                   {greeting(profile?.first_name)}
                 </Txt>
               </View>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={
                   unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
                 }
                 onPress={() => navigation.navigate('Notifications')}
-                style={({ pressed }) => [styles.bell, pressed && { opacity: 0.6 }]}
+                pressedScale={0.9}
+                style={styles.bell}
               >
-                <BellGlyph />
-                {unread > 0 ? (
-                  <View style={styles.bellBadge}>
-                    <Txt variant="caption" color={colors.onAccent}>
-                      {unread > 9 ? '9+' : `${unread}`}
-                    </Txt>
-                  </View>
-                ) : null}
-              </Pressable>
+                <BellGlyph color={colors.ink} />
+                {unread > 0 ? <View style={styles.bellDot} /> : null}
+              </PressableScale>
             </View>
-          </View>
+          </FadeInUp>
 
-          <View style={styles.orbitWrap}>
+          <FadeInUp delay={80} style={styles.orbitWrap}>
             <PillarOrbit
               avatarConfig={avatarConfig}
               photoUrl={photoUrl}
               name={profile?.first_name}
+              level={gamification.level}
               scores={orbitScores}
               progress={orbitProgress}
               expandedPillar={expandedPillar}
@@ -326,19 +362,27 @@ export function TodayScreen({ navigation }: Props) {
                 setExpandedPillar((cur) => (cur === id ? null : id))
               }
             />
-          </View>
+          </FadeInUp>
 
-          <View style={styles.statStrip}>
-            <View style={styles.statCell}>
-              <Txt variant="bodySemi" color={colors.accent}>
-                {`${Math.round(score)}`}
+          <FadeInUp delay={160} style={styles.strip}>
+            <View style={[styles.stripCell, styles.stripFirst]}>
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                {gamification.currentTitle ?? titleForLevel(gamification.level)}
               </Txt>
-              <Txt variant="caption" color={colors.inkFaint}>
-                Life score
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+                {`${gamification.totalXp.toLocaleString()} XP`}
               </Txt>
+              <View style={styles.xpTrack}>
+                <View
+                  style={[
+                    styles.xpFill,
+                    { width: `${Math.round(levelProgress(gamification.totalXp) * 100)}%` },
+                  ]}
+                />
+              </View>
             </View>
-            <View style={styles.statDivider} />
-            <Pressable
+            <View style={styles.stripDivider} />
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={
                 gamification.currentStreak > 0
@@ -347,56 +391,54 @@ export function TodayScreen({ navigation }: Props) {
               }
               disabled={gamification.currentStreak === 0}
               onPress={confirmFreeze}
-              style={({ pressed }) => [styles.statCell, pressed && styles.pressed]}
+              style={styles.stripCell}
             >
-              <Txt variant="bodySemi" color={colors.gold} numberOfLines={1}>
-                {streakLabel(gamification.currentStreak)}
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                Streak
               </Txt>
-              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
                 {gamification.currentStreak > 0
-                  ? 'Tap to freeze'
+                  ? streakLabel(gamification.currentStreak)
                   : bestStreakLabel(gamification.bestStreak)}
               </Txt>
-            </Pressable>
-            <View style={styles.statDivider} />
-            <View style={styles.statCell}>
-              <Txt variant="bodySemi" numberOfLines={1}>
-                {`Level ${gamification.level}`}
+            </PressableScale>
+            <View style={styles.stripDivider} />
+            <View style={styles.stripCell}>
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                {`Today · score ${Math.round(score)}`}
               </Txt>
-              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
-                {gamification.currentTitle ?? titleForLevel(gamification.level)}
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+                {`${doneCount} of ${activeQuests.length}`}
               </Txt>
             </View>
-          </View>
+          </FadeInUp>
 
           <View style={styles.questHeader}>
             <View style={styles.questHeaderTitle}>
               {expandedPillar ? (
-                <PillarGlyph pillar={expandedPillar} size={18} />
+                <PillarGlyph pillar={expandedPillar} size={20} />
               ) : null}
               <Txt
-                variant="label"
-                style={[styles.questHeaderText, expandedPillar && styles.questHeaderTextIcon]}
+                variant="heading"
+                style={expandedPillar ? styles.questHeaderTextIcon : undefined}
               >
                 {scopeLabel}
               </Txt>
             </View>
-            <Txt variant="caption" color={colors.inkFaint}>
-              {`${doneQuests.length} of ${inScope.length} done`}
-            </Txt>
-          </View>
-
-          {expandedPillar !== null ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => setExpandedPillar(null)}
-              style={({ pressed }) => [styles.clearFilter, pressed && styles.pressed]}
+              onPress={() =>
+                expandedPillar !== null
+                  ? setExpandedPillar(null)
+                  : navigation.navigate('Quests')
+              }
+              hitSlop={10}
             >
-              <Txt variant="caption" color={colors.accent}>
-                Show all pillars
+              <Txt variant="bodySemi" color={colors.accent}>
+                {expandedPillar !== null ? 'Show all' : 'See all'}
               </Txt>
             </Pressable>
-          ) : null}
+          </View>
 
           {inScope.length === 0 ? (
             <EmptyState
@@ -425,30 +467,31 @@ export function TodayScreen({ navigation }: Props) {
                     : `All ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests are done.`}
                 </Txt>
               ) : null}
-              {listed.map((quest) => (
-                <QuestRow
-                  key={quest.quest_id}
-                  quest={quest}
-                  onPress={openQuest}
-                  onComplete={handleComplete}
-                  showPillarLabel={expandedPillar === null}
-                />
+              {listed.map((quest, index) => (
+                <FadeInUp key={quest.quest_id} delay={220 + index * 50}>
+                  <QuestRow
+                    quest={quest}
+                    onPress={openQuest}
+                    onComplete={handleComplete}
+                    showPillarLabel={expandedPillar === null}
+                  />
+                </FadeInUp>
               ))}
             </>
           )}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('Quests')}
-            style={({ pressed }) => [styles.allQuests, pressed && styles.pressed]}
-          >
-            <Txt variant="bodySemi" color={colors.accent}>
-              {hiddenCount > 0
-                ? `See all quests (${hiddenCount} more)`
-                : 'See all quests'}
-            </Txt>
-            <ChevronGlyph color={colors.accent} />
-          </Pressable>
+          {hiddenCount > 0 ? (
+            <PressableScale
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Quests')}
+              style={styles.allQuests}
+            >
+              <Txt variant="bodySemi" color={colors.accent}>
+                {`${hiddenCount} more ${hiddenCount === 1 ? 'quest' : 'quests'}`}
+              </Txt>
+              <ChevronGlyph color={colors.accent} />
+            </PressableScale>
+          ) : null}
 
           {questsState.error ? (
             <Txt variant="caption" color={colors.danger} style={styles.error}>
@@ -456,7 +499,6 @@ export function TodayScreen({ navigation }: Props) {
             </Txt>
           ) : null}
 
-          <Hairline style={styles.footerRule} />
           <Txt
             variant="caption"
             color={colors.inkFaint}
@@ -483,6 +525,10 @@ export function TodayScreen({ navigation }: Props) {
 
 const styles = themed(() =>
   StyleSheet.create({
+  blobs: {
+    position: 'absolute',
+    top: -40,
+  },
   header: {
     marginTop: spacing.lg,
   },
@@ -494,53 +540,78 @@ const styles = themed(() =>
     flex: 1,
   },
   bell: {
-    padding: spacing.sm,
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
+    ...softSurface(1),
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 10,
+    right: 11,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.pillar.health,
+    borderWidth: 1.5,
+    borderColor: colors.card,
   },
   greeting: {
-    marginTop: spacing.xs,
+    marginTop: 2,
   },
+  // The orbit is wider than the padded column; let it use the full width.
   orbitWrap: {
-    alignItems: 'center',
     marginTop: spacing.xl,
-  },
-  statStrip: {
-    flexDirection: 'row',
-    marginTop: spacing.lg,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-  },
-  statCell: {
-    flex: 1,
+    marginHorizontal: -spacing.xl,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    minHeight: 44,
   },
-  statDivider: {
+  // Score strip: one soft card, three cells (Figma "score strip").
+  strip: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    ...softSurface(2),
+  },
+  stripCell: {
+    flex: 1,
+    paddingHorizontal: spacing.sm + 2,
+    justifyContent: 'center',
+  },
+  stripFirst: {
+    flex: 1.25,
+  },
+  stripValue: {
+    fontFamily: fonts.heavy,
+    fontSize: 17,
+    lineHeight: 22,
+    marginTop: 2,
+  },
+  stripDivider: {
     width: 1,
-    marginVertical: spacing.sm,
+    marginVertical: spacing.xs,
     backgroundColor: colors.line,
+  },
+  xpTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: spacing.sm,
+    backgroundColor: colors.paperAlt,
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.gold,
   },
   pressed: {
     opacity: 0.7,
   },
   questHeader: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xl + 4,
     marginBottom: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -550,18 +621,8 @@ const styles = themed(() =>
     flexDirection: 'row',
     alignItems: 'center',
   },
-  questHeaderText: {
-    textTransform: 'uppercase',
-  },
   questHeaderTextIcon: {
     marginLeft: spacing.sm,
-  },
-  clearFilter: {
-    alignSelf: 'flex-start',
-    minHeight: 32,
-    justifyContent: 'center',
-    marginTop: -spacing.sm,
-    marginBottom: spacing.sm,
   },
   allDone: {
     marginBottom: spacing.md,
@@ -570,17 +631,19 @@ const styles = themed(() =>
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
     minHeight: 44,
     marginTop: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+    backgroundColor: withAlpha(colors.accent, 0.1),
   },
   error: {
     marginTop: spacing.md,
   },
-  footerRule: {
-    marginTop: spacing.xl,
-  },
   footerNote: {
-    marginVertical: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
   },
   skeletonWrap: {
     paddingTop: spacing.xl,

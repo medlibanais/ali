@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -30,6 +31,9 @@ export function Screen({
   refreshControl,
 }: ScreenProps) {
   const theme = useTheme();
+  // The tab bar floats over the content; keep the last items clear of it.
+  const tabBarHeight = useContext(BottomTabBarHeightContext);
+  const tabInset = tabBarHeight ? { paddingBottom: tabBarHeight + 16 } : null;
   // Content stays readable on wide screens (web, tablets, landscape):
   // centered column capped at 720 logical pixels.
   const body = scroll ? (
@@ -39,6 +43,7 @@ export function Screen({
         styles.grow,
         styles.centerColumn,
         padded ? styles.padded : null,
+        tabInset,
         contentStyle,
       ]}
       keyboardShouldPersistTaps="handled"
@@ -53,6 +58,7 @@ export function Screen({
         styles.flex,
         styles.centerColumn,
         padded ? styles.padded : null,
+        tabInset,
         contentStyle,
       ]}
     >
