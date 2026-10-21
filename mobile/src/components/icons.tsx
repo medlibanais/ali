@@ -375,3 +375,136 @@ export function ArrowUpGlyph({ size = 20, color = colors.onAccent }: IconProps) 
   useTheme();
   return <Outline size={size} color={color} d="M12 19.5v-15M5.5 11 12 4.5l6.5 6.5" />;
 }
+
+// Avatar editor and profile sharing
+
+export function CloseGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M6 6l12 12M18 6 6 18" />;
+}
+
+export function UndoGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />;
+}
+
+export function RedoGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />;
+}
+
+export function DiceGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Rect x={3.5} y={3.5} width={17} height={17} rx={4} stroke={color} strokeWidth={1.8} />
+      {[[8.5, 8.5], [15.5, 8.5], [12, 12], [8.5, 15.5], [15.5, 15.5]].map(([x, y]) => (
+        <Circle key={`${x}${y}`} cx={x} cy={y} r={1.3} fill={color} />
+      ))}
+    </Svg>
+  );
+}
+
+export function BodyToggleGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 10.5l6 1 6-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
+}
+
+export function FaceGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3c4.4 0 7 3.4 7 8 0 5-3.2 10-7 10s-7-5-7-10c0-4.6 2.6-8 7-8ZM9.5 11h.01M14.5 11h.01M9.5 15.5c1.4 1.2 3.6 1.2 5 0" />;
+}
+
+export function HairGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M5.2 14C4 7.5 7.4 3 12 3s8 4.5 6.8 11M5.2 14c2.4-1.2 3.8-3.6 4.3-6.4 2.2 2.6 5.6 4 9.3 6.4M7 14c.2 4.2 2.4 7 5 7s4.8-2.8 5-7" />;
+}
+
+export function EyeGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />;
+}
+
+export function LipsGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M2.5 12c2.6-3.2 5.2-4.6 7.3-3.6l2.2 1 2.2-1c2.1-1 4.7.4 7.3 3.6-2.6 3.6-5.7 5.2-9.5 5.2S5.1 15.6 2.5 12ZM2.5 12h19" />;
+}
+
+export function BeardGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M5 5v5c0 6 3 10 7 10s7-4 7-10V5M8.5 13.5c1.2-1.2 2.4-1.2 3.5-.3 1.1-.9 2.3-.9 3.5.3M10 16.5h4" />;
+}
+
+export function GlassesGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M2 10h2M20 10h2M4 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM13 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM11 10.5c.7-.6 1.3-.6 2 0" />;
+}
+
+export function ShirtGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M8 3.5 3 6.5 5 11l2-1v10.5h10V10l2 1 2-4.5-5-3c-.5 1.5-2 2.5-4 2.5s-3.5-1-4-2.5Z" />;
+}
+
+export function PantsGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M6 3h12l1 18h-5l-2-11-2 11H5L6 3ZM6 6.5h12" />;
+}
+
+export function ShoeGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M3 17V8.5l4 .5c1 2 3 3.2 5.5 3.6L19 14c1.6.5 2.5 1.6 2.5 3v1H3v-1ZM3 15.5h18.5M10 11.5 11.5 10M13 12.5 14.5 11" />;
+}
+
+export function PersonGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM5 10.5l7 1 7-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
+}
+
+export function BackdropGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM4 16l5-5 4 4 2.5-2.5L20 17M15.5 8.5h.01" />;
+}
+
+export function LockGlyph({ size = 14, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M6.5 11h11v9h-11v-9ZM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />;
+}
+
+export function ShareGlyph({ size = 20, color = colors.accent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3.5v11M8 7.5l4-4 4 4M5.5 12v7.5h13V12" />;
+}
+
+export function LinkGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />;
+}
+
+/** Chat bubble with a handset: stands for WhatsApp. */
+export function ChatPhoneGlyph({ size = 22, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M4 20l1.3-3.9A8.5 8.5 0 1 1 8 18.8L4 20ZM9.2 8.4c.3-.4.8-.4 1 0l.7 1.4c.1.3 0 .6-.2.8l-.5.5c.5 1 1.3 1.8 2.3 2.3l.5-.5c.2-.2.5-.3.8-.2l1.4.7c.4.2.4.7 0 1-.8.8-2 1-3 .4a8 8 0 0 1-3.4-3.4c-.6-1-.4-2.2.4-3Z" />;
+}
+
+/** Rounded camera: stands for Instagram. */
+export function CameraGlyph({ size = 22, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M8 3.5h8A4.5 4.5 0 0 1 20.5 8v8a4.5 4.5 0 0 1-4.5 4.5H8A4.5 4.5 0 0 1 3.5 16V8A4.5 4.5 0 0 1 8 3.5ZM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM17 7h.01" />;
+}
+
+/** Ring with a plus: a story. */
+export function StoryGlyph({ size = 22, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3.5a8.5 8.5 0 1 1-6 2.5M3.9 9.2a8.5 8.5 0 0 1 1.2-2.4M12 8.5v7M8.5 12h7" />;
+}
+
+export function MoreGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      {[6, 12, 18].map((x) => (
+        <Circle key={x} cx={x} cy={12} r={1.6} fill={color} />
+      ))}
+    </Svg>
+  );
+}

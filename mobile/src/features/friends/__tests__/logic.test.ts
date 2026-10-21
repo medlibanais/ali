@@ -1,6 +1,8 @@
 import {
   friendErrorText,
   friendsOnly,
+  inviteLink,
+  inviteMessage,
   inviteResultText,
   rankLeaderboard,
   type CircleRow,
@@ -91,5 +93,12 @@ describe('inviteResultText', () => {
     expect(inviteResultText('own_code')).toBe('That is your own code.');
     expect(inviteResultText('already_connected')).toBe('You are already connected.');
     expect(inviteResultText('invalid_code')).toBe('That code is not valid.');
+  });
+});
+
+describe('inviteLink', () => {
+  it('builds the add-friend deep link with the code', () => {
+    expect(inviteLink('AB12CD')).toBe('prayerlock://add-friend?code=AB12CD');
+    expect(inviteMessage('AB12CD')).toContain('prayerlock://add-friend?code=AB12CD');
   });
 });

@@ -23,6 +23,7 @@ import { HairBack, HairFront, Headwear } from './parts-hair';
 import { AuraRing, AvatarBackground, Outfit } from './parts-outfit';
 import { Body } from './parts-body';
 import SoftAvatar from './SoftAvatar';
+import ToonAvatar from './ToonAvatar';
 
 export interface AvatarViewProps {
   config: AvatarConfig;
@@ -30,8 +31,13 @@ export interface AvatarViewProps {
   mood?: Mood;
   animated?: boolean;
   mode?: 'head' | 'full-body';
-  /** 'soft' (default) is the rounded 3D-style character; 'classic' the detailed flat art. */
-  look?: 'soft' | 'classic';
+  /**
+   * 'toon' (default) is the cartoon person with natural proportions,
+   * 'soft' the rounded chibi character, 'classic' the detailed flat art.
+   */
+  look?: 'toon' | 'soft' | 'classic';
+  /** Toon look only: no background and no round crop. */
+  bare?: boolean;
 }
 
 const HEAD_BOX = 200;
@@ -39,8 +45,10 @@ const HEAD_BOX = 200;
 // by y≈434, leaving >20 units of bottom padding.
 const BODY_BOX_H = 460;
 
-export function AvatarView({ look = 'soft', ...props }: AvatarViewProps) {
-  return look === 'soft' ? <SoftAvatar {...props} /> : <ClassicAvatarView {...props} />;
+export function AvatarView({ look = 'toon', bare, ...props }: AvatarViewProps) {
+  if (look === 'toon') return <ToonAvatar {...props} bare={bare} />;
+  if (look === 'soft') return <SoftAvatar {...props} />;
+  return <ClassicAvatarView {...props} />;
 }
 
 function ClassicAvatarView({
