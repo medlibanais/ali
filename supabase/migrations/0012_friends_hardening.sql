@@ -1,4 +1,4 @@
--- PrayerLock 0011: friends hardening.
+-- PrayerLock 0012: friends hardening.
 --
 -- Closes holes that let a user skip consent or read data they should not:
 --   * friendships could be inserted/updated directly, so anyone could make
