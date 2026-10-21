@@ -303,3 +303,63 @@ export function StarGlyph({ size = 14, color = colors.gold }: IconProps) {
     </Svg>
   );
 }
+
+// Profile glyphs (lucide-style outlines, Figma "Profile" frame)
+
+function Outline({ size, color, d }: { size: number; color: string; d: string }) {
+  return (
+    <Svg {...baseProps(size)}>
+      <Path d={d} stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function UserGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M19 21v-1.5A4.5 4.5 0 0 0 14.5 15h-5A4.5 4.5 0 0 0 5 19.5V21M12 11.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />;
+}
+
+export function SettingsGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Path
+        d="M12.2 2.5h-.4a1.8 1.8 0 0 0-1.8 1.8v.2a1.8 1.8 0 0 1-.9 1.5l-.4.2a1.8 1.8 0 0 1-1.8 0l-.1-.1a1.8 1.8 0 0 0-2.5.7l-.2.3a1.8 1.8 0 0 0 .7 2.5l.1.1a1.8 1.8 0 0 1 .9 1.5v.5a1.8 1.8 0 0 1-.9 1.6l-.1.1a1.8 1.8 0 0 0-.7 2.4l.2.4a1.8 1.8 0 0 0 2.5.6l.1-.1a1.8 1.8 0 0 1 1.8 0l.4.3a1.8 1.8 0 0 1 .9 1.5v.2a1.8 1.8 0 0 0 1.8 1.8h.4a1.8 1.8 0 0 0 1.8-1.8v-.2a1.8 1.8 0 0 1 .9-1.5l.4-.3a1.8 1.8 0 0 1 1.8 0l.1.1a1.8 1.8 0 0 0 2.5-.6l.2-.4a1.8 1.8 0 0 0-.7-2.4l-.1-.1a1.8 1.8 0 0 1-.9-1.6v-.5a1.8 1.8 0 0 1 .9-1.5l.1-.1a1.8 1.8 0 0 0 .7-2.5l-.2-.3a1.8 1.8 0 0 0-2.5-.7l-.1.1a1.8 1.8 0 0 1-1.8 0l-.4-.2a1.8 1.8 0 0 1-.9-1.5v-.2a1.8 1.8 0 0 0-1.8-1.8Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  );
+}
+
+export function ShieldCheckGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 21.5s7.5-3.4 7.5-9.4V5.6L12 2.8 4.5 5.6v6.5c0 6 7.5 9.4 7.5 9.4ZM9 12l2 2 4-4" />;
+}
+
+export function HelpGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Svg {...baseProps(size)}>
+      <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.8} />
+      <Path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.3-2.4 2.3M12 16.6h.01" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function SparklesGlyph({ size = 16, color = colors.accent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10 3.5 11.6 8a2 2 0 0 0 1.3 1.3l4.6 1.6-4.6 1.6a2 2 0 0 0-1.3 1.3L10 18.4l-1.6-4.6A2 2 0 0 0 7.1 12.5L2.5 10.9l4.6-1.6A2 2 0 0 0 8.4 8L10 3.5ZM18.5 3v4M20.5 5h-4M19 16.5v3M20.5 18h-3" />;
+}
+
+export function PencilGlyph({ size = 16, color = colors.accent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5ZM14.5 5.5l3 3" />;
+}
+
+export function FlameGlyph({ size = 22, color = colors.accent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.3.6 1.5 1.8 2.8 2.5 2.8Z" />;
+}

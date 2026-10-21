@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { sanitizeAvatarConfig } from '../avatar/types';
 import { VALID_OPTION_IDS } from '../avatar/options';
+import Backdrop from '../components/Backdrop';
 import ConfettiLite from '../components/ConfettiLite';
 import EmptyState from '../components/EmptyState';
 import { FadeInUp, PressableScale } from '../components/Motion';
@@ -83,37 +83,6 @@ function TodaySkeleton() {
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
       <Skeleton height={64} style={styles.skeletonBlock} />
-    </View>
-  );
-}
-
-/**
- * Soft pillar-tint blobs behind the top of the screen (Figma: pillar tints,
- * heavily blurred). Radial gradients fade each blob out to nothing.
- */
-function BackdropBlobs() {
-  const { width } = useWindowDimensions();
-  const blobs = [
-    { id: 'blobHealth', x: 0.05, y: 160, r: 220, color: colors.pillar.health },
-    { id: 'blobSpirit', x: 0.95, y: 260, r: 230, color: colors.pillar.spirituality },
-    { id: 'blobWork', x: 0.35, y: 560, r: 240, color: colors.pillar.work },
-    { id: 'blobFamily', x: 0.9, y: 620, r: 180, color: colors.pillar.family },
-  ];
-  return (
-    <View style={[styles.blobs, { width, left: -(width - Math.min(width, 720)) / 2 }]} pointerEvents="none">
-      <Svg width={width} height={820}>
-        <Defs>
-          {blobs.map((blob) => (
-            <RadialGradient key={blob.id} id={blob.id} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={blob.color} stopOpacity="0.16" />
-              <Stop offset="1" stopColor={blob.color} stopOpacity="0" />
-            </RadialGradient>
-          ))}
-        </Defs>
-        {blobs.map((blob) => (
-          <Circle key={blob.id} cx={blob.x * width} cy={blob.y} r={blob.r} fill={`url(#${blob.id})`} />
-        ))}
-      </Svg>
     </View>
   );
 }
@@ -323,7 +292,14 @@ export function TodayScreen({ navigation }: Props) {
         <TodaySkeleton />
       ) : (
         <>
-          <BackdropBlobs />
+          <Backdrop
+            blobs={[
+              { x: 0.05, y: 160, r: 220, color: colors.pillar.health },
+              { x: 0.95, y: 260, r: 230, color: colors.pillar.spirituality },
+              { x: 0.35, y: 560, r: 240, color: colors.pillar.work },
+              { x: 0.9, y: 620, r: 180, color: colors.pillar.family },
+            ]}
+          />
           <FadeInUp style={styles.header}>
             <View style={styles.headerTop}>
               <View style={styles.headerTitle}>
@@ -525,10 +501,6 @@ export function TodayScreen({ navigation }: Props) {
 
 const styles = themed(() =>
   StyleSheet.create({
-  blobs: {
-    position: 'absolute',
-    top: -40,
-  },
   header: {
     marginTop: spacing.lg,
   },
