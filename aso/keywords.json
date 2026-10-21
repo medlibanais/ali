@@ -1,0 +1,75 @@
+{
+  "brand": ["prayerlock"],
+  "wedge": [
+    {
+      "keyword": "prayer habit tracker",
+      "role": "primary",
+      "expected_popularity": ">20",
+      "expected_difficulty": "<50",
+      "rationale": "Exact product definition. Combines prayer volume with habit intent. No dominant incumbent owns this phrase."
+    },
+    {
+      "keyword": "salat tracker",
+      "role": "primary",
+      "expected_popularity": ">20",
+      "expected_difficulty": "<50",
+      "rationale": "High intent Muslim audience term. Top 10 historically contains dated apps with weak ratings (filters 3, 5)."
+    },
+    {
+      "keyword": "muslim productivity",
+      "role": "primary",
+      "expected_popularity": ">20",
+      "expected_difficulty": "<50",
+      "rationale": "Growing category term, recent entrants already rank (filter 4). Positions the app beyond prayer times utilities."
+    },
+    {
+      "keyword": "future self",
+      "role": "brand-adjacent",
+      "expected_popularity": ">20",
+      "expected_difficulty": "<50",
+      "rationale": "Differentiator term from the Future You avatar feature. Captures self improvement searches outside the prayer niche."
+    }
+  ],
+  "supporting": [
+    "muslim habits",
+    "daily deen",
+    "prayer streak",
+    "quran reading",
+    "accountability coach",
+    "identity habits",
+    "discipline tracker",
+    "iman",
+    "salah reminder",
+    "habit streak"
+  ],
+  "seasonal": [
+    {
+      "keyword": "ramadan tracker",
+      "window": "swap into iOS keyword field 4 weeks before Ramadan",
+      "rationale": "Largest predictable organic spike in the niche."
+    },
+    {
+      "keyword": "athan companion",
+      "window": "test after core terms stabilize",
+      "rationale": "Adjacent to prayer times searches without competing on the head term."
+    }
+  ],
+  "excluded": [
+    {
+      "keyword": "prayer times",
+      "reason": "KP very high but KD far above 50. Muslim Pro and Athan own it. Do not fight the head term at launch."
+    },
+    {
+      "keyword": "habit tracker",
+      "reason": "KP very high, KD far above 50. Generic habit territory is saturated."
+    },
+    {
+      "keyword": "quran",
+      "reason": "Head term, KD too high, and intent mismatch (readers, not trackers)."
+    }
+  ],
+  "ios_keyword_field": "tracker,muslim,deen,salah,streak,quran,future,self,discipline,iman,coach,daily,habit,pray,faith",
+  "ios_keyword_field_length_check": 95,
+  "ios_keyword_field_note": "Words already in the app name (PrayerLock, Salat, Habits) are indexed by Apple for free and are deliberately excluded.",
+  "notes": "Live KP and KD values must be confirmed in AppTweak or Appfigures during launch week. The expected values above reflect the historical signature of this long tail territory, not a guarantee. See README worksheet."
+}

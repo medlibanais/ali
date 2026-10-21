@@ -1,0 +1,18 @@
+# Node / Expo
+node_modules/
+dist/
+dist-check/
+
+# Env & secrets (any directory)
+.env
+.env.local
+**/.env.local
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+supabase/.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db

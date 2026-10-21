@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PrayerLock Avatar Preview</title>
+<style>
+  body { font-family: Georgia, serif; background: #F7F4ED; margin: 0; padding: 32px; }
+  h1 { font-size: 22px; color: #23201A; }
+  p { color: #6E675A; max-width: 720px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; }
+  .cell { text-align: center; }
+  .cell svg { border-radius: 50%; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+  .cell div { margin-top: 8px; font-size: 13px; color: #6E675A; }
+</style>
+</head>
+<body>
+<h1>PrayerLock — layered-SVG avatar preview</h1>
+<p>Static render of the avatar geometry used by the app (200×200 viewBox, circular crop).
+   This mirrors <code>mobile/src/avatar/parts-*.tsx</code>. Open this file in any browser.</p>
+<div class="grid" id="grid"></div>
+
+<script>
+// Minimal port of the app geometry for eyeballing the art direction.
+function avatar({skin, skinShade, hair, outfit, outfitShade, bg1, bg2, mood, hijab}) {
+  const glowing = mood === 'glowing';
+  return `
+  <svg width="160" height="160" viewBox="0 0 200 200">
+    <defs>
+      <linearGradient id="bg${skin}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="200" height="200" fill="url(#bg${skin})"/>
+    ${glowing ? '<circle cx="100" cy="100" r="94" fill="none" stroke="#D8A945" stroke-width="4"/>' : ''}
+    <path d="M84,146 L116,146 L118,176 L82,176 Z" fill="${skin}"/>
+    <path d="M84,146 L116,146 L116,158 C108,166 92,166 84,158 Z" fill="${skinShade}" opacity="0.55"/>
+    <path d="M40,200 C42,168 62,158 100,158 C138,158 158,168 160,200 Z" fill="${outfit}"/>
+    <path d="M78,162 C80,176 88,184 100,184 C112,184 120,176 122,162 C116,170 108,172 100,172 C92,172 84,170 78,162 Z" fill="${outfitShade}"/>
+    <ellipse cx="50" cy="102" rx="7" ry="11" fill="${skin}"/>
+    <ellipse cx="150" cy="102" rx="7" ry="11" fill="${skin}"/>
+    <path d="M100,34 C130,34 148,62 148,96 C148,134 128,158 100,158 C72,158 52,134 52,96 C52,62 70,34 100,34 Z" fill="${skin}"/>
+    <path d="M76,79 Q84,74 93,78" stroke="${hair}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M124,79 Q116,74 107,78" stroke="${hair}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    ${mood === 'happy' || glowing ? `
+      <path d="M77,91 Q84,84 91,91" stroke="#2B2018" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+      <path d="M109,91 Q116,84 123,91" stroke="#2B2018" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    ` : `
+      <ellipse cx="84" cy="90" rx="6.2" ry="4.6" fill="#FDFBF6" stroke="#2B2018" stroke-width="1.2"/>
+      <ellipse cx="116" cy="90" rx="6.2" ry="4.6" fill="#FDFBF6" stroke="#2B2018" stroke-width="1.2"/>
+      <circle cx="84" cy="90.6" r="2.6" fill="#241A12"/><circle cx="116" cy="90.6" r="2.6" fill="#241A12"/>
+      <circle cx="85" cy="89.4" r="0.8" fill="#FFF"/><circle cx="117" cy="89.4" r="0.8" fill="#FFF"/>
+    `}
+    <path d="M98,96 L97,108 Q96,112 100,113 Q104,112 103,108 L102,96" fill="none" stroke="${skinShade}" stroke-width="2.2" stroke-linecap="round"/>
+    ${glowing
+      ? '<path d="M85,123 Q100,142 115,123 Q100,130 85,123 Z" fill="#7C3A34"/><path d="M90,126 Q100,133 110,126 Q100,129.5 90,126 Z" fill="#FDFBF6"/>'
+      : mood === 'tired'
+        ? '<path d="M90,126 L110,126" stroke="#A6574B" stroke-width="2.8" stroke-linecap="round"/>'
+        : '<path d="M88,124 Q100,133 112,124" fill="none" stroke="#A6574B" stroke-width="3.2" stroke-linecap="round"/>'}
+    ${hijab
+      ? `<path d="M48,98 C44,44 70,24 100,24 C130,24 156,44 152,98 C152,140 142,168 132,182 L118,182 C128,160 132,140 132,118 C126,140 116,148 100,148 C84,148 74,140 68,118 C68,140 72,160 82,182 L68,182 C58,168 48,140 48,98 Z" fill="${hair}"/>
+         <path d="M68,96 C68,60 82,44 100,44 C118,44 132,60 132,96 C132,124 118,142 100,142 C82,142 68,124 68,96 Z" fill="${skin}"/>
+         <path d="M76,79 Q84,74 93,78" stroke="#3D2A1B" stroke-width="3" fill="none" stroke-linecap="round"/>
+         <path d="M124,79 Q116,74 107,78" stroke="#3D2A1B" stroke-width="3" fill="none" stroke-linecap="round"/>
+         <ellipse cx="84" cy="90" rx="6.2" ry="4.6" fill="#FDFBF6" stroke="#2B2018" stroke-width="1.2"/>
+         <ellipse cx="116" cy="90" rx="6.2" ry="4.6" fill="#FDFBF6" stroke="#2B2018" stroke-width="1.2"/>
+         <circle cx="84" cy="90.6" r="2.6" fill="#241A12"/><circle cx="116" cy="90.6" r="2.6" fill="#241A12"/>
+         <path d="M88,124 Q100,133 112,124" fill="none" stroke="#A6574B" stroke-width="3.2" stroke-linecap="round"/>`
+      : `<path d="M54,88 C52,48 72,30 100,30 C128,30 148,48 146,88 C142,70 138,60 132,58 C134,68 130,74 126,70 C122,66 124,58 118,56 C112,54 108,60 100,58 C92,56 88,54 82,58 C76,62 76,70 70,72 C64,74 60,66 62,60 C56,62 54,74 54,88 Z" fill="${hair}"/>`
+    }
+  </svg>`;
+}
+
+const samples = [
+  { label: 'Default · neutral', args: { skin:'#C98A5F', skinShade:'#B5754C', hair:'#3D2A1B', outfit:'#1F5138', outfitShade:'#173C2A', bg1:'#F6E3C5', bg2:'#E8B08A', mood:'neutral' } },
+  { label: 'Happy · score ≥ 50', args: { skin:'#F2CBAE', skinShade:'#E2B493', hair:'#24344E', outfit:'#2C4A6E', outfitShade:'#1F3853', bg1:'#CFE4EC', bg2:'#8FB8CC', mood:'happy' } },
+  { label: 'Glowing · score ≥ 80', args: { skin:'#8A5331', skinShade:'#6F4023', hair:'#1C1611', outfit:'#8E3449', outfitShade:'#6E2738', bg1:'#D3EBDD', bg2:'#8FC3A8', mood:'glowing' } },
+  { label: 'Hijab option', args: { skin:'#D89B70', skinShade:'#C58559', hair:'#563B8C', outfit:'#3A3A40', outfitShade:'#2A2A2F', bg1:'#DCD3E8', bg2:'#A08BBD', mood:'neutral', hijab:true } },
+  { label: 'Tired · score < 25', args: { skin:'#6E4125', skinShade:'#583118', hair:'#2C211A', outfit:'#A84A1C', outfitShade:'#863913', bg1:'#EFE6D2', bg2:'#CDBB94', mood:'tired' } },
+];
+
+document.getElementById('grid').innerHTML =
+  samples.map(s => `<div class="cell">${avatar(s.args)}<div>${s.label}</div></div>`).join('');
+</script>
+</body>
+</html>

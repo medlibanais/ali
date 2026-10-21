@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "GROW",
+    "slug": "prayerlock",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "prayerlock",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F4ED",
+    "splash": {
+      "backgroundColor": "#F7F4ED",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "bundleIdentifier": "com.prayerlock.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.prayerlock.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

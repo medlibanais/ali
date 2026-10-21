@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: prayerlock
+      POSTGRES_PASSWORD: prayerlock
+      POSTGRES_DB: prayerlock
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prayerlock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # After first start, pull the model once:
+    #   docker compose exec ollama ollama pull llama2:13b
+    # The API works without it via the deterministic fallback coach.
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PRAYERLOCK_DATABASE_URL: postgresql+psycopg://prayerlock:prayerlock@db:5432/prayerlock
+      PRAYERLOCK_OLLAMA_URL: http://ollama:11434
+      PRAYERLOCK_OLLAMA_ENABLED: "false"
+      PRAYERLOCK_SEED_DEMO: "true"
+      PRAYERLOCK_DEBUG: "false"
+      PRAYERLOCK_JWT_SECRET: change-me-in-production
+      PRAYERLOCK_ALLOWED_ORIGINS: "*"
+    ports:
+      - "8000:8000"
+    volumes:
+      - avatars:/app/static
+
+volumes:
+  pgdata:
+  ollama:
+  avatars:
