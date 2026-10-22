@@ -90,8 +90,8 @@ export const borderWidth = {
 } as const;
 
 export const fonts = {
-  display: 'Fraunces_600SemiBold',
-  title: 'Fraunces_600SemiBold',
+  display: 'IMFellGreatPrimer_400Regular',
+  title: 'IMFellGreatPrimer_400Regular',
   body: 'Nunito_400Regular',
   bodySemi: 'Nunito_700Bold',
   caption: 'Nunito_600SemiBold',
