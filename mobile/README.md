@@ -61,7 +61,7 @@ src/
 - One accent (deep green `#1F5138`) plus a muted five color pillar palette. Gold reserved for streaks and badges.
 - No gradients, no shadows, no blur. Separation comes from 1px hairline borders (`#E4DECF`) and background contrast.
 - Corner radius scale: 3 / 5 / 8 only. The only circular elements are the avatar ring and the score ring, which are geometric shapes, not softened rectangles.
-- Fraunces for display and numerals, Source Sans 3 for body. Loaded locally via `@expo-google-fonts`, with a paper splash fallback while fonts load.
+- IM Fell Great Primer for titles, Nunito for body. Loaded locally via `@expo-google-fonts`, with a paper splash fallback while fonts load.
 - All icons and glyphs are hand-drawn `react-native-svg` line work (1.5 stroke). No icon fonts, no emoji anywhere in the UI.
 - Skeleton loaders (pulsing `paperAlt` blocks) on dashboard, quests, coach, insights, achievements, and profile. No spinner-only states.
 - Press feedback is a single opacity 0.96 state.
