@@ -18,8 +18,13 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
-import { ArrowUpGlyph, ComposeGlyph } from '../components/icons';
+import { ArrowUpGlyph, ComposeGlyph, MicGlyph } from '../components/icons';
 import type { ChatMessage } from '../api/types';
+import {
+  mergeTranscript,
+  useVoiceInput,
+  VOICE_ERROR_MESSAGES,
+} from '../lib/voiceInput';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   chatErrorCleared,
@@ -215,6 +220,13 @@ export function CoachScreen() {
   const profile = useAppSelector((state) => state.user.profile);
   const [draft, setDraft] = useState('');
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // What was typed before the mic was tapped; dictation is added after it.
+  const voiceBase = useRef('');
+  const voice = useVoiceInput({
+    onTranscript: (text) =>
+      setDraft(mergeTranscript(voiceBase.current, text, MESSAGE_MAX_LENGTH)),
+    onError: (error) => toast.showToast({ message: VOICE_ERROR_MESSAGES[error] }),
+  });
 
   useEffect(() => {
     dispatch(fetchChatHistory());
@@ -222,6 +234,7 @@ export function CoachScreen() {
 
   const remaining = remainingMessages(chat);
   const canSend = draft.trim().length > 0 && !chat.sending && remaining > 0;
+  const canUseMic = remaining > 0 && !chat.sending;
   const hasMessages = chat.messages.length > 0;
   const canStartNewChat =
     hasMessages && !chat.sending && !chat.startingNewChat && !chat.loadingHistory;
@@ -231,9 +244,22 @@ export function CoachScreen() {
     if (!toSend || chat.sending || remaining <= 0) {
       return;
     }
+    // Drop any late dictation so it can't refill the cleared input.
+    voice.cancel();
     setDraft('');
     // On failure the slice keeps the text and the banner offers a retry.
     await dispatch(sendChatMessage(toSend));
+  };
+
+  const toggleMic = () => {
+    if (!voice.listening) voiceBase.current = draft;
+    voice.toggle();
+  };
+
+  const onChangeDraft = (text: string) => {
+    // Typing takes over from dictation.
+    if (voice.listening) voice.cancel();
+    setDraft(text);
   };
 
   const retry = () => {
@@ -426,8 +452,8 @@ export function CoachScreen() {
           <TextInput
             style={styles.input}
             value={draft}
-            onChangeText={setDraft}
-            placeholder="Ask your future self"
+            onChangeText={onChangeDraft}
+            placeholder={voice.listening ? 'Listening…' : 'Ask your future self'}
             placeholderTextColor={colors.inkFaint}
             maxLength={MESSAGE_MAX_LENGTH}
             multiline
@@ -441,6 +467,26 @@ export function CoachScreen() {
               {`${draft.length}/${MESSAGE_MAX_LENGTH}`}
             </Txt>
           ) : null}
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={voice.listening ? 'Stop voice input' : 'Speak your message'}
+            accessibilityState={{ disabled: !canUseMic, selected: voice.listening }}
+            onPress={toggleMic}
+            disabled={!canUseMic}
+            pressedScale={0.9}
+            hitSlop={4}
+            style={[
+              styles.micButton,
+              voice.listening && styles.micListening,
+              !canUseMic && styles.sendDisabled,
+            ]}
+            testID="coach-mic"
+          >
+            <MicGlyph
+              size={22}
+              color={voice.listening ? colors.onAccent : colors.inkSoft}
+            />
+          </PressableScale>
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Send message"
@@ -666,6 +712,17 @@ const styles = themed(() =>
       alignSelf: 'center',
       fontSize: 11,
       marginHorizontal: spacing.xs,
+    },
+    micButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.xs,
+    },
+    micListening: {
+      backgroundColor: colors.danger,
     },
     sendButton: {
       width: 44,

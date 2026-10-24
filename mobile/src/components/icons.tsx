@@ -508,3 +508,9 @@ export function MoreGlyph({ size = 22, color = colors.ink }: IconProps) {
     </Svg>
   );
 }
+
+/** Microphone on the coach input (voice-to-text). */
+export function MicGlyph({ size = 20, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3ZM18.5 11a6.5 6.5 0 0 1-13 0M12 17.5v3M9 20.5h6" />;
+}
