@@ -25,8 +25,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow PrayerLock to access your microphone so you can speak to your Future Self.",
-          "speechRecognitionPermission": "Allow PrayerLock to use speech recognition."
+          "microphonePermission": "Allow GROW to access your microphone so you can speak to your Future Self.",
+          "speechRecognitionPermission": "Allow GROW to use speech recognition."
         }
       ]
     ]
