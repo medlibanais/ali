@@ -32,7 +32,52 @@ function loadSpeech(): SpeechPackage | null {
   return cached;
 }
 
-export const VOICE_LANG = 'en-US';
+/** Used when the phone's language can't be recognized. */
+export const FALLBACK_LANG = 'en-US';
+
+/** The phone's language as a BCP-47 tag, e.g. "fr-FR" or "ar-MA". */
+export function deviceLocale(): string {
+  try {
+    const tag = Intl.DateTimeFormat().resolvedOptions().locale;
+    return tag && tag !== 'und' ? tag : FALLBACK_LANG;
+  } catch {
+    return FALLBACK_LANG;
+  }
+}
+
+/**
+ * Picks the recognition language: the phone's own when the recognizer
+ * supports it, else another variant of the same language (fr-CA for fr-FR),
+ * else English. An empty or missing list means "unknown", so the phone's
+ * language is tried as is.
+ */
+export function pickVoiceLang(device: string, supported: string[] | null): string {
+  if (!supported || supported.length === 0) return device;
+  const norm = (tag: string) => tag.replace('_', '-').toLowerCase();
+  const wanted = norm(device);
+  const exact = supported.find((tag) => norm(tag) === wanted);
+  if (exact) return exact;
+  const base = wanted.split('-')[0];
+  const sameLanguage = supported.find((tag) => norm(tag).split('-')[0] === base);
+  return sameLanguage ?? FALLBACK_LANG;
+}
+
+let chosenLang: string | null = null;
+
+async function voiceLang(speech: SpeechPackage): Promise<string> {
+  if (chosenLang) return chosenLang;
+  let supported: string[] | null = null;
+  // The web build only warns and returns nothing, so skip it there.
+  if (Platform.OS !== 'web') {
+    try {
+      supported = (await speech.getSupportedLocales()).locales;
+    } catch {
+      supported = null; // Older Android can't list them.
+    }
+  }
+  chosenLang = pickVoiceLang(deviceLocale(), supported);
+  return chosenLang;
+}
 
 export type VoiceError =
   | 'permission'
@@ -146,7 +191,10 @@ export function useVoiceInput({ onTranscript, onError }: VoiceInputOptions) {
       active.current = true;
       // Show the listening state right away; the 'start' event confirms it.
       setListening(true);
-      ExpoSpeechRecognitionModule.start({ lang: VOICE_LANG, interimResults: true });
+      const lang = await voiceLang(speech);
+      // Sent or cancelled while the language list was loading.
+      if (!active.current) return;
+      ExpoSpeechRecognitionModule.start({ lang, interimResults: true });
     } catch {
       active.current = false;
       setListening(false);
