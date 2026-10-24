@@ -20,6 +20,15 @@
     },
     "web": {
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow PrayerLock to access your microphone so you can speak to your Future Self.",
+          "speechRecognitionPermission": "Allow PrayerLock to use speech recognition."
+        }
+      ]
+    ]
   }
 }
