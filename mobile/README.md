@@ -18,6 +18,52 @@ npx expo start --ios
 npx expo start --web
 ```
 
+## Phone build (needed for voice input)
+
+The Coach mic uses `expo-speech-recognition`, a native module that **Expo Go
+does not have**. In Expo Go the mic only says it needs the installed app.
+Make a development build once, then keep using `npx expo start --dev-client`
+the same way you used Expo Go.
+
+First pull and install:
+
+```powershell
+git pull
+cd mobile
+npm install
+```
+
+`mobile/.env` must have `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` (copy `.env.example`).
+
+### Option A: build in the cloud with EAS (no Android Studio needed, works for iPhone too)
+
+```powershell
+npm install -g eas-cli
+eas login                                   # free Expo account
+eas init                                    # links the project, first time only
+eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value <your url> --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <your anon key> --visibility plaintext
+npm run build:dev:android                   # eas build --profile development --platform android
+```
+
+When the build finishes, open the link on your phone, install the APK, then
+on the laptop run `npm run start:dev` and scan the QR code with the new app.
+For an iPhone, use `eas build --profile development --platform ios` (it asks
+you to register the device; needs an Apple developer account).
+
+### Option B: build on your computer (Android Studio)
+
+Needs Android Studio (Android SDK + JDK 17) and the phone plugged in with
+USB debugging on, or an emulator running. `adb devices` should list it.
+
+```powershell
+npm run android:dev                         # expo run:android
+```
+
+This generates the `android/` folder (git-ignored), builds and installs the
+app. After that, `npm run start:dev` is enough until native packages change.
+
 ## API base URL
 
 The base URL lives in `app.json` under `expo.extra.apiUrl`.
