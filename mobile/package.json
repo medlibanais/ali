@@ -9,7 +9,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "android:dev": "expo run:android",
+    "ios:dev": "expo run:ios",
+    "build:dev:android": "eas build --profile development --platform android",
+    "start:dev": "expo start --dev-client"
   },
   "jest": {
     "preset": "jest-expo",
@@ -35,6 +39,7 @@
     "expo": "~51.0.39",
     "expo-clipboard": "~6.0.3",
     "expo-constants": "~16.0.2",
+    "expo-dev-client": "~4.0.29",
     "expo-file-system": "~17.0.1",
     "expo-font": "~12.0.10",
     "expo-image-manipulator": "~12.0.5",
