@@ -24,6 +24,8 @@ import { AuraRing, AvatarBackground, Outfit } from './parts-outfit';
 import { Body } from './parts-body';
 import SoftAvatar from './SoftAvatar';
 import ToonAvatar from './ToonAvatar';
+import AnimeAvatar from './AnimeAvatar';
+import type { AnimeStyleId } from './animeStyles';
 
 export interface AvatarViewProps {
   config: AvatarConfig;
@@ -32,11 +34,12 @@ export interface AvatarViewProps {
   animated?: boolean;
   mode?: 'head' | 'full-body';
   /**
-   * 'toon' (default) is the cartoon person with natural proportions,
-   * 'soft' the rounded chibi character, 'classic' the detailed flat art.
+   * 'anime' (default) is the seinen anime character in the config's art
+   * style, 'toon' the cartoon person with natural proportions, 'soft' the
+   * rounded chibi character, 'classic' the detailed flat art.
    */
-  look?: 'toon' | 'soft' | 'classic';
-  /** Toon look only: no background and no round crop. */
+  look?: 'anime' | 'toon' | 'soft' | 'classic';
+  /** Anime and toon looks: no background and no round crop. */
   bare?: boolean;
 }
 
@@ -45,7 +48,10 @@ const HEAD_BOX = 200;
 // by y≈434, leaving >20 units of bottom padding.
 const BODY_BOX_H = 460;
 
-export function AvatarView({ look = 'toon', bare, ...props }: AvatarViewProps) {
+export function AvatarView({ look = 'anime', bare, ...props }: AvatarViewProps) {
+  if (look === 'anime') {
+    return <AnimeAvatar {...props} bare={bare} styleId={props.config.artStyle as AnimeStyleId} />;
+  }
   if (look === 'toon') return <ToonAvatar {...props} bare={bare} />;
   if (look === 'soft') return <SoftAvatar {...props} />;
   return <ClassicAvatarView {...props} />;

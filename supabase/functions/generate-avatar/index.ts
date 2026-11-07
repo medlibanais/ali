@@ -52,10 +52,12 @@ Deno.serve(async (req: Request) => {
     if (userError || !user) return json({ error: 'invalid_session' }, 401);
 
     let imageBase64 = '';
+    let artStyle = '';
     try {
       const body = await req.json();
       imageBase64 =
         typeof body?.image_base64 === 'string' ? body.image_base64 : '';
+      artStyle = typeof body?.art_style === 'string' ? body.art_style : '';
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
@@ -87,6 +89,7 @@ Deno.serve(async (req: Request) => {
     const prompt = buildPrompt(
       goals?.dream_body ?? null,
       (goals?.dream_personality as string[] | null) ?? [],
+      artStyle,
     );
 
     // ---- provider call ----
@@ -201,7 +204,24 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildPrompt(dreamBody: string | null, personality: string[]): string {
+// One prompt per anime art style the avatar editor offers
+// (mobile/src/avatar/animeStyles.ts). Unknown styles fall back to crimson.
+const STYLE_PROMPTS: Record<string, string> = {
+  ronin:
+    'Redraw this photo as a dark, cinematic Japanese anime still in the style of a modern samurai period drama: thin clean linework, flat cel shading, half of the face in deep shadow, warm ember light from one side, muted earthy colors, dark wooden interior background at night.',
+  crimson:
+    'Redraw this photo as an intense near-monochrome Japanese seinen anime portrait: thick black ink linework, sepia and gray tones, hatched screentone shadows, sharp spiky locks of hair casting shadow over the eyes, piercing glowing crimson irises, plain pale background with a dark vignette.',
+  grit:
+    'Redraw this photo as a rugged Japanese seinen anime portrait: confident sharp linework, strong angular jaw, thick brows, fine lines under the eyes, hard cel shading with deep shadows, warm muted brown palette, steady intense stare, dim warm interior background.',
+  storm:
+    'Redraw this photo as a moody Japanese anime still of a lone warrior in heavy rain: cold blue-gray palette, sharp linework, flat cel shading, wet hair with white highlight streaks and water drops, overcast stormy sky and dark trees behind, subtle film grain.',
+};
+
+function buildPrompt(
+  dreamBody: string | null,
+  personality: string[],
+  artStyle = '',
+): string {
   const traits = personality
     .filter((t) => typeof t === 'string')
     .slice(0, 4)
@@ -209,13 +229,12 @@ function buildPrompt(dreamBody: string | null, personality: string[]): string {
     .filter(Boolean);
   const body = (dreamBody ?? '').replace(/[^\p{L}\p{N} ,.'-]/gu, '').slice(0, 80);
   const parts = [
-    'Turn this photo into a soft 3D cartoon character of the same person, in the friendly style of a modern 3D animated family film: rounded shapes, smooth matte skin, big expressive friendly eyes, gentle features.',
-    'Keep their identity: same face shape, skin tone, eye color, hairstyle and hair color, facial hair, glasses, and any head covering such as a hijab or cap.',
-    'Show them as the best version of themselves a few years from now: healthy, rested, warm confident smile.',
+    STYLE_PROMPTS[artStyle] ?? STYLE_PROMPTS.crimson,
+    'Keep their identity: same face shape, skin tone, hairstyle and hair color, facial hair, glasses, and any head covering such as a hijab or cap.',
+    'Show them as the strongest version of themselves a few years from now: focused, determined, calm confidence.',
     traits.length > 0 ? `Their expression feels ${traits.join(', ')}.` : '',
     body ? `Physique hint: ${body}.` : '',
-    'Relaxed, natural pose, never stiff or blocky: waist-up, body slightly turned, one hand raised in a friendly wave.',
-    'Centered with space around the head for a circular crop, soft diffused studio light, plain warm cream background, no text, no logos, modest everyday clothing.',
+    'Head and shoulders, centered with space around the head for a circular crop, no text, no logos, no weapons, modest clothing.',
   ];
   return parts.filter(Boolean).join(' ');
 }

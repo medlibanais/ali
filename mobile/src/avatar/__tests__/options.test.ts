@@ -20,6 +20,18 @@ describe('sanitizeAvatarConfig', () => {
     expect(sanitizeAvatarConfig(old, VALID_OPTION_IDS).bottoms).toBe('pants');
   });
 
+  it('gives configs saved before art styles the default anime style', () => {
+    const old = { ...DEFAULT_AVATAR } as Record<string, unknown>;
+    delete old.artStyle;
+    expect(sanitizeAvatarConfig(old, VALID_OPTION_IDS).artStyle).toBe('crimson');
+  });
+
+  it('keeps every anime style choice', () => {
+    for (const id of ['ronin', 'crimson', 'grit', 'storm']) {
+      expect(sanitizeAvatarConfig({ artStyle: id }, VALID_OPTION_IDS).artStyle).toBe(id);
+    }
+  });
+
   it('keeps a valid bottoms choice', () => {
     expect(sanitizeAvatarConfig({ bottoms: 'shorts' }, VALID_OPTION_IDS).bottoms).toBe('shorts');
   });

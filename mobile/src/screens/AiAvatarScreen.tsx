@@ -71,8 +71,11 @@ export function AiAvatarScreen({ navigation, route }: Props) {
     setError(null);
     setPhase('preparing');
     try {
-      const result = await pickAndGenerateAiAvatar(source, () =>
-        setPhase('generating'),
+      const artStyle = profile?.avatar_config?.artStyle;
+      const result = await pickAndGenerateAiAvatar(
+        source,
+        () => setPhase('generating'),
+        typeof artStyle === 'string' ? artStyle : undefined,
       );
       setResultUrl(result.url);
       setPhase('done');
