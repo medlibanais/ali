@@ -16,7 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AvatarView from '../avatar/AvatarView';
 import {
   categoryFor,
-  EDITOR_GROUPS,
+  ACTIVE_EDITOR_GROUPS,
   optionLocked,
   randomAvatarConfig,
   VALID_OPTION_IDS,
@@ -99,14 +99,14 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   );
 
   const [config, setConfig] = useState<AvatarConfig>(initial);
-  const [groupKey, setGroupKey] = useState<string>(EDITOR_GROUPS[0].key);
-  const [view, setView] = useState<'head' | 'full-body'>(EDITOR_GROUPS[0].view);
+  const [groupKey, setGroupKey] = useState<string>(ACTIVE_EDITOR_GROUPS[0].key);
+  const [view, setView] = useState<'head' | 'full-body'>(ACTIVE_EDITOR_GROUPS[0].view);
   const [saving, setSaving] = useState(false);
   const undoStack = useRef<AvatarConfig[]>([]);
   const redoStack = useRef<AvatarConfig[]>([]);
   const [, setHistoryVersion] = useState(0);
 
-  const group: EditorGroup = EDITOR_GROUPS.find((g) => g.key === groupKey) ?? EDITOR_GROUPS[0];
+  const group: EditorGroup = ACTIVE_EDITOR_GROUPS.find((g) => g.key === groupKey) ?? ACTIVE_EDITOR_GROUPS[0];
 
   const commit = (next: AvatarConfig) => {
     undoStack.current.push(config);
@@ -256,7 +256,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.tabs}
           style={styles.tabsBar}
         >
-          {EDITOR_GROUPS.map((g) => {
+          {ACTIVE_EDITOR_GROUPS.map((g) => {
             const Icon = GROUP_ICONS[g.key];
             const selected = g.key === group.key;
             return (

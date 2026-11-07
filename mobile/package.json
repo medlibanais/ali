@@ -13,7 +13,8 @@
     "android:dev": "expo run:android",
     "ios:dev": "expo run:ios",
     "build:dev:android": "eas build --profile development --platform android",
-    "start:dev": "expo start --dev-client"
+    "start:dev": "expo start --dev-client",
+    "build:avatar3d": "node scripts/build-avatar3d.mjs"
   },
   "jest": {
     "preset": "jest-expo",
@@ -38,6 +39,7 @@
     "@tanstack/react-query": "^5.104.1",
     "axios": "^1.7.7",
     "expo": "~51.0.39",
+    "expo-asset": "~10.0.10",
     "expo-clipboard": "~6.0.3",
     "expo-constants": "~16.0.2",
     "expo-dev-client": "~4.0.29",
@@ -60,16 +62,20 @@
     "react-native-url-polyfill": "^4.0.0",
     "react-native-view-shot": "3.8.0",
     "react-native-web": "~0.19.10",
+    "react-native-webview": "13.8.6",
     "react-redux": "^9.1.2"
   },
   "devDependencies": {
+    "@pixiv/three-vrm": "^3.1.0",
     "@types/jest": "^29.5.14",
     "@types/qrcode": "^1.5.5",
     "@types/react": "~18.2.79",
     "babel-preset-expo": "~11.0.15",
+    "esbuild": "^0.23.1",
     "jest": "^29.7.0",
     "jest-expo": "~51.0.4",
     "react-test-renderer": "^18.2.0",
+    "three": "^0.169.0",
     "typescript": "~5.3.3"
   },
   "overrides": {
