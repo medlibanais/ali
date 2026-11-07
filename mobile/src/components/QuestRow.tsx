@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Quest } from '../api/types';
 import {
+  blockTiles,
   colors,
   PILLAR_LABELS,
   pillarPastels,
@@ -9,6 +10,7 @@ import {
   softSurface,
   spacing,
   themed,
+  withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { CheckGlyph, StarGlyph } from './icons';
@@ -39,6 +41,12 @@ export function QuestRow({
   const pillarColor = colors.pillar[quest.pillar];
   const pastel = pillarPastels(quest.pillar);
   const dimmed = quest.skipped === true;
+  // Block tiles: the whole row takes the pillar color with black text.
+  const block = blockTiles();
+  const tileInk = colors.onAccent;
+  const blockRow = block
+    ? { backgroundColor: pillarColor, borderWidth: 0 }
+    : null;
 
   return (
     <PressableScale
@@ -46,7 +54,7 @@ export function QuestRow({
       onPress={onPress ? () => onPress(quest) : undefined}
       disabled={!onPress || dimmed}
       pressedScale={0.98}
-      style={[styles.row, dimmed && styles.dimmed]}
+      style={[styles.row, blockRow, dimmed && styles.dimmed]}
     >
       {onComplete && !quest.completed && !dimmed ? (
         <Pressable
@@ -57,19 +65,28 @@ export function QuestRow({
           hitSlop={11}
           style={({ pressed }) => [
             styles.check,
-            { borderColor: pastel.base },
-            pressed && { backgroundColor: pastel.tint },
+            block
+              ? { borderColor: tileInk, backgroundColor: 'transparent' }
+              : { borderColor: pastel.base },
+            pressed && { backgroundColor: block ? withAlpha(tileInk, 0.15) : pastel.tint },
           ]}
         />
       ) : (
-        <View style={[styles.check, quest.completed && styles.checkDone]}>
+        <View
+          style={[
+            styles.check,
+            block && { borderColor: tileInk, backgroundColor: 'transparent' },
+            quest.completed && styles.checkDone,
+            quest.completed && block && { backgroundColor: tileInk, borderColor: tileInk },
+          ]}
+        >
           {quest.completed ? <CheckGlyph size={14} /> : null}
         </View>
       )}
       <View style={styles.body}>
         <Txt
           variant="bodySemi"
-          color={quest.completed ? colors.inkSoft : colors.ink}
+          color={block ? tileInk : quest.completed ? colors.inkSoft : colors.ink}
           numberOfLines={1}
         >
           {quest.title}
@@ -78,12 +95,12 @@ export function QuestRow({
           <View
             style={[
               styles.tag,
-              { backgroundColor: pastel.tint },
+              { backgroundColor: block ? withAlpha(colors.ink, 0.55) : pastel.tint },
             ]}
           >
             <Txt
               variant="caption"
-              color={pillarColor}
+              color={block ? tileInk : pillarColor}
               style={styles.tagText}
             >
               {showPillarLabel
@@ -92,10 +109,10 @@ export function QuestRow({
             </Txt>
           </View>
           {quest.is_ai_generated ? (
-            <View style={[styles.tag, styles.coachTag]}>
+            <View style={[styles.tag, styles.coachTag, block && { backgroundColor: tileInk }]}>
               <Txt
                 variant="caption"
-                color={colors.accent}
+                color={block ? pillarColor : colors.accent}
                 style={styles.tagText}
               >
                 Coach pick
@@ -103,15 +120,15 @@ export function QuestRow({
             </View>
           ) : null}
           {dimmed ? (
-            <Txt variant="caption" color={colors.inkFaint} style={styles.tagText}>
+            <Txt variant="caption" color={block ? tileInk : colors.inkFaint} style={styles.tagText}>
               Skipped
             </Txt>
           ) : null}
         </View>
       </View>
-      <View style={styles.xpPill}>
+      <View style={[styles.xpPill, block && { backgroundColor: tileInk }]}>
         <StarGlyph size={15} />
-        <Txt variant="label" color={colors.ink} style={styles.xp}>
+        <Txt variant="label" color={block ? pillarColor : colors.ink} style={styles.xp}>
           {`+${quest.xp_reward} XP`}
         </Txt>
       </View>

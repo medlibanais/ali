@@ -89,13 +89,16 @@ export const borderWidth = {
   hairline: 1,
 } as const;
 
+// Neon zine type: Anton (stand-in for a heavy condensed display face) for
+// titles, Inter for running text, JetBrains Mono for small uppercase labels.
 export const fonts = {
-  display: 'IMFellGreatPrimer_400Regular',
-  title: 'IMFellGreatPrimer_400Regular',
-  body: 'Nunito_400Regular',
-  bodySemi: 'Nunito_700Bold',
-  caption: 'Nunito_600SemiBold',
-  heavy: 'Nunito_800ExtraBold',
+  display: 'Anton_400Regular',
+  title: 'Anton_400Regular',
+  body: 'Inter_400Regular',
+  bodySemi: 'Inter_600SemiBold',
+  caption: 'Inter_500Medium',
+  heavy: 'Inter_800ExtraBold',
+  mono: 'JetBrainsMono_600SemiBold',
 } as const;
 
 /** Mixes two token hex colors; t=0 gives `a`, t=1 gives `b`. */
@@ -120,6 +123,11 @@ export function pillarPastels(pillar: Pillar) {
     base: mix(ink, activeColors.card, 0.38),
     tint: mix(ink, activeColors.card, 0.86),
   };
+}
+
+/** True when quest rows should be solid pillar-colored tiles. */
+export function blockTiles(): boolean {
+  return activeColors.tiles === 'block';
 }
 
 /** True when the active palette is a dark theme (light ink on dark paper). */
@@ -148,12 +156,15 @@ export function softShadow(level: 1 | 2 | 3 = 1) {
   };
 }
 
-/** Card-like surface: borderless with a soft shadow on light themes. */
+/**
+ * Card-like surface: borderless with a soft shadow on light themes, a
+ * hairline outline on dark ones.
+ */
 export function softSurface(level: 1 | 2 | 3 = 1) {
   return {
     backgroundColor: activeColors.card,
     borderWidth: isDarkPalette() ? borderWidth.hairline : 0,
-    borderColor: activeColors.line,
+    borderColor: activeColors.outline ?? activeColors.line,
     ...softShadow(level),
   };
 }

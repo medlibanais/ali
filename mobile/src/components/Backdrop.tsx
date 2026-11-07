@@ -6,6 +6,7 @@
 import React from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { getColors } from '../theme/tokens';
 
 export interface Blob {
   /** Horizontal center as a share of the window width (0..1). */
@@ -22,6 +23,8 @@ const MAX_COLUMN = 720;
 
 export function Backdrop({ blobs, height = 820 }: { blobs: Blob[]; height?: number }) {
   const { width } = useWindowDimensions();
+  // Flat themes (Neon) use solid color blocks only, no gradient halos.
+  if (getColors().flat) return null;
   // Screen centers its column at up to 720px; reach back to the window edge.
   const left = -(width - Math.min(width, MAX_COLUMN)) / 2;
   return (

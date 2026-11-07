@@ -23,9 +23,19 @@ export interface ThemeColors {
   gold: string;
   danger: string;
   pillar: PillarColors;
+  /** Card outline on dark themes. Falls back to `line` when unset. */
+  outline?: string;
+  /**
+   * 'block' fills quest rows edge to edge with their pillar color
+   * (black text on top) instead of a neutral card with a colored tag.
+   */
+  tiles?: 'card' | 'block';
+  /** True drops the blurred color halos behind screen headers. */
+  flat?: boolean;
 }
 
 export type ThemeId =
+  | 'neon'
   | 'parchment'
   | 'forest'
   | 'ocean'
@@ -43,6 +53,40 @@ export interface AppTheme {
 }
 
 export const THEMES: Record<ThemeId, AppTheme> = {
+  neon: {
+    id: 'neon',
+    name: 'Neon',
+    dark: true,
+    colors: {
+      // "Neon zine": near-black canvas, white hairline cards, acid mint
+      // as the one action color, ultraviolet as the second hazard accent,
+      // and loud color-block quest tiles. Based on the theverge style in
+      // VoltAgent/awesome-design-md.
+      paper: '#131313',
+      paperAlt: '#2D2D2D',
+      card: '#131313',
+      ink: '#FFFFFF',
+      inkSoft: '#949494',
+      inkFaint: '#8C8C8C',
+      line: '#313131',
+      outline: '#FFFFFF',
+      accent: '#3CFFD0',
+      onAccent: '#000000',
+      gold: '#FFD23C',
+      // Ultraviolet (#5200FF) lifted toward white so error text stays
+      // legible on the black canvas.
+      danger: '#9766FF',
+      tiles: 'block',
+      flat: true,
+      pillar: {
+        health: '#FF8AB5',
+        family: '#FFD23C',
+        work: '#7AA5FF',
+        fun: '#FF9B3C',
+        spirituality: '#3CFFD0',
+      },
+    },
+  },
   parchment: {
     id: 'parchment',
     name: 'Parchment',
@@ -248,6 +292,7 @@ export const THEMES: Record<ThemeId, AppTheme> = {
 };
 
 export const THEME_LIST: readonly AppTheme[] = [
+  THEMES.neon,
   THEMES.parchment,
   THEMES.forest,
   THEMES.ocean,
@@ -258,7 +303,7 @@ export const THEME_LIST: readonly AppTheme[] = [
   THEMES.ember,
 ];
 
-export const DEFAULT_THEME_ID: ThemeId = 'parchment';
+export const DEFAULT_THEME_ID: ThemeId = 'neon';
 
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && value in THEMES;

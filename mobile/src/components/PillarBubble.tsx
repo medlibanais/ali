@@ -152,8 +152,10 @@ const styles = themed(() =>
       bottom: -19,
       width: 84,
       maxWidth: 84,
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 14,
+      // Mono caps run wide; tighter tracking keeps "Spirituality" whole.
+      letterSpacing: 0.2,
     },
   }),
 );
