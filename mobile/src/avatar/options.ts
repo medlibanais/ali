@@ -13,6 +13,7 @@ import {
 } from './parts-face';
 import { HAIR_STYLES, HEADWEAR_STYLES } from './parts-hair';
 import { OUTFIT_STYLES } from './parts-outfit';
+import { ANIME_STYLES } from './animeStyles';
 
 export interface OptionItem {
   id: string;
@@ -31,6 +32,8 @@ export interface Category {
 }
 
 export const CATEGORIES: Category[] = [
+  { key: 'artStyle', label: 'Art style', kind: 'shape',
+    options: Object.values(ANIME_STYLES).map((s) => ({ id: s.id, label: s.label })) },
   { key: 'face', label: 'Face', kind: 'shape',
     options: FACE_SHAPES.map((o) => ({ id: o.id, label: o.label })) },
   { key: 'skin', label: 'Skin', kind: 'color',
@@ -118,6 +121,7 @@ export const VALID_OPTION_IDS: { [K in keyof AvatarConfig]: string[] } =
   ) as { [K in keyof AvatarConfig]: string[] };
 
 const ALL: string[] = [
+  ...Object.keys(ANIME_STYLES),
   ...FACE_SHAPES.map((o) => o.id),
   ...SKIN_TONES.map((o) => o.id),
   ...HAIR_STYLES.map((o) => o.id),
@@ -171,6 +175,7 @@ export interface EditorGroup {
 }
 
 export const EDITOR_GROUPS: EditorGroup[] = [
+  { key: 'style', label: 'Style', categories: ['artStyle'], view: 'head' },
   { key: 'face', label: 'Face', categories: ['face', 'skin'], view: 'head' },
   { key: 'hair', label: 'Hairstyle', categories: ['hair', 'hairColor'], view: 'head' },
   { key: 'eyes', label: 'Eyes', categories: ['eyes', 'brows'], view: 'head' },

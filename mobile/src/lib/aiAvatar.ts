@@ -91,17 +91,19 @@ export interface AiAvatarResult {
 export async function pickAndGenerateAiAvatar(
   source: 'camera' | 'gallery',
   onPicked?: () => void,
+  artStyle?: string,
 ): Promise<AiAvatarResult> {
   const base64 = await pickSquarePhoto(source);
   onPicked?.();
-  return generateAiAvatar(base64);
+  return generateAiAvatar(base64, artStyle);
 }
 
 export async function generateAiAvatar(
   imageBase64: string,
+  artStyle?: string,
 ): Promise<AiAvatarResult> {
   const { data, error } = await supabase.functions.invoke('generate-avatar', {
-    body: { image_base64: imageBase64 },
+    body: { image_base64: imageBase64, art_style: artStyle },
   });
   if (error) {
     throw avatarFailure(await describeFunctionError(error));
