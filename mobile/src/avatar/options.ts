@@ -184,6 +184,24 @@ export const EDITOR_GROUPS: EditorGroup[] = [
   { key: 'bg', label: 'Background', categories: ['bg'], view: 'head' },
 ];
 
+/**
+ * The 3D avatar (Avatar3D.tsx) is one VRoid model: its colors, body, pose
+ * and background follow the config, but face, hair and clothing shapes
+ * come with the model. The editor shows only what changes the 3D avatar.
+ */
+export const AVATAR_3D = true;
+
+export const CATEGORIES_3D = new Set<keyof AvatarConfig>([
+  'skin', 'hairColor', 'outfitColor', 'pantsColor', 'shoesColor', 'bg', 'bodyBuild', 'height', 'pose',
+]);
+
+export const EDITOR_GROUPS_3D: EditorGroup[] = EDITOR_GROUPS
+  .map((g) => ({ ...g, categories: g.categories.filter((c) => CATEGORIES_3D.has(c)) }))
+  .filter((g) => g.categories.length > 0);
+
+/** The editor tabs for the avatar the app currently draws. */
+export const ACTIVE_EDITOR_GROUPS = AVATAR_3D ? EDITOR_GROUPS_3D : EDITOR_GROUPS;
+
 export function categoryFor(key: keyof AvatarConfig): Category {
   const found = CATEGORIES.find((c) => c.key === key);
   if (!found) throw new Error(`Unknown avatar category ${key}`);

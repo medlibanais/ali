@@ -28,7 +28,8 @@
           "microphonePermission": "Allow GROW to access your microphone so you can speak to your Future Self.",
           "speechRecognitionPermission": "Allow GROW to use speech recognition."
         }
-      ]
+      ],
+      "expo-asset"
     ]
   }
 }

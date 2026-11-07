@@ -1,3 +1,4 @@
+import { Avatar3DHost } from './avatar/Avatar3D';
 import React, { useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
@@ -63,6 +64,7 @@ function ThemedRoot() {
         backgroundColor={theme.colors.paper}
       />
       <RootNavigator />
+      <Avatar3DHost />
     </NavigationContainer>
   );
 }

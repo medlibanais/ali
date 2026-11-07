@@ -25,6 +25,7 @@ import { Body } from './parts-body';
 import SoftAvatar from './SoftAvatar';
 import ToonAvatar from './ToonAvatar';
 import AnimeAvatar from './AnimeAvatar';
+import Avatar3D from './Avatar3D';
 import { DEFAULT_ANIME_STYLE } from './animeStyles';
 
 export interface AvatarViewProps {
@@ -34,10 +35,11 @@ export interface AvatarViewProps {
   animated?: boolean;
   mode?: 'head' | 'full-body';
   /**
-   * 'anime' (default) is the seinen anime character in the Ronin style, 'toon' the cartoon person with natural proportions, 'soft' the
+   * '3d' (default) is the toon-shaded 3D anime model (Avatar3D.tsx),
+   * 'anime' the 2D seinen anime drawing in the Ronin style, 'toon' the cartoon person with natural proportions, 'soft' the
    * rounded chibi character, 'classic' the detailed flat art.
    */
-  look?: 'anime' | 'toon' | 'soft' | 'classic';
+  look?: '3d' | 'anime' | 'toon' | 'soft' | 'classic';
   /** Anime and toon looks: no background and no round crop. */
   bare?: boolean;
 }
@@ -47,7 +49,8 @@ const HEAD_BOX = 200;
 // by y≈434, leaving >20 units of bottom padding.
 const BODY_BOX_H = 460;
 
-export function AvatarView({ look = 'anime', bare, ...props }: AvatarViewProps) {
+export function AvatarView({ look = '3d', bare, ...props }: AvatarViewProps) {
+  if (look === '3d') return <Avatar3D {...props} bare={bare} />;
   if (look === 'anime') {
     return <AnimeAvatar {...props} bare={bare} styleId={DEFAULT_ANIME_STYLE} />;
   }
