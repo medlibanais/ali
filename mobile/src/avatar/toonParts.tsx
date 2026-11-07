@@ -604,7 +604,8 @@ export function BodyBack({ config, kit }: { config: AvatarConfig; kit: ToonKit }
   );
 }
 
-export function Body({ config, kit }: { config: AvatarConfig; kit: ToonKit }) {
+/** neck=false leaves the neck out, for looks that draw their own. */
+export function Body({ config, kit, neck = true }: { config: AvatarConfig; kit: ToonKit; neck?: boolean }) {
   const b = BUILDS[config.bodyBuild] ?? BUILDS.average;
   const feet = FEET_Y[config.height] ?? FEET_Y.medium;
   const thobe = config.outfit === 'thobe';
@@ -630,8 +631,12 @@ export function Body({ config, kit }: { config: AvatarConfig; kit: ToonKit }) {
   return (
     <G>
       {/* neck, with the chin's shadow */}
-      <Rect x={91} y={100} width={18} height={SH - 96} rx={6} fill={kit.url('skin')} />
-      <Ellipse cx={100} cy={112} rx={10} ry={5} fill={kit.skin.shade} opacity={0.7} />
+      {neck ? (
+        <G>
+          <Rect x={91} y={100} width={18} height={SH - 96} rx={6} fill={kit.url('skin')} />
+          <Ellipse cx={100} cy={112} rx={10} ry={5} fill={kit.skin.shade} opacity={0.7} />
+        </G>
+      ) : null}
       {thobe ? null : <Bottoms config={config} kit={kit} hips={b.h} feet={feet} />}
       <Shoes style={config.shoes} feet={feet} kit={kit} />
       <Path d={torso} fill={kit.url('top')} />
