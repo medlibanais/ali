@@ -25,9 +25,8 @@ import { mix } from '../theme/tokens';
 import { useNative } from '../components/Motion';
 import { bgStyle, hairColor, outfitColor, pantsColor, shoesColor, skinTone } from './palettes';
 import { HairBack, HairFront, Headwear, HEAD_CX, HEAD_CY } from './softParts';
+import { FluidBody, FluidBodyBack } from './animeBody';
 import {
-  Body,
-  BodyBack,
   CANVAS_H,
   CANVAS_W,
   figureShift,
@@ -63,6 +62,8 @@ export interface AnimeAvatarProps {
   mode?: 'head' | 'full-body';
   bare?: boolean;
   styleId?: AnimeStyleId;
+  /** Body movement (animeBody.ts BODY_FLOWS). */
+  bodyFlowId?: string;
 }
 
 // A slimmer, taller figure than the toon: smaller head on the same body.
@@ -177,6 +178,7 @@ export function AnimeAvatar({
   mode = 'head',
   bare = false,
   styleId,
+  bodyFlowId,
 }: AnimeAvatarProps) {
   const style = animeStyle(styleId);
   const ink = style.ink;
@@ -304,8 +306,8 @@ export function AnimeAvatar({
   );
   const bodyLayer = (k: ToonKit | null) => (
     <G>
-      <BodyBack config={config} kit={k ?? kit} />
-      <Body config={config} kit={k ?? kit} neck={false} />
+      <FluidBodyBack config={config} kit={k ?? kit} flowId={bodyFlowId} />
+      <FluidBody config={config} kit={k ?? kit} flowId={bodyFlowId} ink={ink} line={style.line} silhouette={k !== null} />
     </G>
   );
 
