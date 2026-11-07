@@ -121,8 +121,8 @@ export const ANIME_STYLES: Record<AnimeStyleId, AnimeStyle> = {
 
 export const ANIME_STYLE_IDS = Object.keys(ANIME_STYLES) as AnimeStyleId[];
 
-/** The style the app uses when nothing else is chosen. */
-export const DEFAULT_ANIME_STYLE: AnimeStyleId = 'crimson';
+/** The style every avatar uses (merill picked Ronin on 2026-11-07). */
+export const DEFAULT_ANIME_STYLE: AnimeStyleId = 'ronin';
 
 export function animeStyle(id: string | undefined): AnimeStyle {
   return ANIME_STYLES[id as AnimeStyleId] ?? ANIME_STYLES[DEFAULT_ANIME_STYLE];
