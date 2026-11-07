@@ -11,7 +11,6 @@ export type ShoeStyle = 'sneakers' | 'boots' | 'sandals' | 'barefoot';
 export type BottomsStyle = 'pants' | 'joggers' | 'shorts' | 'skirt';
 
 export interface AvatarConfig {
-  artStyle: string; // 4 anime styles (animeStyles.ts)
   face: string; // 8 face shapes
   skin: string; // 12 skin tones
   hair: string; // 20 hairstyles (incl. hijab, cap, bald)
@@ -36,7 +35,6 @@ export interface AvatarConfig {
 }
 
 export const DEFAULT_AVATAR: AvatarConfig = {
-  artStyle: 'crimson',
   face: 'oval',
   skin: 'tan-3',
   hair: 'short-wave',

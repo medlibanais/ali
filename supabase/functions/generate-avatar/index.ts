@@ -204,8 +204,8 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-// One prompt per anime art style the avatar editor offers
-// (mobile/src/avatar/animeStyles.ts). Unknown styles fall back to crimson.
+// One prompt per anime art style (mobile/src/avatar/animeStyles.ts). The
+// app uses Ronin; a client may still send art_style to try another.
 const STYLE_PROMPTS: Record<string, string> = {
   ronin:
     'Redraw this photo as a dark, cinematic Japanese anime still in the style of a modern samurai period drama: thin clean linework, flat cel shading, half of the face in deep shadow, warm ember light from one side, muted earthy colors, dark wooden interior background at night.',
@@ -229,7 +229,7 @@ function buildPrompt(
     .filter(Boolean);
   const body = (dreamBody ?? '').replace(/[^\p{L}\p{N} ,.'-]/gu, '').slice(0, 80);
   const parts = [
-    STYLE_PROMPTS[artStyle] ?? STYLE_PROMPTS.crimson,
+    STYLE_PROMPTS[artStyle] ?? STYLE_PROMPTS.ronin,
     'Keep their identity: same face shape, skin tone, hairstyle and hair color, facial hair, glasses, and any head covering such as a hijab or cap.',
     'Show them as the strongest version of themselves a few years from now: focused, determined, calm confidence.',
     traits.length > 0 ? `Their expression feels ${traits.join(', ')}.` : '',
