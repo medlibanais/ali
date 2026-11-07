@@ -11,6 +11,7 @@ import React, { useEffect, useId, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
+  ClipPath,
   Defs,
   Ellipse,
   G,
@@ -102,6 +103,68 @@ function Inked({
         </G>
       ))}
       {render(null)}
+    </G>
+  );
+}
+
+// Neck in canvas units: starts behind the jaw, narrows a little, then
+// flares into the shoulders under the collar.
+const NECK = 'M86.5,84 C86.5,96 88.5,108 85,124 Q82,131 76,134 L124,134 Q118,131 115,124 C111.5,108 113.5,96 113.5,84 Z';
+
+/**
+ * A real anime neck (after merill's reference): ink sides, the jaw's hard
+ * shadow cast down onto it, the far side in shade, and the two neck
+ * muscles meeting at the collarbone.
+ */
+function AnimeNeck({
+  face,
+  head,
+  skin,
+  kit,
+}: {
+  face: ReturnType<typeof toonFace>;
+  head: string;
+  skin: { base: string; shade: string };
+  kit: AnimeKit;
+}) {
+  const clip = kit.id('neckClip');
+  const line = kit.style.line * 0.5;
+  return (
+    <G>
+      <Defs>
+        <ClipPath id={clip}>
+          <Path d={NECK} />
+        </ClipPath>
+      </Defs>
+      <Path d={NECK} fill={skin.base} />
+      <G clipPath={`url(#${clip})`}>
+        {/* far side in shade */}
+        <Path d="M106,84 C105,100 107,114 104,136 L130,136 L130,84 Z" fill={skin.shade} />
+        {/* the jaw's shadow, dropped onto the neck */}
+        <G transform={`translate(2 15) ${head}`}>
+          <Path d={animeHeadPath(face)} fill={mix(skin.shade, kit.ink, 0.22)} />
+        </G>
+        {kit.style.rim ? (
+          <Path d="M112.6,96 C112,108 113,116 115.5,124" stroke={kit.style.rim} strokeWidth={1.1} fill="none" opacity={0.8} />
+        ) : null}
+      </G>
+      {/* neck muscles, adam's apple and the dip between the collarbones */}
+      <Path
+        d="M90,104 Q93,116 98.5,127 M110.5,104 Q107.5,116 101.5,127 M99,113 Q100.5,114.5 101.5,113 M97,129 Q100,131 103,129"
+        stroke={kit.ink}
+        strokeWidth={line * 0.6}
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.55}
+      />
+      {/* ink along both sides */}
+      <Path
+        d="M86.5,90 C86.5,98 88.5,108 85,124 Q82,131 76,134 M113.5,90 C113.5,98 111.5,108 115,124 Q118,131 124,134"
+        stroke={kit.ink}
+        strokeWidth={line * 1.6}
+        strokeLinecap="round"
+        fill="none"
+      />
     </G>
   );
 }
@@ -242,7 +305,7 @@ export function AnimeAvatar({
   const bodyLayer = (k: ToonKit | null) => (
     <G>
       <BodyBack config={config} kit={k ?? kit} />
-      <Body config={config} kit={k ?? kit} />
+      <Body config={config} kit={k ?? kit} neck={false} />
     </G>
   );
 
@@ -254,9 +317,8 @@ export function AnimeAvatar({
           <Inked width={lwHead} ink={inkKit} render={hairBackLayer} />
         </G>
       )}
+      <AnimeNeck face={face} head={head} skin={skin} kit={akit} />
       <Inked width={lw} ink={inkKit} render={bodyLayer} />
-      {/* hard shadow the chin casts on the neck */}
-      <Path d={`M89.5,100 L110.5,100 L110.5,119 Q100,123 89.5,117 Z`} fill={skin.shade} />
       <G transform={head}>
         {covered ? <Inked width={lwHead} ink={inkKit} render={hairBackLayer} /> : null}
         <Inked width={lwHead} ink={inkKit} render={headLayer} />
