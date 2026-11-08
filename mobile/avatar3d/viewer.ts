@@ -332,15 +332,15 @@ const POSES: Record<string, Record<string, Rot>> = {
  */
 const AIMS: Record<string, [string, string, [number, number, number]][]> = {
   'arms-crossed': [
-    // Elbows forward and in, so the forearms clear the chest.
-    ['leftUpperArm', 'leftLowerArm', [0.5, -0.7, 0.5]],
-    ['rightUpperArm', 'rightLowerArm', [-0.5, -0.74, 0.5]],
-    // Forearms cross level in front of the chest, one over the other.
-    ['leftLowerArm', 'leftHand', [-0.3, -0.46, 0.8]],
-    ['rightLowerArm', 'rightHand', [0.3, -0.4, 0.68]],
-    // Each hand turns back to grip the outside of the other arm.
-    ['leftHand', 'leftMiddleProximal', [-0.75, -0.45, 0.3]],
-    ['rightHand', 'rightMiddleProximal', [0.75, -0.4, 0.3]],
+    // Elbows forward so the forearms clear the loose top.
+    ['leftUpperArm', 'leftLowerArm', [0.55, -0.75, 0.5]],
+    ['rightUpperArm', 'rightLowerArm', [-0.55, -0.78, 0.5]],
+    // Forearms cross in front, one stacked above the other, wrists straight.
+    ['leftLowerArm', 'leftHand', [-0.55, -0.5, 0.85]],
+    ['rightLowerArm', 'rightHand', [0.55, -0.64, 0.78]],
+    // A gentle wrist turn so each hand wraps the other arm.
+    ['leftHand', 'leftMiddleProximal', [-0.85, -0.6, 0.45]],
+    ['rightHand', 'rightMiddleProximal', [0.85, -0.75, 0.42]],
   ],
 };
 
@@ -375,7 +375,7 @@ const GRIP: Record<string, [number, number]> = {
   standing: [0.55, 0.55],
   hip: [0.55, 0.8],
   wave: [0.55, 0.1],
-  'arms-crossed': [0.8, 0.8],
+  'arms-crossed': [0.5, 0.5],
 };
 
 // Sign that closes the hand for this rig's finger bones.
