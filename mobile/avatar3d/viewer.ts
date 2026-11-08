@@ -332,15 +332,16 @@ const POSES: Record<string, Record<string, Rot>> = {
  */
 const AIMS: Record<string, [string, string, [number, number, number]][]> = {
   'arms-crossed': [
-    // Elbows forward so the forearms clear the loose top.
-    ['leftUpperArm', 'leftLowerArm', [0.55, -0.75, 0.5]],
-    ['rightUpperArm', 'rightLowerArm', [-0.55, -0.78, 0.5]],
-    // Forearms cross in front, one stacked above the other, wrists straight.
-    ['leftLowerArm', 'leftHand', [-0.55, -0.5, 0.85]],
-    ['rightLowerArm', 'rightHand', [0.55, -0.64, 0.78]],
+    // One forearm rests on top of the other, not through it: the top arm
+    // sits high and forward, the lower arm crosses under it, and their
+    // centerlines stay about 7 cm apart (forearms are about 6 cm thick).
+    ['leftUpperArm', 'leftLowerArm', [0.55, -0.65, 0.55]],
+    ['rightUpperArm', 'rightLowerArm', [-0.55, -0.92, 0.45]],
+    ['leftLowerArm', 'leftHand', [-0.55, -0.32, 1.0]],
+    ['rightLowerArm', 'rightHand', [0.55, -0.9, 0.75]],
     // A gentle wrist turn so each hand wraps the other arm.
-    ['leftHand', 'leftMiddleProximal', [-0.85, -0.6, 0.45]],
-    ['rightHand', 'rightMiddleProximal', [0.85, -0.75, 0.42]],
+    ['leftHand', 'leftMiddleProximal', [-0.85, -0.42, 0.5]],
+    ['rightHand', 'rightMiddleProximal', [0.85, -0.9, 0.45]],
   ],
 };
 
