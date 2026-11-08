@@ -374,6 +374,9 @@ const GRIP: Record<string, [number, number]> = {
   'arms-crossed': [0.8, 0.8],
 };
 
+// Sign that closes the hand for this rig's finger bones.
+const FINGER_DIR = -1;
+
 function curlFingers(vrm: VRM, pose: string) {
   const h = vrm.humanoid;
   const [l, r] = GRIP[pose] ?? GRIP.standing;
@@ -391,8 +394,6 @@ function curlFingers(vrm: VRM, pose: string) {
     if (td) td.rotation.set(0, sign * -amt * 0.6 * FINGER_DIR, 0);
   }
 }
-let FINGER_DIR = -1;
-(window as unknown as { setFingerDir: (v: number) => void }).setFingerDir = (v) => { FINGER_DIR = v; };
 
 function applyPose(vrm: VRM, pose: string, build: string, height: string) {
   const h = vrm.humanoid;
