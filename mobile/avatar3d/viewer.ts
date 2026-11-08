@@ -332,11 +332,15 @@ const POSES: Record<string, Record<string, Rot>> = {
  */
 const AIMS: Record<string, [string, string, [number, number, number]][]> = {
   'arms-crossed': [
-    ['leftUpperArm', 'leftLowerArm', [0.5, -0.78, 0.36]],
-    ['rightUpperArm', 'rightLowerArm', [-0.5, -0.84, 0.4]],
-    // Forearms fold across the chest; each hand tucks under the other arm.
-    ['leftLowerArm', 'leftHand', [-0.3, -0.52, 0.62]],
-    ['rightLowerArm', 'rightHand', [0.3, -0.46, 0.7]],
+    // Elbows forward and in, so the forearms clear the chest.
+    ['leftUpperArm', 'leftLowerArm', [0.5, -0.7, 0.5]],
+    ['rightUpperArm', 'rightLowerArm', [-0.5, -0.74, 0.5]],
+    // Forearms cross level in front of the chest, one over the other.
+    ['leftLowerArm', 'leftHand', [-0.3, -0.46, 0.8]],
+    ['rightLowerArm', 'rightHand', [0.3, -0.4, 0.68]],
+    // Each hand turns back to grip the outside of the other arm.
+    ['leftHand', 'leftMiddleProximal', [-0.75, -0.45, 0.3]],
+    ['rightHand', 'rightMiddleProximal', [0.75, -0.4, 0.3]],
   ],
 };
 
