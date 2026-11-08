@@ -75,11 +75,14 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 
 const scene = new THREE.Scene();
+(window as unknown as { avatarScene: THREE.Scene }).avatarScene = scene;
 const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 20);
-const key = new THREE.DirectionalLight(0xffc89a, Math.PI * 0.75);
-key.position.set(-2.2, 1.2, 0.9);
+// Ronin light: one low ember key from the side, so half the face falls
+// into a clean cel shadow, and very little fill.
+const key = new THREE.DirectionalLight(0xffd4ae, Math.PI * 0.85);
+key.position.set(-3, 0.6, 0.15);
 scene.add(key);
-scene.add(new THREE.AmbientLight(0x3a2a3a, 0.35));
+scene.add(new THREE.AmbientLight(0x2a2230, 0.25));
 
 function resize() {
   const w = window.innerWidth || 300;
@@ -194,7 +197,38 @@ interface MToonLike extends THREE.Material {
   outlineWidthMode?: string;
   outlineWidthFactor?: number;
   outlineColorFactor?: THREE.Color;
+  matcapFactor?: THREE.Color;
+  rimLightingMixFactor?: number;
   userData: Record<string, unknown>;
+}
+
+/**
+ * Anime face shading: point the face's normals out from a center behind
+ * it, like a ball, so light splits the face into one clean lit half and one
+ * shadow half instead of blotches from the nose and cheeks.
+ */
+function sphereNormals(mesh: THREE.Mesh) {
+  const g = mesh.geometry;
+  const pos = g.getAttribute('position');
+  const nrm = g.getAttribute('normal');
+  if (!pos || !nrm) return;
+  g.computeBoundingBox();
+  const box = g.boundingBox!;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  // Model faces +z after rotateVRM0 in bind space for VRM 1.0 (-z for 0.x);
+  // pick the side the face's own normals mostly point to.
+  let zSum = 0;
+  for (let i = 0; i < nrm.count; i++) zSum += nrm.getZ(i);
+  const front = zSum >= 0 ? 1 : -1;
+  center.z -= front * size.z * 0.9;
+  center.y -= size.y * 0.1;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).sub(center).normalize();
+    nrm.setXYZ(i, v.x, v.y, v.z);
+  }
+  nrm.needsUpdate = true;
 }
 
 function prepareMaterials(vrm: VRM) {
@@ -202,6 +236,8 @@ function prepareMaterials(vrm: VRM) {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.frustumCulled = false;
+    const mats = ([] as THREE.Material[]).concat(mesh.material);
+    if (mats[0]?.name.toLowerCase().startsWith('face_')) sphereNormals(mesh);
     for (const mat of ([] as THREE.Material[]).concat(mesh.material)) {
       const m = mat as MToonLike;
       if (!m.isMToonMaterial) continue;
@@ -212,15 +248,22 @@ function prepareMaterials(vrm: VRM) {
         m.map = gray;
         if (m.shadeMultiplyTexture) m.shadeMultiplyTexture = gray;
       }
-      // Ronin look: hard toon edge, deep shadow, ember rim, dark ink outline.
-      m.shadingToonyFactor = 0.95;
-      m.shadingShiftFactor = -0.05;
-      m.parametricRimColorFactor?.set(0xe07a3a);
-      m.parametricRimFresnelPowerFactor = 3.5;
-      m.parametricRimLiftFactor = 0.05;
-      m.outlineWidthMode = 'screenCoordinates';
-      m.outlineWidthFactor = 0.004;
-      m.outlineColorFactor?.set(0x1a100c);
+      const n = m.name.toLowerCase();
+      const face = n.endsWith('_face') || n.endsWith('_eye');
+      // Ronin look: hard toon edge, deep shadow, a thin ember rim on the lit
+      // edge only, and a thin dark ink outline.
+      m.shadingToonyFactor = 1;
+      // The face gets a little more light so the nose throws no blotch,
+      // leaving one clean split between its lit and shadow halves.
+      m.shadingShiftFactor = n.startsWith('face_') ? 0.1 : part === 'skin' ? 0.05 : 0;
+      m.matcapFactor?.set(0, 0, 0);
+      m.parametricRimColorFactor?.set(part === 'hair' ? 0x6a2c12 : part === 'skin' ? 0xc0582a : 0x8a3a18);
+      m.parametricRimFresnelPowerFactor = 6;
+      m.parametricRimLiftFactor = 0;
+      m.rimLightingMixFactor = 1;
+      m.outlineWidthMode = face ? 'none' : 'screenCoordinates';
+      m.outlineWidthFactor = part === 'skin' ? 0.0035 : 0.005;
+      m.outlineColorFactor?.set(0x120a08);
       m.needsUpdate = true;
     }
   });
@@ -277,9 +320,9 @@ const BASE: Record<string, Rot> = {
 const POSES: Record<string, Record<string, Rot>> = {
   standing: {},
   hip: { rightUpperArm: [0, 0.2, 0.85], rightLowerArm: [0, 0.4, 1.75], rightHand: [0, 0, 0.3] },
-  wave: { rightUpperArm: [0, 0, -0.35], rightLowerArm: [0, 0, -1.4], rightHand: [0, 0, -0.2] },
-  'arms-crossed': {
-  },
+  wave: { rightUpperArm: [0, -0.3, 0.35], rightLowerArm: [0, 0, -2.0], rightHand: [0, 0, -0.15] },
+  // Wrists bend back so the fists tuck in against the upper arms.
+  'arms-crossed': {},
 };
 
 /**
@@ -289,10 +332,11 @@ const POSES: Record<string, Record<string, Rot>> = {
  */
 const AIMS: Record<string, [string, string, [number, number, number]][]> = {
   'arms-crossed': [
-    ['leftUpperArm', 'leftLowerArm', [0.62, -0.75, 0.42]],
-    ['rightUpperArm', 'rightLowerArm', [-0.62, -0.8, 0.44]],
-    ['leftLowerArm', 'leftHand', [-0.45, -0.42, 0.62]],
-    ['rightLowerArm', 'rightHand', [0.45, -0.38, 0.66]],
+    ['leftUpperArm', 'leftLowerArm', [0.5, -0.78, 0.36]],
+    ['rightUpperArm', 'rightLowerArm', [-0.5, -0.84, 0.4]],
+    // Forearms fold across the chest; each hand tucks under the other arm.
+    ['leftLowerArm', 'leftHand', [-0.3, -0.52, 0.62]],
+    ['rightLowerArm', 'rightHand', [0.3, -0.46, 0.7]],
   ],
 };
 
@@ -317,7 +361,38 @@ const BUILD_SCALE: Record<string, [number, number]> = {
   curvy: [0.97, 1.08],
   broad: [1.12, 1.06],
 };
+const HEAD_SCALE = 0.9;
 const HEIGHT_SCALE: Record<string, number> = { short: 0.95, medium: 1, tall: 1.05 };
+
+const FINGERS = ['Index', 'Middle', 'Ring', 'Little'];
+const SEGMENTS = ['Proximal', 'Intermediate', 'Distal'];
+/** How far each hand closes: 0 open, 1 a loose fist. */
+const GRIP: Record<string, [number, number]> = {
+  standing: [0.55, 0.55],
+  hip: [0.55, 0.8],
+  wave: [0.55, 0.1],
+  'arms-crossed': [0.8, 0.8],
+};
+
+function curlFingers(vrm: VRM, pose: string) {
+  const h = vrm.humanoid;
+  const [l, r] = GRIP[pose] ?? GRIP.standing;
+  for (const [side, amt, sign] of [['left', l, 1], ['right', r, -1]] as const) {
+    FINGERS.forEach((f, i) => {
+      SEGMENTS.forEach((seg, j) => {
+        const node = h.getNormalizedBoneNode(`${side}${f}${seg}` as never);
+        // Outer fingers close a little more, like a relaxed hand.
+        if (node) node.rotation.set(0, 0, sign * amt * (j === 0 ? 1.0 : 1.2) * (1 + i * 0.08) * FINGER_DIR);
+      });
+    });
+    const tp = h.getNormalizedBoneNode(`${side}ThumbProximal` as never);
+    if (tp) tp.rotation.set(0, sign * -amt * 0.5 * FINGER_DIR, 0);
+    const td = h.getNormalizedBoneNode(`${side}ThumbDistal` as never);
+    if (td) td.rotation.set(0, sign * -amt * 0.6 * FINGER_DIR, 0);
+  }
+}
+let FINGER_DIR = -1;
+(window as unknown as { setFingerDir: (v: number) => void }).setFingerDir = (v) => { FINGER_DIR = v; };
 
 function applyPose(vrm: VRM, pose: string, build: string, height: string) {
   const h = vrm.humanoid;
@@ -342,6 +417,9 @@ function applyPose(vrm: VRM, pose: string, build: string, height: string) {
       aim(vrm, bone, child, t);
     }
   }
+  curlFingers(vrm, pose);
+  // Seinen proportions: a slightly smaller head than the moe default.
+  h.getNormalizedBoneNode('head' as never)?.scale.setScalar(HEAD_SCALE);
   const [chestW, hipW] = BUILD_SCALE[build] ?? BUILD_SCALE.average;
   h.getNormalizedBoneNode('chest' as never)?.scale.set(chestW, 1, Math.sqrt(chestW));
   h.getNormalizedBoneNode('hips' as never)?.scale.set(hipW, 1, hipW);
@@ -350,7 +428,7 @@ function applyPose(vrm: VRM, pose: string, build: string, height: string) {
 
 const MOODS: Record<string, Record<string, number>> = {
   tired: { relaxed: 0.6, sad: 0.25 },
-  neutral: {},
+  neutral: { angry: 0.4 },
   happy: { relaxed: 0.35, happy: 0.25 },
   glowing: { happy: 0.6 },
 };
@@ -364,18 +442,22 @@ function applyMood(vrm: VRM, mood: string) {
 
 // ---------------------------------------------------------------- render
 
+const HEAD_FRAME = { y: 0.08, dist: 1.65 };
+
 function frame(vrm: VRM, mode: 'head' | 'full-body') {
   vrm.update(0);
   const head = vrm.humanoid.getNormalizedBoneNode('head' as never)!.getWorldPosition(new THREE.Vector3());
   const yaw = 0.3;
   if (mode === 'head') {
     camera.fov = 18;
-    camera.position.set(Math.sin(yaw) * 1.25, head.y + 0.02, Math.cos(yaw) * 1.25);
-    camera.lookAt(0, head.y - 0.03, 0);
+    // Whole head and the top of the shoulders, like the 2D portrait.
+    const cy = head.y + HEAD_FRAME.y;
+    camera.position.set(Math.sin(yaw) * HEAD_FRAME.dist, cy + 0.02, Math.cos(yaw) * HEAD_FRAME.dist);
+    camera.lookAt(0, cy, 0);
   } else {
     camera.fov = 24;
     const mid = head.y * 0.52;
-    const dist = 4.7 * Math.max(1, 0.62 / Math.min(1, camera.aspect / 0.62));
+    const dist = 4.7 * vrm.scene.scale.y * Math.max(1, 0.62 / Math.min(1, camera.aspect / 0.62));
     camera.position.set(Math.sin(yaw) * dist, mid + 0.15, Math.cos(yaw) * dist);
     camera.lookAt(0, mid, 0);
   }
