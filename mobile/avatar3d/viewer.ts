@@ -129,6 +129,7 @@ function loadModel(url: string): Promise<VRM> {
       VRMUtils.removeUnnecessaryVertices(gltf.scene);
       VRMUtils.rotateVRM0(vrm);
       prepareMaterials(vrm);
+      prepareTightTop(vrm);
       return vrm;
     });
     models.set(url, p);
@@ -269,6 +270,68 @@ function prepareMaterials(vrm: VRM) {
   });
 }
 
+/**
+ * The sample top hangs loose, several centimeters in front of the belly,
+ * so crossed forearms sink into it. Keep a second copy of its shape with the
+ * front pulled in close to the body (never inside it) for that pose.
+ */
+function prepareTightTop(vrm: VRM) {
+  const meshes: THREE.Mesh[] = [];
+  vrm.scene.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+  });
+  const named = (re: RegExp) => meshes.filter((m) => re.test(([] as THREE.Material[]).concat(m.material)[0].name));
+  // The body and the shorts: the top must stay outside both.
+  const under = named(/^Body_\d+_SKIN|Bottoms/);
+  if (!under.length) return;
+  // Front-most body surface per 2 cm cell, in the shared bind space.
+  const cell = 0.02;
+  const front = new Map<string, number>();
+  for (const m of under) {
+    const bp = m.geometry.getAttribute('position');
+    for (let i = 0; i < bp.count; i++) {
+      const k = `${Math.round(bp.getX(i) / cell)},${Math.round(bp.getY(i) / cell)}`;
+      const z = bp.getZ(i);
+      if (!(front.get(k)! >= z)) front.set(k, z);
+    }
+  }
+  const frontAt = (x: number, y: number) => {
+    let best = -Infinity;
+    const cx = Math.round(x / cell);
+    const cy = Math.round(y / cell);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) best = Math.max(best, front.get(`${cx + dx},${cy + dy}`) ?? -Infinity);
+    return best;
+  };
+  for (const top of named(/Tops/)) {
+    const pos = top.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const loose = (pos.array as Float32Array).slice();
+    const tight = (pos.array as Float32Array).slice();
+    for (let i = 0; i < pos.count; i++) {
+      const x = loose[i * 3];
+      const y = loose[i * 3 + 1];
+      const z = loose[i * 3 + 2];
+      const f = frontAt(x, y);
+      if (!Number.isFinite(f) || z <= f) continue;
+      const rest = f + TOP_MARGIN;
+      if (z > rest) tight[i * 3 + 2] = rest + (z - rest) * TOP_KEEP;
+    }
+    top.userData.loose = loose;
+    top.userData.tight = tight;
+    top.userData.positions = pos;
+  }
+}
+const TOP_MARGIN = 0.012;
+const TOP_KEEP = 0.35;
+
+function fitTop(vrm: VRM, tight: boolean) {
+  vrm.scene.traverse((o) => {
+    const d = o.userData as { loose?: Float32Array; tight?: Float32Array; positions?: THREE.BufferAttribute };
+    if (!d.positions || !d.loose || !d.tight) return;
+    (d.positions.array as Float32Array).set(tight ? d.tight : d.loose);
+    d.positions.needsUpdate = true;
+  });
+}
+
 // Reference skin the model's texture was painted with; config skin tones
 // are applied as a multiply relative to it.
 const MODEL_SKIN = c('#F6DCCB');
@@ -369,6 +432,32 @@ const BUILD_SCALE: Record<string, [number, number]> = {
 const HEAD_SCALE = 0.9;
 const HEIGHT_SCALE: Record<string, number> = { short: 0.95, medium: 1, tall: 1.05 };
 
+/**
+ * Body proportions. three-vrm copies only rotations from the normalized rig
+ * to the model, so scale goes on the raw bones. A parent's scale passes to
+ * its children, so each child undoes it: only that body part changes.
+ */
+function applyProportions(vrm: VRM, build: string) {
+  const h = vrm.humanoid;
+  const [cw, hw] = BUILD_SCALE[build] ?? BUILD_SCALE.average;
+  const cd = Math.sqrt(cw);
+  const scales: Record<string, [number, number, number]> = {
+    hips: [hw, 1, hw],
+    spine: [1 / hw, 1, 1 / hw],
+    leftUpperLeg: [1 / hw, 1, 1 / hw],
+    rightUpperLeg: [1 / hw, 1, 1 / hw],
+    chest: [cw, 1, cd],
+    neck: [1 / cw, 1, 1 / cd],
+    leftShoulder: [1 / cw, 1, 1 / cd],
+    rightShoulder: [1 / cw, 1, 1 / cd],
+    // Seinen proportions: a slightly smaller head than the moe default.
+    head: [HEAD_SCALE, HEAD_SCALE, HEAD_SCALE],
+  };
+  for (const [bone, [x, y, z]] of Object.entries(scales)) {
+    h.getRawBoneNode(bone as never)?.scale.set(x, y, z);
+  }
+}
+
 const FINGERS = ['Index', 'Middle', 'Ring', 'Little'];
 const SEGMENTS = ['Proximal', 'Intermediate', 'Distal'];
 /** How far each hand closes: 0 open, 1 a loose fist. */
@@ -424,11 +513,8 @@ function applyPose(vrm: VRM, pose: string, build: string, height: string) {
     }
   }
   curlFingers(vrm, pose);
-  // Seinen proportions: a slightly smaller head than the moe default.
-  h.getNormalizedBoneNode('head' as never)?.scale.setScalar(HEAD_SCALE);
-  const [chestW, hipW] = BUILD_SCALE[build] ?? BUILD_SCALE.average;
-  h.getNormalizedBoneNode('chest' as never)?.scale.set(chestW, 1, Math.sqrt(chestW));
-  h.getNormalizedBoneNode('hips' as never)?.scale.set(hipW, 1, hipW);
+  applyProportions(vrm, build);
+  fitTop(vrm, pose === 'arms-crossed');
   vrm.scene.scale.setScalar(HEIGHT_SCALE[height] ?? 1);
 }
 
