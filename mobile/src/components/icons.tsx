@@ -514,3 +514,9 @@ export function MicGlyph({ size = 20, color = colors.inkSoft }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3ZM18.5 11a6.5 6.5 0 0 1-13 0M12 17.5v3M9 20.5h6" />;
 }
+
+/** Eye with a slash: "hide password" state of the password field toggle. */
+export function EyeOffGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 4l16 16" />;
+}
