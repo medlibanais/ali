@@ -4,7 +4,7 @@
 //   back, instead of flashing its opacity.
 // The native driver is not available on web, so it is only used natively.
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Easing,
@@ -143,5 +143,10 @@ export function useFloat(amplitude = 4, duration = 2600, delay = 0) {
     run.start();
     return () => run.stop();
   }, [t, duration, delay]);
-  return t.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] });
+  // Same node across re-renders: a new interpolation on every render would
+  // make Animated detach and re-attach the transform mid-loop.
+  return useMemo(
+    () => t.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] }),
+    [t, amplitude],
+  );
 }

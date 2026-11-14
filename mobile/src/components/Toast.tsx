@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -97,6 +98,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => clearTimers, [clearTimers]);
 
+  // Stable value: the countdown ticks every second, and a fresh object here
+  // would re-render every screen that calls useToast() on each tick.
+  const contextValue = useMemo(() => ({ showToast, hideToast }), [showToast, hideToast]);
+
   const actionLabel =
     toast?.actionLabel && secondsLeft !== null && secondsLeft > 0
       ? `${toast.actionLabel} (${secondsLeft}s)`
@@ -105,7 +110,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const actionDisabled = secondsLeft !== null && secondsLeft <= 0;
 
   return (
-    <ToastContext.Provider value={{ showToast, hideToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {toast ? (
         <View style={styles.wrap} pointerEvents="box-none">

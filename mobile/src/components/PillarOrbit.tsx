@@ -3,17 +3,29 @@
 // like guardians on a dashed ring, each orb showing its progress today.
 // Angles are degrees, 0° = right, clockwise: spirituality on top, then
 // health, family, work and fun around the ellipse (Figma "Today" frame).
+//
+// Rendering: the orbit itself only re-renders when the avatar, mood, level
+// or the tapped pillar changes. Each bubble reads its own score and quest
+// counts from the store (LivePillarBubble), so completing a quest
+// re-renders that one bubble. The float animations run on Animated values
+// that survive re-renders and use the native driver on iOS/Android.
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Animated, Image, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Ellipse } from 'react-native-svg';
 import AvatarView from '../avatar/AvatarView';
-import { moodForScore, type AvatarConfig } from '../avatar/types';
+import type { AvatarConfig, Mood } from '../avatar/types';
+import { useAppSelector } from '../store/hooks';
+import {
+  selectPillarDone,
+  selectPillarScore,
+  selectPillarTotal,
+} from '../store/selectors/today';
 import { useFloat } from './Motion';
 import PillarBubble, { type PillarId } from './PillarBubble';
 import Txt from './Txt';
 import { StarGlyph } from './icons';
-import { colors, PILLARS, radius, softShadow, themed, withAlpha } from '../theme/tokens';
+import { colors, radius, softShadow, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 const ORBIT_ANGLES: Record<PillarId, number> = {
@@ -43,12 +55,82 @@ export interface PillarOrbitProps {
   photoUrl?: string | null;
   name?: string | null;
   level?: number;
-  scores: Record<PillarId, number>;
-  /** Today's quest counts per pillar, read out by screen readers. */
-  progress?: Partial<Record<PillarId, { done: number; total: number }>>;
+  /** The avatar's expression (selectDayMood). */
+  mood: Mood;
   expandedPillar: PillarId | null;
+  /** Keep this stable (useCallback) so the bubbles can skip re-renders. */
   onPillarPress: (pillar: PillarId) => void;
 }
+
+/** A pillar bubble wired to its own slice of the store. */
+const LivePillarBubble = memo(function LivePillarBubble({
+  pillar,
+  size,
+  expanded,
+  onPress,
+}: {
+  pillar: PillarId;
+  size: number;
+  expanded: boolean;
+  onPress: (pillar: PillarId) => void;
+}) {
+  const score = useAppSelector((state) => selectPillarScore(state, pillar));
+  const done = useAppSelector((state) => selectPillarDone(state, pillar));
+  const total = useAppSelector((state) => selectPillarTotal(state, pillar));
+  return (
+    <PillarBubble
+      pillar={pillar}
+      score={score}
+      size={size}
+      done={done}
+      total={total}
+      expanded={expanded}
+      onPress={onPress}
+    />
+  );
+});
+
+/** The avatar (or photo) and level badge inside the floating rim. */
+const OrbitAvatar = memo(function OrbitAvatar({
+  avatarConfig,
+  photoUrl,
+  name,
+  level,
+  mood,
+  size,
+}: {
+  avatarConfig: AvatarConfig;
+  photoUrl?: string | null;
+  name?: string | null;
+  level?: number;
+  mood: Mood;
+  size: number;
+}) {
+  return (
+    <>
+      <View style={[styles.avatarClip, { borderRadius: size / 2 }]}>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={{ width: size, height: size }}
+            resizeMode="cover"
+            accessibilityLabel={name ? `Avatar of ${name}` : 'Your avatar'}
+          />
+        ) : (
+          <AvatarView config={avatarConfig} size={size} mood={mood} />
+        )}
+      </View>
+      {level !== undefined ? (
+        <View style={styles.levelBadge}>
+          <StarGlyph size={13} />
+          <Txt variant="label" color={colors.onAccent} style={styles.levelText}>
+            {`Lv ${level}`}
+          </Txt>
+        </View>
+      ) : null}
+    </>
+  );
+});
 
 /** One guardian orb, drifting on its own rhythm. */
 function FloatingOrb({
@@ -72,13 +154,12 @@ function FloatingOrb({
   );
 }
 
-export function PillarOrbit({
+function PillarOrbitBase({
   avatarConfig,
   photoUrl,
   name,
   level,
-  scores,
-  progress,
+  mood,
   expandedPillar,
   onPillarPress,
 }: PillarOrbitProps) {
@@ -94,12 +175,6 @@ export function PillarOrbit({
   const cx = boxW / 2;
   const cy = boxH / 2;
   const avatarLift = useFloat(3, 3600);
-
-  // The avatar's expression reflects the day (average of the five scores).
-  const average =
-    PILLARS.reduce((sum, pillar) => sum + (scores[pillar] ?? 0), 0) /
-    PILLARS.length;
-  const mood = moodForScore(average);
 
   return (
     <View style={styles.outer}>
@@ -136,26 +211,14 @@ export function PillarOrbit({
             },
           ]}
         >
-          <View style={[styles.avatarClip, { borderRadius: (avatar - RIM * 2) / 2 }]}>
-            {photoUrl ? (
-              <Image
-                source={{ uri: photoUrl }}
-                style={{ width: avatar - RIM * 2, height: avatar - RIM * 2 }}
-                resizeMode="cover"
-                accessibilityLabel={name ? `Avatar of ${name}` : 'Your avatar'}
-              />
-            ) : (
-              <AvatarView config={avatarConfig} size={avatar - RIM * 2} mood={mood} />
-            )}
-          </View>
-          {level !== undefined ? (
-            <View style={styles.levelBadge}>
-              <StarGlyph size={13} />
-              <Txt variant="label" color={colors.onAccent} style={styles.levelText}>
-                {`Lv ${level}`}
-              </Txt>
-            </View>
-          ) : null}
+          <OrbitAvatar
+            avatarConfig={avatarConfig}
+            photoUrl={photoUrl}
+            name={name}
+            level={level}
+            mood={mood}
+            size={avatar - RIM * 2}
+          />
         </Animated.View>
 
         {ORBIT_ORDER.map((pillar, index) => {
@@ -167,12 +230,9 @@ export function PillarOrbit({
               left={cx + Math.cos(angle) * rx - orb / 2}
               top={cy + Math.sin(angle) * ry - orb / 2}
             >
-              <PillarBubble
+              <LivePillarBubble
                 pillar={pillar}
-                score={scores[pillar] ?? 0}
                 size={orb}
-                done={progress?.[pillar]?.done}
-                total={progress?.[pillar]?.total}
                 expanded={expandedPillar === pillar}
                 onPress={onPillarPress}
               />
@@ -183,6 +243,8 @@ export function PillarOrbit({
     </View>
   );
 }
+
+export const PillarOrbit = memo(PillarOrbitBase);
 
 const styles = themed(() =>
   StyleSheet.create({

@@ -2,7 +2,7 @@
 // icon in its soft core and the pillar name underneath (Figma "Pillar
 // bubble" component). Used by PillarOrbit on the Today screen.
 
-import React from 'react';
+import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Txt from './Txt';
@@ -160,4 +160,6 @@ const styles = themed(() =>
   }),
 );
 
-export default PillarBubble;
+// Memoized: a bubble only re-renders when its own score, counts or
+// selection change (pass a stable onPress).
+export default memo(PillarBubble);
