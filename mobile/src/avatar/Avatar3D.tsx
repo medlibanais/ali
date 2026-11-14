@@ -4,9 +4,16 @@
 // Avatar3D shows that image; until it is ready it shows the 2D anime
 // avatar, so something is always on screen. Images are cached by
 // everything that changes them, so each look renders once per session.
+//
+// To feel alive, the image breathes (a UI-thread scale anchored at the
+// bottom, paced by the life score, see alive.ts) and blinks: each look is
+// also rendered once with the eyes shut, and that image is shown for the
+// ~0.2 s of a blink. Both are View transforms/opacity, cheap on Android.
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Image, Platform, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import { useAliveMotion } from './alive';
 import { Asset } from 'expo-asset';
 import AnimeAvatar from './AnimeAvatar';
 import { bgStyle, hairColor, outfitColor, pantsColor, shoesColor, skinTone } from './palettes';
@@ -55,7 +62,7 @@ export function requestRender(req: RenderRequest) {
   pump?.();
 }
 
-function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean) {
+function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, eyesClosed = false) {
   const bg = bgStyle(config.bg);
   return {
     type: 'render',
@@ -76,6 +83,7 @@ function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean)
     bare,
     animated: false,
     snapshot: true,
+    eyes: eyesClosed ? 'closed' : 'open',
   };
 }
 
@@ -230,10 +238,23 @@ export interface Avatar3DProps {
   mode?: Mode;
   bare?: boolean;
   animated?: boolean;
+  /** Life score for the breathing pace (see AvatarView). */
+  score?: number | SharedValue<number>;
 }
 
-export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true }: Avatar3DProps) {
+/** Breath scale of the whole image, anchored at its bottom edge. */
+const BREATH_SCALE: Record<Mode, number> = { head: 0.022, 'full-body': 0.012 };
+
+export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score }: Avatar3DProps) {
   const key = renderKey(config, mood, mode, bare);
+  const blinkKey = `${key}:blink`;
+  // The eyes-shut frame, only when it belongs to the image on screen.
+  const blinkUri = useSyncExternalStore(
+    subscribe,
+    () => images.get(blinkKey),
+    () => images.get(blinkKey),
+  );
+  const { breath, eyes } = useAliveMotion(score, animated);
   // Subscribe to this avatar's own image only: other avatars finishing
   // their renders must not re-render this one.
   const ready = useSyncExternalStore(
@@ -249,20 +270,36 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
     ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined);
   useEffect(() => {
     requestRender({ key, mode, command: commandFor(config, mood, mode, bare) });
+    // Queued after the open-eyes image, so the avatar shows up first.
+    if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, true) });
     // config fields are all in the key
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, animated]);
 
   const box = RENDER_SIZE[mode];
   const height = size;
   const width = Math.round((size * box.w) / box.h);
+  const amp = BREATH_SCALE[mode];
+  const breathStyle = useAnimatedStyle(() => {
+    const s = 1 + amp * breath.value;
+    // Scale about the bottom edge: the shoulders rise, nothing slides.
+    return { transform: [{ translateY: (height / 2) * (1 - s) }, { scale: s }] };
+  });
+  const shutStyle = useAnimatedStyle(() => ({ opacity: eyes.value < 0.5 ? 1 : 0 }));
   if (!uri) {
     // Still rendering (or the renderer failed): the 2D anime avatar.
     return <AnimeAvatar config={config} size={size} mood={mood} mode={mode} bare={bare} animated={animated} />;
   }
   return (
     <View style={[mode === 'head' && !bare ? styles.round : null, { width, height }]} accessibilityLabel="Your avatar">
-      <Image source={{ uri }} style={{ width, height }} resizeMode="contain" />
+      <Animated.View style={[{ width, height }, animated ? breathStyle : null]}>
+        <Image source={{ uri }} style={{ width, height }} resizeMode="contain" />
+        {animated && blinkUri && ready ? (
+          <Animated.View style={[StyleSheet.absoluteFill, shutStyle]} pointerEvents="none">
+            <Image source={{ uri: blinkUri }} style={{ width, height }} resizeMode="contain" />
+          </Animated.View>
+        ) : null}
+      </Animated.View>
     </View>
   );
 }

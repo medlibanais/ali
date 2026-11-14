@@ -388,3 +388,48 @@ export function Body({ config }: { config: AvatarConfig }) {
     </G>
   );
 }
+
+/**
+ * The body split for the breathing animation: BodyLower (legs, shoes)
+ * stays planted while BodyUpper (torso, robe, arms) breathes above it.
+ * Drawn lower first, the pair matches Body's look.
+ */
+export function BodyLower({ config }: { config: AvatarConfig }) {
+  const skin = skinTone(config.skin);
+  const pants = pantsColor(config.pantsColor);
+  return (
+    <G>
+      <Legs skin={skin} pants={pants} height={config.height} build={config.bodyBuild} />
+      <Shoes
+        style={config.shoes}
+        color={shoesColor(config.shoesColor)}
+        skin={skin}
+        height={config.height}
+        build={config.bodyBuild}
+      />
+    </G>
+  );
+}
+
+export function BodyUpper({ config }: { config: AvatarConfig }) {
+  const skin = skinTone(config.skin);
+  const outfit = outfitColor(config.outfitColor);
+  const robeColor = hairColor(config.hairColor);
+  const isHijab = config.hair === 'hijab';
+  return (
+    <G>
+      <Torso
+        build={config.bodyBuild}
+        height={config.height}
+        outfit={outfit}
+        pants={pantsColor(config.pantsColor)}
+      />
+      {isHijab ? <Robe color={robeColor} height={config.height} /> : null}
+      <Arms skin={skin} sleeve={isHijab ? robeColor : outfit.value} pose={config.pose} build={config.bodyBuild} />
+    </G>
+  );
+}
+
+/** Where the breathing torso is anchored (hips) and where it rises (shoulders). */
+export const BODY_HIP_Y = HIP_BOTTOM;
+export const BODY_SHOULDER_Y = SHOULDER_Y;
