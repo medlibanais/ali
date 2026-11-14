@@ -1,9 +1,9 @@
-// 3D anime avatar. One hidden WebView (Avatar3DHost, mounted once at the
-// app root) runs the three.js + VRM viewer (assets/avatar3d/viewer.html)
+// The realistic 3D avatar. One hidden WebView (Avatar3DHost, mounted once
+// at the app root) runs the three.js viewer (assets/avatar3d/viewer.html)
 // and renders every avatar the app asks for into a PNG, one at a time.
-// Avatar3D shows that image; until it is ready it shows the 2D anime
-// avatar, so something is always on screen. Images are cached by
-// everything that changes them, so each look renders once per session.
+// Avatar3D shows that image; until it is ready it shows a quiet
+// placeholder. Images are cached by everything that changes them, so
+// each look renders once per session.
 //
 // To feel alive, the image breathes (a UI-thread scale anchored at the
 // bottom, paced by the life score, see alive.ts) and blinks: each look is
@@ -11,27 +11,29 @@
 // ~0.2 s of a blink. Both are View transforms/opacity, cheap on Android.
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useAliveMotion } from './alive';
 import { Asset } from 'expo-asset';
-import AnimeAvatar from './AnimeAvatar';
-import { bgStyle, eyeColor, hairColor, outfitColor, pantsColor, shoesColor, skinTone } from './palettes';
+import { bgStyle } from './palettes';
+import { irisFor, partsFor, skinFor, targetsFor } from './shape';
 import type { AvatarConfig, Mood } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const VIEWER = require('../../assets/avatar3d/viewer.html');
-// The base model every avatar uses until more VRoid models are added.
+// The human every avatar is shaped from (built by tools/human/build.py).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const MODELS: Record<string, number> = { 'base-f1': require('../../assets/avatar3d/models/base-f1.vrm') };
-export const DEFAULT_MODEL = 'base-f1';
+const MODEL: number = require('../../assets/avatar3d/models/human.bin');
 
-type Mode = 'head' | 'full-body';
+/** 'head-thumb' and 'body-thumb' are the small pictures on the editor's choices. */
+export type Mode = 'head' | 'full-body' | 'head-thumb' | 'body-thumb';
 
 /** Pixel size each mode is rendered at (the image is scaled to fit). */
 export const RENDER_SIZE: Record<Mode, { w: number; h: number }> = {
   head: { w: 384, h: 384 },
   'full-body': { w: 300, h: 660 },
+  'head-thumb': { w: 144, h: 144 },
+  'body-thumb': { w: 110, h: 242 },
 };
 
 export interface RenderRequest {
@@ -39,8 +41,9 @@ export interface RenderRequest {
   mode: Mode;
   command: Record<string, unknown>;
   /**
-   * Requests in the same channel replace each other while they wait and
-   * jump the queue: the editor's live preview only ever wants the newest.
+   * Requests in the same channel replace each other while they wait: a
+   * live preview only ever wants the newest. The 'editor' channel also
+   * jumps the queue.
    */
   channel?: string;
 }
@@ -50,7 +53,7 @@ export interface RenderRequest {
 const images = new Map<string, string>();
 const queue: RenderRequest[] = [];
 // Dragging a slider asks for many looks: keep the newest images only.
-const MAX_IMAGES = 60;
+const MAX_IMAGES = 140;
 function remember(key: string, data: string) {
   images.delete(key);
   images.set(key, data);
@@ -76,7 +79,9 @@ export function requestRender(req: RenderRequest) {
   if (images.has(req.key)) return;
   if (req.channel) {
     for (let i = queue.length - 1; i >= 0; i--) if (queue[i].channel === req.channel) queue.splice(i, 1);
-    queue.unshift(req);
+    // The editor's main preview goes first; its small pictures wait their turn.
+    if (req.channel === 'editor') queue.unshift(req);
+    else queue.push(req);
   } else {
     if (queue.some((q) => q.key === req.key)) return;
     queue.push(req);
@@ -94,45 +99,26 @@ export interface Camera {
 
 function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera, eyesClosed = false) {
   const bg = bgStyle(config.bg);
+  const head = mode === 'head' || mode === 'head-thumb';
   return {
     type: 'render',
-    colors: {
-      skin: skinTone(config.skin).base,
-      hair: hairColor(config.hairColor),
-      top: outfitColor(config.outfitColor).value,
-      bottom: pantsColor(config.pantsColor).value,
-      shoes: shoesColor(config.shoesColor).value,
-      iris: eyeColor(config.eyeColor),
-      bgFrom: bg.from,
-      bgTo: bg.to,
-    },
+    targets: targetsFor(config, mood, eyesClosed),
+    skin: skinFor(config),
+    parts: partsFor(config),
+    eyeColor: irisFor(config),
     pose: config.pose,
-    build: config.bodyBuild,
-    height: config.height,
-    sliders: config.sliders,
-    expression: config.expression,
-    paint: {
-      beard: config.facialHair,
-      mark: config.mark,
-      topPattern: config.topPattern,
-      top2: outfitColor(config.topColor2).value,
-      bottomPattern: config.bottomPattern,
-      bottom2: outfitColor(config.bottomColor2).value,
-    },
-    yaw: camera.yaw ?? 0.3,
+    colors: { bgFrom: bg.from, bgTo: bg.to },
+    yaw: camera.yaw ?? (head ? 0.22 : 0.3),
     zoom: camera.zoom ?? 1,
-    mood,
-    mode,
+    mode: head ? 'head' : 'full-body',
     bare,
-    animated: false,
     snapshot: true,
-    eyes: eyesClosed ? 'closed' : 'open',
   };
 }
 
 /** Everything that changes the picture, so each look renders once. */
 export function renderKey(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera = {}): string {
-  return JSON.stringify([DEFAULT_MODEL, commandFor(config, mood, mode, bare, camera)]);
+  return JSON.stringify([mode, commandFor(config, mood, mode, bare, camera)]);
 }
 
 // ---------------------------------------------------------------- host
@@ -157,7 +143,7 @@ export function Avatar3DHost() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([assetUri(VIEWER), assetUri(MODELS[DEFAULT_MODEL])])
+    Promise.all([assetUri(VIEWER), assetUri(MODEL)])
       .then(([v, m]) => {
         if (!alive) return;
         setViewerUri(v);
@@ -290,7 +276,7 @@ export interface Avatar3DProps {
 const NO_CAMERA: Camera = {};
 
 /** Breath scale of the whole image, anchored at its bottom edge. */
-const BREATH_SCALE: Record<Mode, number> = { head: 0.022, 'full-body': 0.012 };
+const BREATH_SCALE: Record<Mode, number> = { head: 0.012, 'full-body': 0.008, 'head-thumb': 0, 'body-thumb': 0 };
 
 export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live }: Avatar3DProps) {
   const key = renderKey(config, mood, mode, bare, camera);
@@ -333,12 +319,17 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
     return { transform: [{ translateY: (height / 2) * (1 - s) }, { scale: s }] };
   });
   const shutStyle = useAnimatedStyle(() => ({ opacity: eyes.value < 0.5 ? 1 : 0 }));
+  const head = mode === 'head' || mode === 'head-thumb';
   if (!uri) {
-    // Still rendering (or the renderer failed): the 2D anime avatar.
-    return <AnimeAvatar config={config} size={size} mood={mood} mode={mode} bare={bare} animated={animated} />;
+    // Still rendering, or the renderer failed.
+    return (
+      <View style={[styles.waiting, head && !bare ? styles.round : null, bare ? null : styles.waitingFill, { width, height }]} accessibilityLabel="Your avatar is loading">
+        {size >= 64 && ready !== '' ? <ActivityIndicator color="#9AA0A8" /> : null}
+      </View>
+    );
   }
   return (
-    <View style={[mode === 'head' && !bare ? styles.round : null, { width, height }]} accessibilityLabel="Your avatar">
+    <View style={[head && !bare ? styles.round : null, { width, height }]} accessibilityLabel="Your avatar">
       <Animated.View style={[{ width, height }, animated ? breathStyle : null]}>
         <Image source={{ uri }} style={{ width, height }} resizeMode="contain" />
         {animated && blinkUri && ready ? (
@@ -365,6 +356,13 @@ const styles = StyleSheet.create({
   round: {
     borderRadius: 999,
     overflow: 'hidden',
+  },
+  waiting: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waitingFill: {
+    backgroundColor: 'rgba(140,146,156,0.18)',
   },
 });
 

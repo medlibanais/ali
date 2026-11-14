@@ -1,48 +1,38 @@
 // Avatar config: a single JSON object stored in profiles.avatar_config.
-// Every value is an id into the option catalogs below — the same config
-// renders at any size, anywhere in the app.
-
-export type Mood = 'tired' | 'neutral' | 'happy' | 'glowing';
-
-export type BodyBuild = 'slim' | 'athletic' | 'average' | 'curvy' | 'broad';
-export type BodyHeight = 'short' | 'medium' | 'tall';
-export type BodyPose = 'standing' | 'hip' | 'arms-crossed' | 'wave';
-export type ShoeStyle = 'sneakers' | 'boots' | 'sandals' | 'barefoot';
-export type BottomsStyle = 'pants' | 'joggers' | 'shorts' | 'skirt';
+// Every value is an id into the option catalogs (options.ts) or a custom
+// colour; the sliders shape the face and body (custom.ts). The same
+// config renders at any size, anywhere in the app.
 
 import { sanitizeSliders, type Sliders } from './custom';
 import { isHex } from './palettes';
+import type { Sex } from './wardrobe';
+
+export type Mood = 'tired' | 'neutral' | 'happy' | 'glowing';
 
 export interface AvatarConfig {
-  face: string; // 8 face shapes
-  skin: string; // 12 skin tones
-  hair: string; // 20 hairstyles (incl. hijab, cap, bald)
-  hairColor: string; // 20 hair colors
-  eyes: string; // 10 eye styles
-  brows: string; // 8 brow styles
-  nose: string; // 6 nose styles
-  mouth: string; // 8 mouth styles
-  facialHair: string; // none + 4 styles
-  glasses: string; // none + 4 styles
-  headwear: string; // none + 4 styles
-  outfit: string; // 6 outfits
-  outfitColor: string; // palette key
-  bg: string; // 8 background styles
-  bodyBuild: BodyBuild;
-  height: BodyHeight;
-  pose: BodyPose;
-  bottoms: BottomsStyle;
-  pantsColor: string; // palette key
-  shoes: ShoeStyle;
-  shoesColor: string; // palette key
-  eyeColor: string; // palette key, 'natural' keeps the model's eyes
+  sex: Sex;
+  /** Face structure family the body blends toward. */
+  features: string;
+  /** Named body type, or 'none' to use the sliders alone. */
+  bodyType: string;
+  skin: string;
+  hair: string;
+  hairColor: string;
+  brows: string;
+  lashes: string;
+  eyeColor: string;
+  /** A whole outfit, or 'separates' to wear `top` and `bottom`. */
+  outfit: string;
+  top: string;
+  topColor: string;
+  bottom: string;
+  bottomColor: string;
+  shoes: string;
+  glasses: string;
   expression: string; // 'auto' follows the day's mood
-  mark: string; // beauty mark or scar
-  topPattern: string;
-  topColor2: string; // the pattern's second color
-  bottomPattern: string;
-  bottomColor2: string;
-  /** Proportion sliders, -1..1, zeros left out (custom.ts). */
+  pose: string;
+  bg: string;
+  /** Shape sliders, -1..1, zeros left out (custom.ts). */
   sliders: Sliders;
 }
 
@@ -51,50 +41,33 @@ export type AvatarChoiceKey = Exclude<keyof AvatarConfig, 'sliders'>;
 export type ValidChoices = { [K in AvatarChoiceKey]: string[] };
 
 /** Fields that also accept a custom '#RRGGBB' color. */
-export const CUSTOM_COLOR_KEYS: AvatarChoiceKey[] = [
-  'skin', 'hairColor', 'eyeColor', 'outfitColor', 'pantsColor', 'shoesColor', 'topColor2', 'bottomColor2',
-];
+export const CUSTOM_COLOR_KEYS: AvatarChoiceKey[] = ['skin', 'hairColor', 'eyeColor', 'topColor', 'bottomColor'];
 
 export const DEFAULT_AVATAR: AvatarConfig = {
-  face: 'oval',
-  skin: 'tan-3',
-  hair: 'short-wave',
+  sex: 'female',
+  features: 'blend',
+  bodyType: 'none',
+  skin: 'tan-1',
+  hair: 'long01',
   hairColor: 'espresso',
-  eyes: 'almond',
-  brows: 'natural',
-  nose: 'straight',
-  mouth: 'soft-smile',
-  facialHair: 'none',
+  brows: 'brow1',
+  lashes: 'lashes1',
+  eyeColor: 'brown',
+  outfit: 'separates',
+  top: 'fitted_tee',
+  topColor: 'forest',
+  bottom: 'trousers',
+  bottomColor: 'navy',
+  shoes: 'shoes2',
   glasses: 'none',
-  headwear: 'none',
-  outfit: 'crewneck',
-  outfitColor: 'forest',
-  bg: 'sunrise',
-  bodyBuild: 'average',
-  height: 'medium',
-  pose: 'standing',
-  bottoms: 'pants',
-  pantsColor: 'navy',
-  shoes: 'sneakers',
-  shoesColor: 'charcoal',
-  eyeColor: 'natural',
   expression: 'auto',
-  mark: 'none',
-  topPattern: 'plain',
-  topColor2: 'cream',
-  bottomPattern: 'plain',
-  bottomColor2: 'cream',
+  pose: 'relaxed',
+  bg: 'studio',
   sliders: {},
 };
 
-/** Sliders that match the body and height choices made before sliders existed. */
-const LEGACY_BUILD: Record<string, Sliders> = {
-  slim: { bodyFat: -0.6, muscle: -0.3, waist: -0.3 },
-  athletic: { muscle: 0.5, shoulders: 0.4, bodyFat: -0.4, waist: -0.2 },
-  curvy: { hips: 0.8, chest: 0.5, waist: -0.4, bodyFat: 0.2 },
-  broad: { shoulders: 0.9, muscle: 0.4 },
-};
-const LEGACY_HEIGHT: Record<string, number> = { short: -0.7, tall: 0.7 };
+/** Field names used before the realistic avatar, and what they map to now. */
+const RENAMED: Partial<Record<AvatarChoiceKey, string>> = { topColor: 'outfitColor', bottomColor: 'pantsColor' };
 
 /** Coerce arbitrary JSONB into a valid config (falls back per-field). */
 export function sanitizeAvatarConfig(raw: unknown, valid: ValidChoices): AvatarConfig {
@@ -103,21 +76,14 @@ export function sanitizeAvatarConfig(raw: unknown, valid: ValidChoices): AvatarC
   const record = raw as Record<string, unknown>;
   const choices = out as unknown as Record<AvatarChoiceKey, string>;
   for (const key of Object.keys(valid) as AvatarChoiceKey[]) {
-    const value = record[key];
+    const old = RENAMED[key];
+    const value = record[key] ?? (old ? record[old] : undefined);
     if (typeof value !== 'string') continue;
     if (valid[key].includes(value) || (CUSTOM_COLOR_KEYS.includes(key) && isHex(value))) {
       choices[key] = value;
     }
   }
-  if (record.sliders && typeof record.sliders === 'object') {
-    out.sliders = sanitizeSliders(record.sliders);
-  } else {
-    // Saved before sliders: keep the body it had.
-    const seeded: Sliders = { ...(LEGACY_BUILD[out.bodyBuild] ?? {}) };
-    const h = LEGACY_HEIGHT[out.height];
-    if (h) seeded.height = h;
-    out.sliders = seeded;
-  }
+  out.sliders = sanitizeSliders(record.sliders);
   return out;
 }
 
@@ -161,24 +127,24 @@ export function readAvatarDoc(raw: unknown, valid: ValidChoices): AvatarDoc {
 }
 
 export function writeAvatarDoc(doc: AvatarDoc): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...doc.current, v: 2 };
+  const out: Record<string, unknown> = { ...doc.current, v: 3 };
   if (doc.future) out.future = doc.future;
   if (doc.looks.length) out.looks = doc.looks.slice(0, MAX_LOOKS);
   return out;
 }
 
 /**
- * A first Future You: the same person, standing taller, a little fitter
+ * A first Future You: the same person, a little fitter, standing tall
  * and smiling. A starting point to edit, not a goal we choose for them.
  */
 export function suggestFuture(current: AvatarConfig): AvatarConfig {
   const s = current.sliders;
-  const up = (v: number | undefined, by: number, max = 1) => Math.max(-1, Math.min(max, Math.round(((v ?? 0) + by) * 100) / 100));
+  const up = (v: number | undefined, by: number) => Math.max(-1, Math.min(1, Math.round(((v ?? 0) + by) * 100) / 100));
   return {
     ...current,
     expression: 'confident',
-    pose: 'arms-crossed',
-    sliders: { ...s, posture: up(s.posture, 0.7), muscle: up(s.muscle, 0.3), shoulders: up(s.shoulders, 0.2) },
+    pose: 'confident',
+    sliders: { ...s, muscle: up(s.muscle, 0.35), stomachTone: up(s.stomachTone, 0.4), proportions: up(s.proportions, 0.3) },
   };
 }
 

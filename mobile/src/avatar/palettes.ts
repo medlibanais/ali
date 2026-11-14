@@ -105,7 +105,7 @@ export const OUTFIT_COLORS: { id: string; label: string; value: string; shade: s
   { id: 'turquoise', label: 'Turquoise', value: '#3CC2C2', shade: '#2D9B9B' },
 ];
 
-// Eye colors. 'natural' keeps the eyes the 3D model was painted with.
+// Eye colors: the iris of the model's eye texture is recoloured to these.
 export const EYE_COLORS: { id: string; label: string; value: string }[] = [
   { id: 'natural', label: 'Natural brown', value: '#8A5A3A' },
   { id: 'black', label: 'Black', value: '#2A2422' },
@@ -132,6 +132,8 @@ export const EYE_COLORS: { id: string; label: string; value: string }[] = [
 ];
 
 export const BG_STYLES: { id: string; label: string; from: string; to: string }[] = [
+  { id: 'studio', label: 'Studio', from: '#9DA2AA', to: '#E4E6EA' },
+  { id: 'studio-dark', label: 'Dark studio', from: '#17181C', to: '#4A4E57' },
   { id: 'sunrise', label: 'Sunrise', from: '#F6E3C5', to: '#E8B08A' },
   { id: 'meadow', label: 'Meadow', from: '#DDEBCB', to: '#A8C89A' },
   { id: 'ocean', label: 'Ocean', from: '#CFE4EC', to: '#8FB8CC' },
@@ -169,11 +171,10 @@ export function shoesColor(id: string) {
   return cloth(id, 'charcoal');
 }
 
-/** Iris tint, or undefined to keep the model's own eyes. */
-export function eyeColor(id: string): string | undefined {
+/** Iris colour. */
+export function eyeColor(id: string): string {
   if (isHex(id)) return id;
-  if (id === 'natural') return undefined;
-  return EYE_COLORS.find((c) => c.id === id)?.value;
+  return EYE_COLORS.find((c) => c.id === id)?.value ?? EYE_COLORS[0].value;
 }
 
 export function bgStyle(id: string) {

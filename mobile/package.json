@@ -68,7 +68,6 @@
     "react-redux": "^9.1.2"
   },
   "devDependencies": {
-    "@pixiv/three-vrm": "^3.1.0",
     "@types/jest": "^29.5.14",
     "@types/qrcode": "^1.5.5",
     "@types/react": "~18.2.79",

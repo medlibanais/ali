@@ -1,6 +1,8 @@
-// Avatar editor. A live 3D preview on top (drag to turn it, zoom from
-// full body to a close-up), and below it ten tabs from Face to
-// Personality. Shapes are presets plus sliders: a preset moves a group of
+// Avatar editor, laid out like a game's character creator: a live 3D
+// preview on a studio backdrop (drag to turn it, zoom from full body to
+// a close-up), a row of pill tabs from Presets to Style, and below them
+// picture grids to pick from. Basic edit shows presets and choices;
+// Detailed edit adds every shape slider. A preset moves a group of
 // sliders, and every slider stays free to fine-tune.
 //
 // It edits two avatars: Current You, the person you are today, and
@@ -31,11 +33,13 @@ import {
 import {
   categoryFor,
   EDITOR_TABS,
+  fitToSex,
+  LOOKS,
   optionLocked,
+  optionsFor,
   randomAvatarConfig,
   randomizeTab,
   resetTab,
-  syncLegacyBody,
   VALID_OPTION_IDS,
   type EditorSection,
   type EditorTab,
@@ -43,6 +47,7 @@ import {
   type OptionItem,
 } from '../avatar/options';
 import { bgStyle, isHex } from '../avatar/palettes';
+import { wornOutfit } from '../avatar/shape';
 import {
   DEFAULT_AVATAR,
   MAX_LOOKS,
@@ -56,26 +61,15 @@ import {
 import ColorPicker from '../components/ColorPicker';
 import {
   BackdropGlyph,
-  BeardGlyph,
   CloseGlyph,
   CompareGlyph,
   DiceGlyph,
-  EyeGlyph,
-  FaceGlyph,
-  GlassesGlyph,
-  HairGlyph,
-  LipsGlyph,
   LockGlyph,
-  PersonGlyph,
   RedoGlyph,
   ResetGlyph,
   RotateGlyph,
-  ShirtGlyph,
-  SkinGlyph,
-  SmileGlyph,
   UndoGlyph,
   ZoomGlyph,
-  type IconProps,
 } from '../components/icons';
 import { PressableScale } from '../components/Motion';
 import Slider from '../components/Slider';
@@ -96,19 +90,6 @@ type Props = NativeStackScreenProps<
   'AvatarCreator'
 >;
 
-const TAB_ICONS: Record<string, (props: IconProps) => React.ReactElement> = {
-  face: FaceGlyph,
-  eyes: EyeGlyph,
-  mouth: LipsGlyph,
-  skin: SkinGlyph,
-  hair: HairGlyph,
-  body: PersonGlyph,
-  clothing: ShirtGlyph,
-  accessories: GlassesGlyph,
-  details: BeardGlyph,
-  personality: SmileGlyph,
-};
-
 type Who = 'current' | 'future';
 
 /** Both avatars at one moment: what undo and redo step through. */
@@ -124,7 +105,7 @@ const YAW_STEP = Math.PI / 12;
 const FRONT = 0.3;
 const VIEWS: EditorView[] = ['full-body', 'head', 'face'];
 const VIEW_LABEL: Record<EditorView, string> = { 'full-body': 'full body', head: 'head and shoulders', face: 'face close-up' };
-const FACE_ZOOM = 1.6;
+const FACE_ZOOM = 1.7;
 
 export function AvatarCreatorScreen({ navigation, route }: Props) {
   useTheme();
@@ -149,6 +130,8 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const [view, setView] = useState<EditorView>(EDITOR_TABS[0].view);
   const [yawSteps, setYawSteps] = useState(0);
   const [comparing, setComparing] = useState(false);
+  // Basic edit: presets and choices. Detailed edit: every slider too.
+  const [detailed, setDetailed] = useState(false);
   const [customFor, setCustomFor] = useState<AvatarChoiceKey | null>(null);
   const [saving, setSaving] = useState(false);
   const undoStack = useRef<Draft[]>([]);
@@ -176,7 +159,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const commit = (next: AvatarConfig) => {
     pushHistory(dragFrom.current ?? draft);
     dragFrom.current = null;
-    setDraft(withConfig(syncLegacyBody(next)));
+    setDraft(withConfig(next));
   };
 
   /** A change still in progress (a slider being dragged): preview only. */
@@ -211,7 +194,9 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
 
   const setChoice = (key: AvatarChoiceKey, value: string, live = false) => {
     if (!config || config[key] === value) return;
-    const next = { ...config, [key]: value } as AvatarConfig;
+    let next = { ...config, [key]: value } as AvatarConfig;
+    // A new body: swap what was cut for the other one.
+    if (key === 'sex') next = fitToSex(next);
     if (live) preview(next);
     else commit(next);
   };
@@ -295,6 +280,8 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const contentW = Math.min(winW, 720);
   const previewH = Math.max(280, Math.min(winH * 0.44, 440));
   const colorCell = Math.floor((contentW - SIDE * 2 - 8 * 5) / 6);
+  const thumbCols = contentW > 560 ? 6 : 4;
+  const thumbCell = Math.floor((contentW - SIDE * 2 - 10 * (thumbCols - 1)) / thumbCols);
   const bg = bgStyle((shown ?? draft.current).bg);
   const canUndo = undoStack.current.length > 0;
   const canRedo = redoStack.current.length > 0;
@@ -428,26 +415,25 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.tabs}
           style={styles.tabsBar}
         >
-          {EDITOR_TABS.map((t) => {
-            const Icon = TAB_ICONS[t.key];
-            const selected = t.key === tab.key;
-            return (
-              <Pressable
-                key={t.key}
-                accessibilityRole="tab"
-                accessibilityLabel={t.label}
-                accessibilityState={{ selected }}
-                onPress={() => selectTab(t)}
-                style={styles.tab}
-              >
-                <Icon size={22} color={selected ? colors.accent : colors.inkSoft} />
-                <Txt variant="caption" color={selected ? colors.accent : colors.inkSoft} numberOfLines={1} style={styles.tabLabel}>
-                  {t.label}
-                </Txt>
-                <View style={[styles.tabBar, selected && styles.tabBarOn]} />
-              </Pressable>
-            );
-          })}
+          <View style={styles.tabPills} accessibilityRole="tablist">
+            {EDITOR_TABS.map((t) => {
+              const selected = t.key === tab.key;
+              return (
+                <Pressable
+                  key={t.key}
+                  accessibilityRole="tab"
+                  accessibilityLabel={t.label}
+                  accessibilityState={{ selected }}
+                  onPress={() => selectTab(t)}
+                  style={[styles.tab, selected && styles.tabOn]}
+                >
+                  <Txt variant="caption" color={selected ? colors.onAccent : colors.ink} numberOfLines={1} style={styles.tabLabel}>
+                    {t.label}
+                  </Txt>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
 
         {config ? (
@@ -458,6 +444,22 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {tab.sections.some((x) => x.kind === 'sliders' && x.detail) ? (
+              <View style={styles.modes} accessibilityRole="tablist">
+                {([false, true] as const).map((d) => (
+                  <Pressable
+                    key={d ? 'detailed' : 'basic'}
+                    accessibilityRole="tab"
+                    accessibilityLabel={d ? 'Detailed edit mode: every slider' : 'Basic edit mode: presets only'}
+                    accessibilityState={{ selected: detailed === d }}
+                    onPress={() => setDetailed(d)}
+                    style={[styles.mode, detailed === d && styles.modeOn]}
+                  >
+                    <Txt variant="caption" color={colors.ink} style={styles.whoText}>{d ? 'Detailed edit' : 'Basic edit'}</Txt>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             <View style={styles.tabHead}>
               <Txt variant="label" color={colors.inkSoft} style={styles.sheetTitle}>
                 {`${who === 'future' ? 'Future you' : 'Current you'} · ${tab.label}`}
@@ -485,6 +487,9 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                 config={config}
                 level={level}
                 colorCell={colorCell}
+                thumbCell={thumbCell}
+                detailed={detailed}
+                onLook={(look) => commit({ ...look, expression: config.expression, pose: config.pose, bg: config.bg })}
                 customOpen={section.kind === 'color' && customFor === section.category}
                 onToggleCustom={(key) => setCustomFor(customFor === key ? null : key)}
                 onOption={pickOption}
@@ -494,7 +499,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               />
             ))}
 
-            {tab.key === 'personality' ? (
+            {tab.key === 'style' ? (
               <View style={styles.section}>
                 <Txt variant="label" style={styles.sectionTitle}>Saved looks</Txt>
                 <View style={styles.chips}>
@@ -566,6 +571,9 @@ interface SectionProps {
   config: AvatarConfig;
   level: number;
   colorCell: number;
+  thumbCell: number;
+  detailed: boolean;
+  onLook: (config: AvatarConfig) => void;
   customOpen: boolean;
   onToggleCustom: (key: AvatarChoiceKey) => void;
   onOption: (key: AvatarChoiceKey, option: OptionItem) => void;
@@ -574,8 +582,61 @@ interface SectionProps {
   onSlider: (id: SliderId, value: number, live: boolean) => void;
 }
 
-function Section({ section, config, level, colorCell, customOpen, onToggleCustom, onOption, onColor, onPreset, onSlider }: SectionProps) {
+/** A picture of the avatar wearing one choice. */
+function Thumb({ config, shape, cell, label, text, selected, locked = false, channel, onPress }: {
+  config: AvatarConfig;
+  shape: 'head' | 'full-body';
+  cell: number;
+  label: string;
+  text: string;
+  selected: boolean;
+  locked?: boolean;
+  channel: string;
+  onPress: () => void;
+}) {
+  const h = shape === 'head' ? cell : Math.round(cell * 2.2);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected, disabled: locked }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.thumb, { width: cell }, locked && styles.dim, pressed && styles.pressed]}
+    >
+      <View style={[styles.thumbFrame, shape === 'head' ? { borderRadius: cell / 2 } : null, { width: cell, height: h }, selected && styles.thumbFrameOn]}>
+        <View pointerEvents="none" style={[styles.thumbClip, shape === 'head' ? { borderRadius: cell / 2 } : null]}>
+          <Avatar3D config={config} size={h - 6} mood="neutral" mode={shape === 'head' ? 'head-thumb' : 'body-thumb'} animated={false} live={channel} />
+        </View>
+      </View>
+      <Txt variant="caption" color={selected ? colors.accent : colors.inkSoft} numberOfLines={2} style={styles.thumbLabel}>{text}</Txt>
+    </Pressable>
+  );
+}
+
+function Section({ section, config, level, colorCell, thumbCell, detailed, onLook, customOpen, onToggleCustom, onOption, onColor, onPreset, onSlider }: SectionProps) {
   useTheme();
+  if (section.kind === 'looks') {
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <View style={styles.thumbs}>
+          {LOOKS.filter((l) => l.config.sex === config.sex).map((l) => (
+            <Thumb
+              key={l.id}
+              config={{ ...l.config, expression: 'neutral', pose: 'relaxed', bg: config.bg }}
+              shape="head"
+              cell={thumbCell}
+              label={`Start from the look ${l.label}`}
+              text={l.label}
+              selected={false}
+              channel={`thumb:look:${l.id}`}
+              onPress={() => onLook(l.config)}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  }
   if (section.kind === 'note') {
     return (
       <View style={styles.note}>
@@ -604,6 +665,7 @@ function Section({ section, config, level, colorCell, customOpen, onToggleCustom
     );
   }
   if (section.kind === 'sliders') {
+    if ((section.detail && !detailed) || (section.only && section.only !== config.sex)) return null;
     return (
       <View style={styles.section}>
         <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
@@ -628,12 +690,44 @@ function Section({ section, config, level, colorCell, customOpen, onToggleCustom
   }
   const category = categoryFor(section.category);
   const value = config[section.category];
+  const worn = wornOutfit(config);
+  if (section.when === 'separates' && worn.outfit) return null;
+  if (section.when === 'top' && !worn.top?.tint) return null;
+  if (section.when === 'bottom' && !worn.bottom?.tint) return null;
+  const options = optionsFor(section.category, config.sex);
+  if (section.kind === 'choice' && section.thumbs) {
+    const shape = section.thumbs;
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <View style={styles.thumbs}>
+          {options.map((option) => {
+            const locked = optionLocked(option, level);
+            return (
+              <Thumb
+                key={option.id}
+                config={{ ...config, [section.category]: option.id, expression: 'neutral', pose: 'relaxed' } as AvatarConfig}
+                shape={shape}
+                cell={thumbCell}
+                label={`${section.title}: ${option.label}${locked ? `, unlocks at level ${option.minLevel}` : ''}`}
+                text={option.label}
+                selected={value === option.id}
+                locked={locked}
+                channel={`thumb:${section.category}:${option.id}`}
+                onPress={() => onOption(section.category, option)}
+              />
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
   if (section.kind === 'choice') {
     return (
       <View style={styles.section}>
         <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
         <View style={styles.chips}>
-          {category.options.map((option) => {
+          {options.map((option) => {
             const locked = optionLocked(option, level);
             return (
               <Chip
@@ -890,34 +984,77 @@ const styles = themed(() =>
     },
     tabsBar: {
       flexGrow: 0,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.line,
     },
     tabs: {
-      paddingHorizontal: SIDE - 6,
+      paddingHorizontal: SIDE,
+      paddingBottom: spacing.sm,
+    },
+    tabPills: {
+      flexDirection: 'row',
+      padding: 3,
+      borderRadius: radius.pill,
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+      borderWidth: 1,
+      borderColor: colors.line,
     },
     tab: {
-      minWidth: 68,
-      height: 56,
-      paddingHorizontal: 6,
+      minWidth: 64,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 2,
+    },
+    tabOn: {
+      backgroundColor: colors.accent,
     },
     tabLabel: {
+      fontFamily: fonts.bodySemi,
+    },
+    modes: {
+      flexDirection: 'row',
+      alignSelf: 'center',
+      gap: spacing.xs,
+    },
+    mode: {
+      minHeight: 44,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modeOn: {
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.2),
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    thumbs: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    thumb: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    thumbFrame: {
+      borderRadius: radius.sm,
+      borderWidth: 3,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    thumbFrameOn: {
+      borderColor: colors.accent,
+    },
+    thumbClip: {
+      borderRadius: radius.sm - 2,
+      overflow: 'hidden',
+    },
+    thumbLabel: {
+      textAlign: 'center',
       fontSize: 11,
       lineHeight: 14,
-    },
-    tabBar: {
-      position: 'absolute',
-      bottom: 0,
-      width: 30,
-      height: 3,
-      borderRadius: 2,
-      backgroundColor: 'transparent',
-    },
-    tabBarOn: {
-      backgroundColor: colors.accent,
     },
     tabHead: {
       flexDirection: 'row',

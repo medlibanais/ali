@@ -1,33 +1,18 @@
-// Fine-grained avatar customization: proportion sliders, the presets built
-// from them, expressions and painted details. Pure data with no React
-// Native imports, so the 3D viewer (avatar3d/viewer.ts) bundles the same
-// definitions the editor shows.
+// Fine-grained avatar customization: the sliders that shape the realistic
+// human, the presets built from them, and expressions. Pure data with no
+// React Native imports.
 //
-// Every slider runs from -1 to 1 (or 0 to 1 for amounts), 0 is the
-// model as VRoid made it. A preset is a named set of slider values: picking
-// "Heart-shaped" moves the face sliders, and the sliders stay free to tweak.
+// A slider runs from -1 to 1 (or 0 to 1 for amounts); 0 leaves the body
+// as it is. Each slider blends MakeHuman shape targets stored in the
+// model file (assets/avatar3d/models/human.bin): `neg` at the low end,
+// `pos` at the high end. A preset is a named set of slider values, so
+// picking "Heart" moves the face sliders and they stay free to tweak.
 
-export type SliderId =
-  // Face
-  | 'faceWidth' | 'faceLength' | 'jawWidth' | 'jawAngle' | 'chinWidth' | 'chinLength'
-  | 'cheekbones' | 'cheekFull'
-  // Eyes and brows
-  | 'eyeSize' | 'eyeWidth' | 'eyeHeight' | 'eyeSpacing' | 'eyeTilt' | 'eyeY' | 'eyelid' | 'irisSize'
-  | 'browY' | 'browSpacing' | 'browTilt' | 'browThick' | 'browLength'
-  // Nose and mouth
-  | 'noseLength' | 'noseWidth' | 'noseBridge' | 'noseTip' | 'noseProjection'
-  | 'mouthWidth' | 'mouthHeight' | 'mouthY' | 'mouthCorners'
-  // Skin details (amounts, 0..1)
-  | 'freckles' | 'blush' | 'underEye'
-  // Hair
-  | 'hairVolume' | 'hairLength'
-  // Body
-  | 'height' | 'shoulders' | 'chest' | 'waist' | 'hips' | 'armLength' | 'legLength'
-  | 'torsoLength' | 'neckLength' | 'neckThick' | 'headSize' | 'muscle' | 'bodyFat' | 'posture'
-  // Clothes
-  | 'topFit' | 'bottomFit';
+export type SliderId = string;
+export type Sliders = Record<SliderId, number>;
 
-export type Sliders = Partial<Record<SliderId, number>>;
+/** Whole-body sliders that mix several targets (see shape.ts). */
+export type Macro = 'muscle' | 'weight' | 'height' | 'proportions' | 'cup' | 'firmness';
 
 export interface SliderDef {
   id: SliderId;
@@ -35,266 +20,364 @@ export interface SliderDef {
   /** Words at the two ends of the track. */
   low: string;
   high: string;
-  /** 0 for amounts (freckles), -1 for everything else. */
+  /** 0 for amounts, -1 for everything else. */
   min: 0 | -1;
+  neg?: string;
+  pos?: string;
+  macro?: Macro;
 }
 
-const s = (id: SliderId, label: string, low = 'Less', high = 'More', min: 0 | -1 = -1): SliderDef => ({ id, label, low, high, min });
+/** A two-ended slider over a pair of targets, `<target>-<lo>` and `<target>-<hi>`. */
+const t = (id: string, label: string, target: string, low = 'Less', high = 'More', lo = 'decr', hi = 'incr'): SliderDef => ({
+  id, label, low, high, min: -1, neg: `${target}-${lo}`, pos: `${target}-${hi}`,
+});
+/** A one-ended amount over a single target. */
+const amount = (id: string, label: string, target: string): SliderDef => ({ id, label, low: 'None', high: 'Full', min: 0, pos: target });
+const macro = (id: Macro, label: string, low: string, high: string): SliderDef => ({ id, label, low, high, min: -1, macro: id });
 
-export const SLIDERS: SliderDef[] = [
-  s('faceWidth', 'Face width', 'Narrow', 'Wide'),
-  s('faceLength', 'Face length', 'Short', 'Long'),
-  s('jawWidth', 'Jaw width', 'Narrow', 'Wide'),
-  s('jawAngle', 'Jaw angle', 'Soft', 'Square'),
-  s('chinWidth', 'Chin width', 'Pointed', 'Broad'),
-  s('chinLength', 'Chin length', 'Short', 'Long'),
-  s('cheekbones', 'Cheekbones', 'Flat', 'High'),
-  s('cheekFull', 'Cheek fullness', 'Hollow', 'Full'),
-
-  s('eyeSize', 'Eye size', 'Small', 'Large'),
-  s('eyeWidth', 'Eye width', 'Narrow', 'Wide'),
-  s('eyeHeight', 'Eye height', 'Slim', 'Tall'),
-  s('eyeSpacing', 'Distance between eyes', 'Close', 'Wide'),
-  s('eyeTilt', 'Eye angle', 'Down', 'Up'),
-  s('eyeY', 'Eye position', 'Low', 'High'),
-  s('eyelid', 'Upper eyelid', 'Open', 'Heavy'),
-  s('irisSize', 'Iris size', 'Small', 'Large'),
-  s('browY', 'Brow height', 'Low', 'High'),
-  s('browSpacing', 'Distance between brows', 'Close', 'Far'),
-  s('browTilt', 'Brow angle', 'Down', 'Up'),
-  s('browThick', 'Brow thickness', 'Thin', 'Thick'),
-  s('browLength', 'Brow length', 'Short', 'Long'),
-
-  s('noseLength', 'Nose length', 'Short', 'Long'),
-  s('noseWidth', 'Nose width', 'Narrow', 'Wide'),
-  s('noseBridge', 'Bridge height', 'Low', 'High'),
-  s('noseTip', 'Tip rotation', 'Down', 'Up'),
-  s('noseProjection', 'Nose projection', 'Flat', 'Pointed'),
-  s('mouthWidth', 'Mouth width', 'Narrow', 'Wide'),
-  s('mouthHeight', 'Mouth height', 'Thin', 'Full'),
-  s('mouthY', 'Mouth position', 'Low', 'High'),
-  s('mouthCorners', 'Mouth corners', 'Down', 'Up'),
-
-  s('freckles', 'Freckles', 'None', 'Lots', 0),
-  s('blush', 'Blush', 'None', 'Rosy', 0),
-  s('underEye', 'Under-eye circles', 'None', 'Deep', 0),
-
-  s('hairVolume', 'Hair volume', 'Flat', 'Full'),
-  s('hairLength', 'Hair length', 'Shorter', 'Longer'),
-
-  s('height', 'Height', 'Short', 'Tall'),
-  s('shoulders', 'Shoulder width', 'Narrow', 'Broad'),
-  s('chest', 'Chest size', 'Small', 'Large'),
-  s('waist', 'Waist size', 'Slim', 'Wide'),
-  s('hips', 'Hip width', 'Narrow', 'Wide'),
-  s('armLength', 'Arm length', 'Short', 'Long'),
-  s('legLength', 'Leg length', 'Short', 'Long'),
-  s('torsoLength', 'Torso length', 'Short', 'Long'),
-  s('neckLength', 'Neck length', 'Short', 'Long'),
-  s('neckThick', 'Neck thickness', 'Thin', 'Thick'),
-  s('headSize', 'Head-to-body ratio', 'Smaller head', 'Bigger head'),
-  s('muscle', 'Muscle mass', 'Lean', 'Muscular'),
-  s('bodyFat', 'Body fat', 'Low', 'High'),
-  s('posture', 'Posture', 'Slouched', 'Upright'),
-
-  s('topFit', 'Top fit', 'Fitted', 'Oversized'),
-  s('bottomFit', 'Bottoms fit', 'Fitted', 'Relaxed'),
+const HEAD: SliderDef[] = [
+  amount('shapeOval', 'Oval', 'head-oval'),
+  amount('shapeRound', 'Round', 'head-round'),
+  amount('shapeSquare', 'Square', 'head-square'),
+  amount('shapeRect', 'Rectangular', 'head-rectangular'),
+  amount('shapeHeart', 'Heart', 'head-invertedtriangular'),
+  amount('shapeTriangle', 'Triangle', 'head-triangular'),
+  amount('shapeDiamond', 'Diamond', 'head-diamond'),
+  t('headWidth', 'Face width', 'head-scale-horiz', 'Narrow', 'Wide'),
+  t('headHeight', 'Face length', 'head-scale-vert', 'Short', 'Long'),
+  t('headDepth', 'Head depth', 'head-scale-depth', 'Shallow', 'Deep'),
+  t('headFat', 'Face fullness', 'head-fat', 'Lean', 'Full'),
+  t('headAge', 'Face age', 'head-age', 'Younger', 'Older'),
+  t('headAngle', 'Profile angle', 'head-angle', 'In', 'Out', 'in', 'out'),
+  t('foreheadHeight', 'Forehead height', 'forehead-scale-vert', 'Low', 'High'),
+  t('foreheadSlope', 'Forehead slope', 'forehead-nubian', 'Flat', 'Round'),
+  t('foreheadDepth', 'Forehead', 'forehead-trans', 'Back', 'Forward', 'backward', 'forward'),
+  t('temples', 'Temples', 'forehead-temple', 'Narrow', 'Wide'),
+];
+const CHEEKS: SliderDef[] = [
+  t('cheekbones', 'Cheekbones', 'cheek-bones', 'Flat', 'High'),
+  t('cheekVolume', 'Cheek fullness', 'cheek-volume', 'Hollow', 'Full'),
+  t('cheekInner', 'Inner cheeks', 'cheek-inner', 'Flat', 'Full'),
+  t('cheekHeight', 'Cheek position', 'cheek-trans', 'Low', 'High', 'down', 'up'),
+];
+const JAW: SliderDef[] = [
+  t('chinWidth', 'Chin width', 'chin-width', 'Pointed', 'Broad'),
+  t('chinHeight', 'Chin length', 'chin-height', 'Short', 'Long'),
+  t('chinProminent', 'Chin projection', 'chin-prominent', 'Back', 'Forward'),
+  t('chinBones', 'Jaw width', 'chin-bones', 'Narrow', 'Wide'),
+  t('chinCleft', 'Chin cleft', 'chin-cleft', 'Smooth', 'Cleft'),
+  t('jawDrop', 'Jaw drop', 'chin-jaw-drop', 'High', 'Low'),
+  t('jawForward', 'Lower jaw', 'chin-prognathism', 'Back', 'Forward'),
+  amount('chinTriangle', 'Tapered chin', 'chin-triangle'),
+];
+const NECK: SliderDef[] = [
+  t('neckWidth', 'Neck width', 'neck-scale-horiz', 'Thin', 'Thick'),
+  t('neckDepth', 'Neck depth', 'neck-scale-depth', 'Thin', 'Thick'),
+  t('neckLength', 'Neck length', 'neck-scale-vert', 'Short', 'Long'),
+  t('neckDouble', 'Under the chin', 'neck-double', 'Tight', 'Full'),
+];
+const EARS: SliderDef[] = [
+  t('earSize', 'Ear size', 'ear-scale', 'Small', 'Large'),
+  t('earWing', 'Ear angle', 'ear-wing', 'Flat', 'Out'),
+  t('earLobe', 'Earlobe', 'ear-lobe', 'Small', 'Large'),
+  t('earFlap', 'Ear fold', 'ear-flap', 'Thin', 'Thick'),
+  t('earHeight', 'Ear position', 'ear-trans', 'Low', 'High', 'down', 'up'),
+];
+const EYES: SliderDef[] = [
+  t('eyeSize', 'Eye size', 'eye-scale', 'Small', 'Large'),
+  t('eyeOpen', 'Eye opening', 'eye-height2', 'Narrow', 'Open'),
+  t('eyeInnerHeight', 'Inner height', 'eye-height1', 'Low', 'High'),
+  t('eyeOuterHeight', 'Outer height', 'eye-height3', 'Low', 'High'),
+  t('eyeY', 'Eye position', 'eye-trans', 'Low', 'High', 'down', 'up'),
+  t('eyeOuterCorner', 'Outer corner', 'eye-corner1', 'Down', 'Up', 'down', 'up'),
+  t('eyeInnerCorner', 'Inner corner', 'eye-corner2', 'Down', 'Up', 'down', 'up'),
+  t('eyeDepthInner', 'Inner depth', 'eye-push1', 'Deep', 'Forward', 'in', 'out'),
+  t('eyeDepthOuter', 'Outer depth', 'eye-push2', 'Deep', 'Forward', 'in', 'out'),
+  t('eyeFoldAngle', 'Eyelid fold angle', 'eye-eyefold-angle', 'Down', 'Up', 'down', 'up'),
+  t('eyeFold', 'Eyelid fold', 'eye-eyefold', 'Low', 'High', 'down', 'up'),
+  t('eyeFoldShape', 'Eyelid shape', 'eye-eyefold', 'Hollow', 'Full', 'concave', 'convex'),
+  t('epicanthus', 'Inner eyelid', 'eye-epicanthus', 'Covered', 'Open', 'in', 'out'),
+  t('eyeBags', 'Under-eye', 'eye-bag', 'Smooth', 'Heavy'),
+  t('eyeBagDepth', 'Under-eye depth', 'eye-bag', 'In', 'Out', 'in', 'out'),
+  t('eyeBagHeight', 'Under-eye height', 'eye-bag-height', 'Low', 'High'),
+];
+const BROWS: SliderDef[] = [
+  t('browAngle', 'Brow angle', 'eyebrows-angle', 'Down', 'Up', 'down', 'up'),
+  t('browHeight', 'Brow height', 'eyebrows-trans', 'Low', 'High', 'down', 'up'),
+  t('browDepth', 'Brow ridge', 'eyebrows-trans', 'Back', 'Forward', 'backward', 'forward'),
+];
+const NOSE: SliderDef[] = [
+  t('noseWidth', 'Nose width', 'nose-scale-horiz', 'Narrow', 'Wide'),
+  t('noseLength', 'Nose length', 'nose-scale-vert', 'Short', 'Long'),
+  t('noseDepth', 'Nose projection', 'nose-scale-depth', 'Flat', 'Pointed'),
+  t('noseBridgeWidth', 'Bridge width', 'nose-width1', 'Narrow', 'Wide'),
+  t('noseMidWidth', 'Middle width', 'nose-width2', 'Narrow', 'Wide'),
+  t('noseTipWidth', 'Lower width', 'nose-width3', 'Narrow', 'Wide'),
+  t('noseCurve', 'Bridge curve', 'nose-curve', 'Scooped', 'Arched', 'concave', 'convex'),
+  t('noseHump', 'Bridge bump', 'nose-hump', 'Smooth', 'Bump'),
+  t('noseGreek', 'Bridge to forehead', 'nose-greek', 'Notched', 'Straight'),
+  t('noseTip', 'Tip rotation', 'nose-point', 'Down', 'Up', 'down', 'up'),
+  t('noseTipSize', 'Tip size', 'nose-point-width', 'Fine', 'Round'),
+  t('nostrilWidth', 'Nostril width', 'nose-nostrils-width', 'Narrow', 'Wide'),
+  t('nostrilFlare', 'Nostril flare', 'nose-flaring', 'Tight', 'Flared'),
+  t('nostrilAngle', 'Nostril angle', 'nose-nostrils-angle', 'Down', 'Up', 'down', 'up'),
+  t('noseBase', 'Nose base', 'nose-base', 'Low', 'High', 'down', 'up'),
+  t('noseSeptum', 'Septum angle', 'nose-septumangle', 'Down', 'Up'),
+  t('noseVolume', 'Nose volume', 'nose-volume', 'Slim', 'Full'),
+  t('noseCompress', 'Nose press', 'nose-compression', 'Pressed', 'Free', 'compress', 'uncompress'),
+  t('noseY', 'Nose position', 'nose-trans', 'Low', 'High', 'down', 'up'),
+  t('noseZ', 'Nose depth', 'nose-trans', 'Back', 'Forward', 'backward', 'forward'),
+];
+const MOUTH: SliderDef[] = [
+  t('mouthWidth', 'Mouth width', 'mouth-scale-horiz', 'Narrow', 'Wide'),
+  t('mouthHeight', 'Mouth height', 'mouth-scale-vert', 'Thin', 'Full'),
+  t('mouthDepth', 'Mouth depth', 'mouth-scale-depth', 'Flat', 'Forward'),
+  t('upperLipVolume', 'Upper lip fullness', 'mouth-upperlip-volume', 'Thin', 'Full'),
+  t('upperLipHeight', 'Upper lip height', 'mouth-upperlip-height', 'Short', 'Tall'),
+  t('upperLipWidth', 'Upper lip width', 'mouth-upperlip-width', 'Narrow', 'Wide'),
+  t('lowerLipVolume', 'Lower lip fullness', 'mouth-lowerlip-volume', 'Thin', 'Full'),
+  t('lowerLipHeight', 'Lower lip height', 'mouth-lowerlip-height', 'Short', 'Tall'),
+  t('lowerLipWidth', 'Lower lip width', 'mouth-lowerlip-width', 'Narrow', 'Wide'),
+  t('cupidsBow', "Cupid's bow", 'mouth-cupidsbow', 'Flat', 'Defined'),
+  t('cupidsBowWidth', "Cupid's bow width", 'mouth-cupidsbow-width', 'Narrow', 'Wide'),
+  t('mouthCorners', 'Mouth corners', 'mouth-angles', 'Down', 'Up', 'down', 'up'),
+  t('upperLipMiddle', 'Upper lip middle', 'mouth-upperlip-middle', 'Down', 'Up', 'down', 'up'),
+  t('lowerLipMiddle', 'Lower lip middle', 'mouth-lowerlip-middle', 'Down', 'Up', 'down', 'up'),
+  t('upperLipEdge', 'Upper lip edges', 'mouth-upperlip-ext', 'Down', 'Up', 'down', 'up'),
+  t('lowerLipEdge', 'Lower lip edges', 'mouth-lowerlip-ext', 'Down', 'Up', 'down', 'up'),
+  t('dimples', 'Dimples', 'mouth-dimples', 'In', 'Out', 'in', 'out'),
+  t('laughLines', 'Laugh lines', 'mouth-laugh-lines', 'In', 'Out', 'in', 'out'),
+  t('philtrum', 'Philtrum', 'mouth-philtrum-volume', 'Flat', 'Deep'),
+  t('mouthY', 'Mouth position', 'mouth-trans', 'Low', 'High', 'down', 'up'),
+  t('mouthZ', 'Mouth forward', 'mouth-trans', 'Back', 'Forward', 'backward', 'forward'),
+];
+const BODY_MAIN: SliderDef[] = [
+  macro('height', 'Height', 'Short', 'Tall'),
+  macro('weight', 'Weight', 'Light', 'Heavy'),
+  macro('muscle', 'Muscle', 'Soft', 'Muscular'),
+  macro('proportions', 'Proportions', 'Natural', 'Idealized'),
+];
+const CHEST: SliderDef[] = [
+  macro('cup', 'Bust size', 'Small', 'Large'),
+  macro('firmness', 'Bust shape', 'Soft', 'Firm'),
+];
+const TORSO: SliderDef[] = [
+  t('vShape', 'Shoulder to waist', 'torso-vshape', 'Straight', 'V-shape'),
+  t('pectorals', 'Chest muscle', 'torso-muscle-pectoral', 'Flat', 'Built'),
+  t('dorsi', 'Back muscle', 'torso-muscle-dorsi', 'Flat', 'Built'),
+  t('torsoWidth', 'Torso width', 'torso-scale-horiz', 'Narrow', 'Wide'),
+  t('torsoDepth', 'Torso depth', 'torso-scale-depth', 'Thin', 'Deep'),
+  t('torsoLength', 'Torso length', 'torso-scale-vert', 'Short', 'Long'),
+  t('stomachTone', 'Stomach', 'stomach-tone', 'Soft', 'Toned'),
+  t('belly', 'Belly', 'stomach-pregnant', 'Flat', 'Round'),
+  t('hipWidth', 'Hip width', 'hip-scale-horiz', 'Narrow', 'Wide'),
+  t('hipDepth', 'Hip depth', 'hip-scale-depth', 'Thin', 'Deep'),
+  t('hipLength', 'Hip height', 'hip-scale-vert', 'Short', 'Long'),
+  t('waistHeight', 'Waistline', 'hip-waist', 'Low', 'High', 'down', 'up'),
+  t('buttocks', 'Buttocks', 'buttocks-volume', 'Flat', 'Full'),
+];
+const LIMBS: SliderDef[] = [
+  t('shoulderMuscle', 'Shoulders', 'upperarm-shoulder-muscle', 'Slim', 'Broad'),
+  t('upperArmMuscle', 'Upper arm muscle', 'upperarm-muscle', 'Slim', 'Built'),
+  t('upperArmFat', 'Upper arm fullness', 'upperarm-fat', 'Lean', 'Full'),
+  t('lowerArmMuscle', 'Forearm muscle', 'lowerarm-muscle', 'Slim', 'Built'),
+  t('lowerArmFat', 'Forearm fullness', 'lowerarm-fat', 'Lean', 'Full'),
+  t('upperLegMuscle', 'Thigh muscle', 'upperleg-muscle', 'Slim', 'Built'),
+  t('upperLegFat', 'Thigh fullness', 'upperleg-fat', 'Lean', 'Full'),
+  t('lowerLegMuscle', 'Calf muscle', 'lowerleg-muscle', 'Slim', 'Built'),
+  t('lowerLegFat', 'Calf fullness', 'lowerleg-fat', 'Lean', 'Full'),
+  t('upperLegLength', 'Thigh length', 'upperlegs-height', 'Short', 'Long'),
+  t('lowerLegLength', 'Lower leg length', 'lowerlegs-height', 'Short', 'Long'),
+  t('handSize', 'Hand size', 'hand-scale', 'Small', 'Large'),
+  t('footSize', 'Foot size', 'foot-scale', 'Small', 'Large'),
 ];
 
+export const SLIDERS: SliderDef[] = [...HEAD, ...CHEEKS, ...JAW, ...NECK, ...EARS, ...EYES, ...BROWS, ...NOSE, ...MOUTH, ...BODY_MAIN, ...CHEST, ...TORSO, ...LIMBS];
 export const SLIDER_IDS = SLIDERS.map((d) => d.id);
+const BY_ID = new Map(SLIDERS.map((d) => [d.id, d]));
 
 export function sliderDef(id: SliderId): SliderDef {
-  const d = SLIDERS.find((x) => x.id === id);
-  if (!d) throw new Error(`Unknown slider ${id}`);
-  return d;
+  const def = BY_ID.get(id);
+  if (!def) throw new Error(`Unknown slider ${id}`);
+  return def;
 }
 
-/** Read a slider, clamped to its range; missing is 0. */
+/** A slider's value, 0 when unset. */
 export function sv(sliders: Sliders | undefined, id: SliderId): number {
-  const v = sliders?.[id];
-  if (typeof v !== 'number' || !Number.isFinite(v)) return 0;
-  const min = id === 'freckles' || id === 'blush' || id === 'underEye' ? 0 : -1;
-  return Math.max(min, Math.min(1, v));
+  return sliders?.[id] ?? 0;
 }
 
-/** Coerce stored JSON into sliders: known ids, numbers in range, 2 decimals, zeros dropped. */
+/** Keep known sliders with sane values; zeros are left out. */
 export function sanitizeSliders(raw: unknown): Sliders {
   const out: Sliders = {};
   if (!raw || typeof raw !== 'object') return out;
-  const rec = raw as Record<string, unknown>;
-  for (const id of SLIDER_IDS) {
-    if (typeof rec[id] !== 'number') continue;
-    const v = Math.round(sv(rec as Sliders, id) * 100) / 100;
-    if (v !== 0) out[id] = v;
+  const record = raw as Record<string, unknown>;
+  for (const def of SLIDERS) {
+    const v = record[def.id];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const clamped = Math.round(Math.max(def.min, Math.min(1, v)) * 100) / 100;
+    if (clamped) out[def.id] = clamped;
   }
   return out;
 }
+
+const ids = (defs: SliderDef[]) => defs.map((d) => d.id);
+export const HEAD_SLIDERS = ids(HEAD);
+export const CHEEK_SLIDERS = ids(CHEEKS);
+export const JAW_SLIDERS = ids(JAW);
+export const NECK_SLIDERS = ids(NECK);
+export const EAR_SLIDERS = ids(EARS);
+export const FACE_SLIDERS = [...HEAD_SLIDERS, ...CHEEK_SLIDERS, ...JAW_SLIDERS];
+export const EYE_SLIDERS = ids(EYES);
+export const BROW_SLIDERS = ids(BROWS);
+export const NOSE_SLIDERS = ids(NOSE);
+export const MOUTH_SLIDERS = ids(MOUTH);
+export const BODY_MAIN_SLIDERS = ids(BODY_MAIN);
+export const CHEST_SLIDERS = ids(CHEST);
+export const TORSO_SLIDERS = ids(TORSO);
+export const LIMB_SLIDERS = ids(LIMBS);
+export const BODY_SLIDERS = [...BODY_MAIN_SLIDERS, ...CHEST_SLIDERS, ...TORSO_SLIDERS, ...LIMB_SLIDERS];
 
 // ---------------------------------------------------------------- presets
 
 export interface Preset {
   id: string;
   label: string;
+  /** Values for the sliders the preset owns; the rest of them go to 0. */
   values: Sliders;
 }
-
-/** Slider groups a preset family owns: picking a preset resets these first. */
-export const FACE_SLIDERS: SliderId[] = ['faceWidth', 'faceLength', 'jawWidth', 'jawAngle', 'chinWidth', 'chinLength', 'cheekbones', 'cheekFull'];
-export const EYE_SLIDERS: SliderId[] = ['eyeSize', 'eyeWidth', 'eyeHeight', 'eyeSpacing', 'eyeTilt', 'eyeY', 'eyelid', 'irisSize'];
-export const BROW_SLIDERS: SliderId[] = ['browY', 'browSpacing', 'browTilt', 'browThick', 'browLength'];
-export const NOSE_SLIDERS: SliderId[] = ['noseLength', 'noseWidth', 'noseBridge', 'noseTip', 'noseProjection'];
-export const MOUTH_SLIDERS: SliderId[] = ['mouthWidth', 'mouthHeight', 'mouthY', 'mouthCorners'];
-export const SKIN_SLIDERS: SliderId[] = ['freckles', 'blush', 'underEye'];
-export const HAIR_SLIDERS: SliderId[] = ['hairVolume', 'hairLength'];
-export const BODY_SLIDERS: SliderId[] = ['height', 'shoulders', 'chest', 'waist', 'hips', 'armLength', 'legLength', 'torsoLength', 'neckLength', 'neckThick', 'headSize', 'muscle', 'bodyFat'];
-export const CLOTHES_SLIDERS: SliderId[] = ['topFit', 'bottomFit'];
-
-const p = (id: string, label: string, values: Sliders): Preset => ({ id, label, values });
+const p = (id: string, label: string, values: Sliders = {}): Preset => ({ id, label, values });
 
 export const FACE_PRESETS: Preset[] = [
-  p('balanced', 'Balanced', {}),
-  p('oval', 'Oval', { faceLength: 0.3, jawWidth: -0.3, chinWidth: -0.2 }),
-  p('round', 'Round', { faceWidth: 0.5, faceLength: -0.4, jawAngle: -0.6, cheekFull: 0.6, chinLength: -0.3 }),
-  p('square', 'Square', { faceWidth: 0.3, jawWidth: 0.6, jawAngle: 0.9, chinWidth: 0.6 }),
-  p('oblong', 'Oblong', { faceLength: 0.8, faceWidth: -0.3, jawAngle: 0.3 }),
-  p('heart', 'Heart-shaped', { cheekbones: 0.6, jawWidth: -0.6, chinWidth: -0.7, chinLength: 0.2 }),
-  p('diamond', 'Diamond', { cheekbones: 0.9, jawWidth: -0.5, chinWidth: -0.6, faceLength: 0.2 }),
-  p('triangle', 'Triangle', { jawWidth: 0.7, jawAngle: 0.4, cheekbones: -0.5, chinWidth: 0.3 }),
-  p('inverted-triangle', 'Inverted triangle', { cheekbones: 0.7, faceWidth: 0.2, jawWidth: -0.7, chinWidth: -0.5 }),
-  p('long-oval', 'Long oval', { faceLength: 0.9, jawWidth: -0.3, chinLength: 0.4 }),
-  p('wide-oval', 'Wide oval', { faceWidth: 0.6, jawWidth: -0.1, cheekFull: 0.3 }),
-  p('soft-square', 'Soft square', { jawWidth: 0.4, jawAngle: 0.4, cheekFull: 0.3 }),
-  p('angular-square', 'Angular square', { jawWidth: 0.6, jawAngle: 1, cheekbones: 0.4, cheekFull: -0.5 }),
-  p('narrow', 'Narrow', { faceWidth: -0.7, jawWidth: -0.3 }),
-  p('broad', 'Broad', { faceWidth: 0.8, jawWidth: 0.4, cheekbones: 0.3 }),
-  p('tapered', 'Tapered', { jawWidth: -0.4, chinWidth: -0.9, chinLength: 0.5 }),
-  p('chubby', 'Chubby', { faceWidth: 0.5, cheekFull: 1, jawAngle: -0.7, chinLength: -0.2 }),
-  p('slim', 'Slim', { faceWidth: -0.5, cheekFull: -0.7, cheekbones: 0.3 }),
-  p('baby', 'Baby face', { faceLength: -0.6, cheekFull: 0.7, chinLength: -0.6, jawAngle: -0.5 }),
-  p('defined-jaw', 'Defined jaw', { jawAngle: 1, jawWidth: 0.3, cheekFull: -0.6, chinLength: 0.2 }),
-  p('v-shaped', 'V-shaped', { jawWidth: -0.8, chinWidth: -0.8, chinLength: 0.5, cheekFull: -0.3 }),
-  p('u-shaped', 'U-shaped', { jawWidth: 0.1, jawAngle: -0.4, chinWidth: 0.4 }),
-  p('pear', 'Pear-shaped', { jawWidth: 0.9, cheekFull: 0.5, cheekbones: -0.6, chinWidth: 0.4 }),
-  p('high-cheekbone', 'High-cheekbone', { cheekbones: 1, cheekFull: -0.4 }),
+  p('natural', 'Natural'),
+  p('oval', 'Oval', { shapeOval: 1 }),
+  p('round', 'Round', { shapeRound: 1, headFat: 0.2 }),
+  p('square', 'Square', { shapeSquare: 1 }),
+  p('rectangular', 'Rectangular', { shapeRect: 1 }),
+  p('heart', 'Heart', { shapeHeart: 1 }),
+  p('triangle', 'Triangle', { shapeTriangle: 1 }),
+  p('diamond', 'Diamond', { shapeDiamond: 1 }),
+  p('long', 'Long', { headHeight: 0.6, shapeRect: 0.3 }),
+  p('short', 'Short', { headHeight: -0.6, shapeRound: 0.3 }),
+  p('narrow', 'Narrow', { headWidth: -0.6, cheekbones: 0.2 }),
+  p('wide', 'Wide', { headWidth: 0.6 }),
+  p('soft', 'Soft', { headFat: 0.6, cheekVolume: 0.4, chinWidth: 0.2 }),
+  p('lean', 'Lean', { headFat: -0.7, cheekbones: 0.5, cheekVolume: -0.4 }),
+  p('sculpted', 'Sculpted', { cheekbones: 0.8, cheekVolume: -0.5, chinBones: 0.3, headFat: -0.3 }),
+  p('strong-jaw', 'Strong jaw', { shapeSquare: 0.5, chinBones: 0.7, chinWidth: 0.5, chinProminent: 0.3 }),
+  p('pointed-chin', 'Pointed chin', { chinWidth: -0.8, chinTriangle: 0.6, shapeHeart: 0.3 }),
+  p('long-chin', 'Long chin', { chinHeight: 0.7, chinProminent: 0.3 }),
+  p('baby-face', 'Baby face', { headAge: -0.8, shapeRound: 0.5, cheekVolume: 0.5, chinHeight: -0.4 }),
+  p('mature', 'Mature', { headAge: 0.6, cheekVolume: -0.2 }),
+  p('high-forehead', 'High forehead', { foreheadHeight: 0.8, shapeOval: 0.4 }),
+  p('cleft', 'Cleft chin', { chinCleft: 0.9, chinWidth: 0.3, chinBones: 0.3 }),
 ];
 
 export const EYE_PRESETS: Preset[] = [
-  p('balanced', 'Balanced', {}),
-  p('almond', 'Almond', { eyeWidth: 0.3, eyeHeight: -0.3, eyeTilt: 0.2 }),
-  p('round', 'Round', { eyeHeight: 0.6, eyeWidth: -0.1, irisSize: 0.2 }),
-  p('hooded', 'Hooded', { eyelid: 0.55, eyeHeight: -0.2 }),
-  p('monolid', 'Monolid', { eyeHeight: -0.6, eyeWidth: 0.2, eyelid: 0.3 }),
-  p('upturned', 'Upturned', { eyeTilt: 0.7 }),
-  p('downturned', 'Downturned', { eyeTilt: -0.7 }),
-  p('deep-set', 'Deep-set', { eyeSize: -0.3, eyelid: 0.3, eyeY: -0.2 }),
-  p('protruding', 'Protruding', { eyeSize: 0.3, eyeHeight: 0.3, eyelid: -0.5 }),
-  p('wide-set', 'Wide-set', { eyeSpacing: 0.8 }),
-  p('close-set', 'Close-set', { eyeSpacing: -0.8 }),
-  p('narrow', 'Narrow', { eyeHeight: -0.8 }),
-  p('large', 'Large', { eyeSize: 0.8 }),
-  p('small', 'Small', { eyeSize: -0.7 }),
-  p('doe', 'Doe eyes', { eyeSize: 0.6, eyeHeight: 0.5, irisSize: 0.4, eyeTilt: -0.2 }),
-  p('cat', 'Cat eyes', { eyeTilt: 0.8, eyeWidth: 0.4, eyeHeight: -0.3 }),
-  p('fox', 'Fox eyes', { eyeTilt: 1, eyeWidth: 0.6, eyeHeight: -0.6, eyelid: 0.2 }),
-  p('sleepy', 'Sleepy eyes', { eyelid: 0.8, eyeTilt: -0.2 }),
-  p('droopy', 'Droopy', { eyeTilt: -1, eyelid: 0.4 }),
-  p('slanted', 'Slanted', { eyeTilt: 0.5, eyeHeight: -0.4 }),
-  p('straight', 'Straight', { eyeTilt: 0, eyeWidth: 0.4, eyeHeight: -0.2 }),
-  p('tapered', 'Tapered', { eyeWidth: 0.6, eyeHeight: -0.5, eyeTilt: 0.3 }),
-  p('prominent', 'Prominent', { eyeSize: 0.5, irisSize: 0.5, eyelid: -0.4 }),
-  p('heavy-lidded', 'Heavy-lidded', { eyelid: 1 }),
+  p('natural', 'Natural'),
+  p('large', 'Large', { eyeSize: 0.7 }),
+  p('small', 'Small', { eyeSize: -0.6 }),
+  p('wide-open', 'Wide open', { eyeOpen: 0.8, eyeSize: 0.2 }),
+  p('narrow', 'Narrow', { eyeOpen: -0.7 }),
+  p('almond', 'Almond', { eyeOuterCorner: 0.4, eyeOpen: -0.2, eyeInnerCorner: -0.2 }),
+  p('upturned', 'Upturned', { eyeOuterCorner: 0.9, eyeOuterHeight: 0.4 }),
+  p('downturned', 'Downturned', { eyeOuterCorner: -0.8, eyeOuterHeight: -0.3 }),
+  p('round', 'Round', { eyeOpen: 0.6, eyeInnerHeight: 0.4, eyeOuterHeight: 0.4 }),
+  p('hooded', 'Hooded', { eyeFold: -0.8, eyeFoldShape: 0.5, eyeOpen: -0.2 }),
+  p('monolid', 'Monolid', { epicanthus: -0.9, eyeFold: -0.6, eyeFoldShape: 0.6 }),
+  p('deep-set', 'Deep-set', { eyeDepthInner: -0.8, eyeDepthOuter: -0.7, browDepth: 0.4 }),
+  p('prominent', 'Prominent', { eyeDepthInner: 0.7, eyeDepthOuter: 0.7 }),
+  p('high', 'High-set', { eyeY: 0.7 }),
+  p('low', 'Low-set', { eyeY: -0.7 }),
+  p('sleepy', 'Sleepy', { eyeOpen: -0.5, eyeBags: 0.5, eyeOuterCorner: -0.3 }),
+  p('bright', 'Bright', { eyeOpen: 0.5, eyeBags: -0.6, eyeSize: 0.3 }),
+  p('cat', 'Cat', { eyeOuterCorner: 1, eyeInnerCorner: -0.5, eyeOpen: -0.3 }),
+  p('doe', 'Doe', { eyeSize: 0.6, eyeOpen: 0.5, eyeInnerCorner: -0.3 }),
+  p('tired', 'Tired', { eyeBags: 0.9, eyeBagHeight: 0.4, eyeOpen: -0.3 }),
 ];
 
 export const BROW_PRESETS: Preset[] = [
-  p('natural', 'Natural', {}),
-  p('straight', 'Straight', { browTilt: 0, browLength: 0.2 }),
-  p('soft-arch', 'Soft arch', { browTilt: 0.25 }),
-  p('high-arch', 'High arch', { browTilt: 0.5, browY: 0.4 }),
-  p('low-arch', 'Low arch', { browTilt: 0.15, browY: -0.4 }),
-  p('angled', 'Angled', { browTilt: 0.7 }),
-  p('sharp-angled', 'Sharp angled', { browTilt: 1, browThick: 0.2 }),
-  p('thick-straight', 'Thick straight', { browThick: 0.9, browLength: 0.3 }),
-  p('thin-straight', 'Thin straight', { browThick: -0.8, browLength: 0.2 }),
-  p('bushy', 'Bushy', { browThick: 1, browLength: 0.4, browSpacing: -0.3 }),
-  p('feathered', 'Feathered', { browThick: 0.4, browY: 0.2 }),
-  p('tapered', 'Tapered', { browThick: -0.3, browLength: 0.5 }),
-  p('flat', 'Flat', { browTilt: -0.2, browLength: 0.3 }),
-  p('dramatic', 'Dramatic', { browThick: 0.7, browTilt: 0.8, browLength: 0.5 }),
-  p('raised', 'Raised', { browY: 0.9 }),
-  p('drooping', 'Drooping', { browTilt: -0.8, browY: -0.2 }),
-  p('close', 'Close together', { browSpacing: -0.9 }),
-  p('far', 'Far apart', { browSpacing: 0.9 }),
-  p('short', 'Short', { browLength: -0.8 }),
-  p('low', 'Low and heavy', { browY: -0.9, browThick: 0.5 }),
+  p('natural', 'Natural'),
+  p('high', 'High', { browHeight: 0.7 }),
+  p('low', 'Low', { browHeight: -0.7 }),
+  p('arched', 'Lifted', { browAngle: 0.8, browHeight: 0.2 }),
+  p('serious', 'Serious', { browAngle: -0.8, browHeight: -0.3 }),
+  p('strong-ridge', 'Strong ridge', { browDepth: 0.8, browHeight: -0.2 }),
+  p('soft-ridge', 'Soft ridge', { browDepth: -0.7 }),
 ];
 
 export const NOSE_PRESETS: Preset[] = [
-  p('balanced', 'Balanced', {}),
-  p('straight', 'Straight', { noseBridge: 0.4, noseTip: 0 }),
-  p('roman', 'Roman', { noseBridge: 0.9, noseLength: 0.4, noseTip: -0.3 }),
-  p('greek', 'Greek', { noseBridge: 0.8, noseProjection: 0.4 }),
-  p('nubian', 'Nubian', { noseWidth: 0.8, noseLength: 0.3, noseBridge: -0.2 }),
-  p('aquiline', 'Aquiline', { noseBridge: 1, noseTip: -0.6, noseProjection: 0.5 }),
-  p('button', 'Button', { noseLength: -0.6, noseProjection: -0.3, noseWidth: 0.2 }),
-  p('snub', 'Snub', { noseTip: 0.8, noseLength: -0.5 }),
-  p('upturned', 'Upturned', { noseTip: 0.6 }),
-  p('downturned', 'Downturned', { noseTip: -0.7 }),
-  p('broad', 'Broad', { noseWidth: 0.9 }),
-  p('narrow', 'Narrow', { noseWidth: -0.8 }),
-  p('long', 'Long', { noseLength: 0.9 }),
+  p('natural', 'Natural'),
+  p('small', 'Small', { noseWidth: -0.5, noseLength: -0.4, noseDepth: -0.3 }),
+  p('large', 'Large', { noseWidth: 0.4, noseLength: 0.5, noseDepth: 0.5 }),
+  p('narrow', 'Narrow', { noseWidth: -0.8, nostrilWidth: -0.5 }),
+  p('wide', 'Wide', { noseWidth: 0.8, nostrilWidth: 0.6, nostrilFlare: 0.4 }),
+  p('button', 'Button', { noseLength: -0.6, noseTip: 0.6, noseTipSize: 0.5, noseDepth: -0.4 }),
+  p('upturned', 'Upturned', { noseTip: 0.9, noseCurve: -0.5 }),
+  p('roman', 'Roman', { noseHump: 0.8, noseCurve: 0.6, noseLength: 0.3 }),
+  p('aquiline', 'Aquiline', { noseCurve: 0.9, noseTip: -0.6, noseHump: 0.4 }),
+  p('straight', 'Straight', { noseGreek: 0.8, noseCurve: 0 }),
+  p('snub', 'Snub', { noseLength: -0.7, noseTip: 0.4, noseDepth: -0.6, nostrilWidth: 0.3 }),
+  p('long', 'Long', { noseLength: 0.8 }),
   p('short', 'Short', { noseLength: -0.8 }),
-  p('flat', 'Flat', { noseProjection: -0.9, noseBridge: -0.6 }),
-  p('pointed', 'Pointed', { noseProjection: 0.9, noseWidth: -0.4 }),
+  p('pointed', 'Pointed', { noseDepth: 0.8, noseTipSize: -0.7 }),
+  p('flat', 'Flat', { noseDepth: -0.8, noseWidth: 0.4, noseBridgeWidth: 0.5 }),
+  p('bulbous', 'Round tip', { noseTipSize: 0.9, noseVolume: 0.5 }),
+  p('high-bridge', 'High bridge', { noseGreek: 0.6, noseBridgeWidth: -0.4, noseDepth: 0.4 }),
+  p('low-bridge', 'Low bridge', { noseGreek: -0.8, noseCurve: -0.4, noseBridgeWidth: 0.4 }),
+  p('flared', 'Flared', { nostrilFlare: 0.9, nostrilWidth: 0.5 }),
+  p('refined', 'Refined', { noseWidth: -0.4, noseTipSize: -0.5, nostrilWidth: -0.4, noseVolume: -0.4 }),
 ];
 
 export const MOUTH_PRESETS: Preset[] = [
-  p('balanced', 'Balanced', {}),
-  p('full', 'Full lips', { mouthHeight: 0.8 }),
-  p('thin', 'Thin lips', { mouthHeight: -0.7 }),
-  p('wide', 'Wide mouth', { mouthWidth: 0.8 }),
-  p('narrow', 'Narrow mouth', { mouthWidth: -0.7 }),
-  p('small', 'Small mouth', { mouthWidth: -0.6, mouthHeight: -0.4 }),
-  p('large', 'Large mouth', { mouthWidth: 0.6, mouthHeight: 0.6 }),
-  p('upturned', 'Upturned', { mouthCorners: 0.7 }),
-  p('downturned', 'Downturned', { mouthCorners: -0.7 }),
-  p('wide-smile', 'Wide smile', { mouthWidth: 0.7, mouthCorners: 0.8 }),
-  p('subtle-smile', 'Subtle smile', { mouthCorners: 0.35 }),
-  p('high', 'Set high', { mouthY: 0.7 }),
-  p('low', 'Set low', { mouthY: -0.7 }),
+  p('natural', 'Natural'),
+  p('full', 'Full', { upperLipVolume: 0.7, lowerLipVolume: 0.7, mouthHeight: 0.3 }),
+  p('thin', 'Thin', { upperLipVolume: -0.7, lowerLipVolume: -0.7, mouthHeight: -0.4 }),
+  p('wide', 'Wide', { mouthWidth: 0.8 }),
+  p('small', 'Small', { mouthWidth: -0.7, mouthHeight: -0.2 }),
+  p('bow', "Cupid's bow", { cupidsBow: 0.9, upperLipHeight: 0.3 }),
+  p('heart', 'Heart', { cupidsBow: 0.7, mouthWidth: -0.4, lowerLipVolume: 0.6, upperLipVolume: 0.3 }),
+  p('pouty', 'Pouty', { lowerLipVolume: 0.9, mouthDepth: 0.5, upperLipVolume: 0.4 }),
+  p('heavy-lower', 'Fuller lower lip', { lowerLipVolume: 0.8, lowerLipHeight: 0.5, upperLipVolume: -0.2 }),
+  p('heavy-upper', 'Fuller upper lip', { upperLipVolume: 0.8, upperLipHeight: 0.5, lowerLipVolume: -0.2 }),
+  p('upturned', 'Upturned corners', { mouthCorners: 0.8 }),
+  p('downturned', 'Downturned corners', { mouthCorners: -0.8 }),
+  p('dimpled', 'Dimpled', { dimples: -0.8, mouthCorners: 0.3 }),
+  p('flat', 'Straight', { cupidsBow: -0.8, upperLipMiddle: -0.3 }),
+  p('round', 'Round', { mouthWidth: -0.5, upperLipVolume: 0.5, lowerLipVolume: 0.6, mouthHeight: 0.4 }),
+  p('high', 'High-set', { mouthY: 0.7 }),
+  p('low', 'Low-set', { mouthY: -0.7 }),
+  p('forward', 'Forward', { mouthZ: 0.7, mouthDepth: 0.4 }),
+  p('defined', 'Defined', { cupidsBow: 0.6, philtrum: 0.6, laughLines: -0.4 }),
+  p('soft', 'Soft', { cupidsBow: -0.4, upperLipVolume: 0.3, lowerLipVolume: 0.3, laughLines: 0.4 }),
 ];
 
-/**
- * Body types. Muscle and body fat are separate sliders, so a slim
- * athletic build and a large muscular one never share a preset.
- */
-export const BODY_PRESETS: (Preset & { build: 'slim' | 'athletic' | 'average' | 'curvy' | 'broad' })[] = [
-  { ...p('balanced', 'Balanced', {}), build: 'average' },
-  { ...p('very-slim', 'Very slim', { bodyFat: -1, muscle: -0.6, waist: -0.5, shoulders: -0.3, hips: -0.3 }), build: 'slim' },
-  { ...p('slim', 'Slim', { bodyFat: -0.6, muscle: -0.3, waist: -0.3 }), build: 'slim' },
-  { ...p('lean', 'Lean', { bodyFat: -0.7, muscle: 0.2, waist: -0.3 }), build: 'slim' },
-  { ...p('athletic', 'Athletic', { muscle: 0.5, shoulders: 0.4, bodyFat: -0.4, waist: -0.2 }), build: 'athletic' },
-  { ...p('toned', 'Toned', { muscle: 0.35, bodyFat: -0.5 }), build: 'athletic' },
-  { ...p('fit', 'Fit', { muscle: 0.4, bodyFat: -0.3, shoulders: 0.2 }), build: 'athletic' },
-  { ...p('muscular', 'Muscular', { muscle: 0.8, shoulders: 0.6, chest: 0.5, neckThick: 0.4, waist: -0.1 }), build: 'broad' },
-  { ...p('bodybuilder', 'Bodybuilder', { muscle: 1, shoulders: 1, chest: 0.9, neckThick: 0.8, waist: -0.3, bodyFat: -0.4 }), build: 'broad' },
-  { ...p('broad-shoulders', 'Broad-shouldered', { shoulders: 0.9 }), build: 'broad' },
-  { ...p('narrow-shoulders', 'Narrow-shouldered', { shoulders: -0.8 }), build: 'slim' },
-  { ...p('average', 'Average', { bodyFat: 0.1 }), build: 'average' },
-  { ...p('soft', 'Soft build', { bodyFat: 0.5, muscle: -0.3, waist: 0.3 }), build: 'average' },
-  { ...p('stocky', 'Stocky', { bodyFat: 0.4, muscle: 0.4, height: -0.5, legLength: -0.3, neckThick: 0.4 }), build: 'broad' },
-  { ...p('compact', 'Compact', { height: -0.6, torsoLength: -0.3, muscle: 0.2 }), build: 'average' },
-  { ...p('heavyset', 'Heavyset', { bodyFat: 0.8, waist: 0.7, chest: 0.4, neckThick: 0.5 }), build: 'broad' },
-  { ...p('plus-size', 'Plus-size', { bodyFat: 1, waist: 0.9, hips: 0.6, chest: 0.5 }), build: 'curvy' },
-  { ...p('curvy', 'Curvy', { hips: 0.8, chest: 0.5, waist: -0.4, bodyFat: 0.2 }), build: 'curvy' },
-  { ...p('pear', 'Pear-shaped', { hips: 1, shoulders: -0.4, waist: 0.1 }), build: 'curvy' },
-  { ...p('apple', 'Apple-shaped', { waist: 1, chest: 0.3, hips: -0.2, bodyFat: 0.4 }), build: 'average' },
-  { ...p('rectangle', 'Rectangle-shaped', { waist: 0.3, hips: -0.2, shoulders: -0.1 }), build: 'average' },
-  { ...p('hourglass', 'Hourglass', { chest: 0.7, hips: 0.7, waist: -0.8 }), build: 'curvy' },
-  { ...p('inverted-triangle', 'Inverted triangle', { shoulders: 0.9, chest: 0.4, hips: -0.6 }), build: 'broad' },
-  { ...p('v-shaped', 'V-shaped', { shoulders: 1, muscle: 0.6, waist: -0.6, hips: -0.3 }), build: 'athletic' },
+export const BODY_PRESETS: Preset[] = [
+  p('average', 'Average'),
+  p('slim', 'Slim', { weight: -0.6, muscle: -0.2 }),
+  p('skinny', 'Skinny', { weight: -1, muscle: -0.6 }),
+  p('lean', 'Lean', { weight: -0.5, muscle: 0.4, stomachTone: 0.5 }),
+  p('toned', 'Toned', { weight: -0.2, muscle: 0.5, stomachTone: 0.7, proportions: 0.4 }),
+  p('athletic', 'Athletic', { muscle: 0.7, weight: -0.1, vShape: 0.5, shoulderMuscle: 0.4, stomachTone: 0.6, proportions: 0.5 }),
+  p('muscular', 'Muscular', { muscle: 1, weight: 0.1, vShape: 0.7, pectorals: 0.6, shoulderMuscle: 0.7, upperArmMuscle: 0.6 }),
+  p('bodybuilder', 'Bodybuilder', { muscle: 1, weight: 0.3, vShape: 1, pectorals: 1, dorsi: 0.9, shoulderMuscle: 1, upperArmMuscle: 1, upperLegMuscle: 0.9, lowerLegMuscle: 0.7 }),
+  p('swimmer', 'Swimmer', { muscle: 0.5, weight: -0.3, vShape: 0.9, dorsi: 0.6, shoulderMuscle: 0.6, height: 0.3 }),
+  p('runner', 'Runner', { muscle: 0.3, weight: -0.6, upperLegMuscle: 0.4, lowerLegMuscle: 0.5, stomachTone: 0.6 }),
+  p('curvy', 'Curvy', { weight: 0.3, hipWidth: 0.7, buttocks: 0.6, cup: 0.5, waistHeight: 0.3 }),
+  p('hourglass', 'Hourglass', { hipWidth: 0.6, cup: 0.5, torsoWidth: -0.3, buttocks: 0.4, proportions: 0.6 }),
+  p('pear', 'Pear', { hipWidth: 0.9, buttocks: 0.7, upperLegFat: 0.6, torsoWidth: -0.3 }),
+  p('apple', 'Apple', { weight: 0.5, belly: 0.5, torsoWidth: 0.4, hipWidth: -0.2 }),
+  p('stocky', 'Stocky', { weight: 0.5, muscle: 0.5, height: -0.4, torsoWidth: 0.5, neckWidth: 0.5 }),
+  p('broad', 'Broad', { torsoWidth: 0.7, shoulderMuscle: 0.6, vShape: 0.4, muscle: 0.3 }),
+  p('soft', 'Soft', { weight: 0.5, muscle: -0.5, stomachTone: -0.6 }),
+  p('heavy', 'Heavy', { weight: 1, muscle: -0.2, belly: 0.4 }),
+  p('petite', 'Petite', { height: -0.8, weight: -0.4 }),
+  p('tall-slim', 'Tall and slim', { height: 0.8, weight: -0.5, lowerLegLength: 0.4 }),
+  p('tall-strong', 'Tall and strong', { height: 0.8, muscle: 0.6, vShape: 0.5, shoulderMuscle: 0.5 }),
+  p('long-legs', 'Long legs', { upperLegLength: 0.7, lowerLegLength: 0.7, torsoLength: -0.3 }),
 ];
 
-/** The preset whose values match the sliders exactly, if any. */
+/** The preset whose values the owned sliders hold right now, if any. */
 export function matchingPreset(presets: Preset[], owned: SliderId[], sliders: Sliders): string | null {
   for (const preset of presets) {
     if (owned.every((id) => Math.abs(sv(sliders, id) - (preset.values[id] ?? 0)) < 0.005)) return preset.id;
@@ -302,114 +385,64 @@ export function matchingPreset(presets: Preset[], owned: SliderId[], sliders: Sl
   return null;
 }
 
-/** Sliders with one family replaced by a preset's values. */
+/** Set the owned sliders to a preset; other sliders are untouched. */
 export function applyPreset(sliders: Sliders, owned: SliderId[], preset: Preset): Sliders {
-  const next: Sliders = { ...sliders };
-  for (const id of owned) delete next[id];
-  for (const [id, v] of Object.entries(preset.values) as [SliderId, number][]) if (v) next[id] = v;
-  return next;
+  const out: Sliders = { ...sliders };
+  for (const id of owned) {
+    const v = preset.values[id] ?? 0;
+    if (v) out[id] = v;
+    else delete out[id];
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- expressions
 
-/**
- * Facial expressions from the model's own blend shapes: VRM presets
- * (happy, angry, sad, relaxed, surprised, blink) and VRoid's per-part
- * shapes (brows, eyes, mouth). 'auto' follows the day's mood.
- */
 export interface ExpressionDef {
   id: string;
   label: string;
-  /** VRM expression preset weights. */
-  vrm?: Record<string, number>;
-  /** VRoid morph weights by short name (Fcl_BRW_Angry → BRW_Angry). */
-  morphs?: Record<string, number>;
+  /** Face-unit targets (without the `expr-` prefix; `eye`/`eyebrows` units name a side). */
+  units: Record<string, number>;
 }
 
+/** Both sides of a left/right unit. */
+const lr = (unit: string, v: number): Record<string, number> => {
+  const [head, ...rest] = unit.split('-');
+  return { [`${head}-left-${rest.join('-')}`]: v, [`${head}-right-${rest.join('-')}`]: v };
+};
+
 export const EXPRESSIONS: ExpressionDef[] = [
-  { id: 'auto', label: 'Follows your day' },
-  { id: 'neutral', label: 'Neutral' },
-  { id: 'happy', label: 'Happy', vrm: { happy: 0.6 } },
-  { id: 'big-smile', label: 'Big smile', vrm: { happy: 1 } },
-  { id: 'slight-smile', label: 'Slight smile', vrm: { relaxed: 0.3 }, morphs: { MTH_Fun: 0.35 } },
-  { id: 'laughing', label: 'Laughing', vrm: { happy: 0.9, aa: 0.5 } },
-  { id: 'sad', label: 'Sad', vrm: { sad: 0.7 } },
-  { id: 'angry', label: 'Angry', vrm: { angry: 0.8 } },
-  { id: 'confident', label: 'Confident', vrm: { relaxed: 0.2 }, morphs: { BRW_Angry: 0.35, MTH_Fun: 0.4 } },
-  { id: 'surprised', label: 'Surprised', vrm: { surprised: 0.8 } },
-  { id: 'shocked', label: 'Shocked', vrm: { surprised: 1, aa: 0.4 } },
-  { id: 'serious', label: 'Serious', vrm: { angry: 0.35 } },
-  { id: 'focused', label: 'Focused', morphs: { BRW_Angry: 0.5, EYE_Angry: 0.3, MTH_Close: 0.4 } },
-  { id: 'relaxed', label: 'Relaxed', vrm: { relaxed: 0.7 } },
-  { id: 'sleepy', label: 'Sleepy', vrm: { relaxed: 0.3 }, morphs: { EYE_Close: 0.55, BRW_Sorrow: 0.3 } },
-  { id: 'tired', label: 'Tired', vrm: { relaxed: 0.6, sad: 0.25 } },
-  { id: 'excited', label: 'Excited', vrm: { happy: 0.7, surprised: 0.3 } },
-  { id: 'determined', label: 'Determined', morphs: { BRW_Angry: 0.6, MTH_Close: 0.6, EYE_Angry: 0.15 } },
-  { id: 'shy', label: 'Shy', vrm: { relaxed: 0.4 }, morphs: { BRW_Sorrow: 0.5, MTH_Small: 0.5 } },
-  { id: 'worried', label: 'Worried', morphs: { BRW_Sorrow: 0.8, MTH_Sorrow: 0.3 } },
-  { id: 'curious', label: 'Curious', morphs: { BRW_Surprised: 0.6, MTH_Small: 0.3 } },
-  { id: 'proud', label: 'Proud', morphs: { EYE_Joy: 0.6, MTH_Fun: 0.6, BRW_Fun: 0.4 } },
-  { id: 'peaceful', label: 'Peaceful', vrm: { relaxed: 0.5 }, morphs: { EYE_Close: 0.8 } },
+  { id: 'auto', label: 'Follows your day', units: {} },
+  { id: 'neutral', label: 'Neutral', units: {} },
+  { id: 'soft-smile', label: 'Soft smile', units: { 'mouth-corner-puller': 0.45 } },
+  { id: 'smile', label: 'Smile', units: { 'mouth-corner-puller': 0.8, ...lr('eye-slit', 0.15) } },
+  { id: 'big-smile', label: 'Big smile', units: { 'mouth-corner-puller': 1, 'mouth-open': 0.18, 'mouth-upward-retraction': 0.3, ...lr('eye-slit', 0.3) } },
+  { id: 'laugh', label: 'Laughing', units: { 'mouth-corner-puller': 1, 'mouth-open': 0.5, ...lr('eye-slit', 0.55), ...lr('eyebrows-up', 0.2) } },
+  { id: 'confident', label: 'Confident', units: { 'mouth-corner-puller': 0.35, ...lr('eyebrows-down', 0.15), ...lr('eye-slit', 0.12) } },
+  { id: 'determined', label: 'Determined', units: { ...lr('eyebrows-down', 0.6), 'mouth-compression': 0.5, ...lr('eye-slit', 0.2) } },
+  { id: 'calm', label: 'Calm', units: { 'mouth-corner-puller': 0.2, ...lr('eye-slit', 0.25) } },
+  { id: 'serious', label: 'Serious', units: { ...lr('eyebrows-down', 0.35), 'mouth-compression': 0.25 } },
+  { id: 'surprised', label: 'Surprised', units: { ...lr('eyebrows-up', 0.9), ...lr('eye-opened-up', 0.8), 'mouth-open': 0.35 } },
+  { id: 'curious', label: 'Curious', units: { 'eyebrows-left-up': 0.8, 'eyebrows-right-down': 0.2, 'mouth-corner-puller': 0.15 } },
+  { id: 'sad', label: 'Sad', units: { ...lr('eyebrows-inner-up', 0.9), 'mouth-depression': 0.6 } },
+  { id: 'tired', label: 'Tired', units: { ...lr('eye-slit', 0.55), 'mouth-depression': 0.2, ...lr('eyebrows-inner-up', 0.25) } },
+  { id: 'angry', label: 'Angry', units: { ...lr('eyebrows-down', 1), 'mouth-compression': 0.6, 'mouth-depression': 0.3 } },
+  { id: 'smirk', label: 'Smirk', units: { 'mouth-corner-puller': 0.3, 'mouth-part-later': 0.5, 'eyebrows-left-up': 0.4 } },
+  { id: 'wink', label: 'Wink', units: { 'eye-left-closure': 1, 'mouth-corner-puller': 0.6 } },
+  { id: 'pout', label: 'Pout', units: { 'mouth-pursing': 0.8, 'mouth-protusion': 0.5 } },
+  { id: 'kiss', label: 'Kiss', units: { 'mouth-pursing': 1, 'mouth-protusion': 0.8, ...lr('eye-slit', 0.3) } },
+  { id: 'open', label: 'Mouth open', units: { 'mouth-open': 0.6 } },
+  { id: 'eyes-closed', label: 'Eyes closed', units: { ...lr('eye-closure', 1), 'mouth-corner-puller': 0.25 } },
 ];
 
-// ---------------------------------------------------------------- painted details
+/** Expression each mood wears when the choice is "Follows your day". */
+export const MOOD_EXPRESSION: Record<string, string> = { tired: 'tired', neutral: 'neutral', happy: 'soft-smile', glowing: 'big-smile' };
 
-/** Facial hair, painted on the face's skin in the hair color. */
-export const FACIAL_HAIR_3D: { id: string; label: string }[] = [
-  { id: 'none', label: 'Clean-shaven' },
-  { id: 'stubble-light', label: 'Light stubble' },
-  { id: 'stubble', label: 'Medium stubble' },
-  { id: 'stubble-heavy', label: 'Heavy stubble' },
-  { id: 'short-beard', label: 'Short beard' },
-  { id: 'beard', label: 'Full beard' },
-  { id: 'boxed', label: 'Boxed beard' },
-  { id: 'faded', label: 'Faded beard' },
-  { id: 'goatee', label: 'Goatee' },
-  { id: 'extended-goatee', label: 'Extended goatee' },
-  { id: 'van-dyke', label: 'Van Dyke' },
-  { id: 'anchor', label: 'Anchor' },
-  { id: 'balbo', label: 'Balbo' },
-  { id: 'circle', label: 'Circle beard' },
-  { id: 'chin-strap', label: 'Chin strap' },
-  { id: 'mutton-chops', label: 'Mutton chops' },
-  { id: 'mustache', label: 'Mustache only' },
-  { id: 'pencil', label: 'Pencil mustache' },
-  { id: 'horseshoe', label: 'Horseshoe mustache' },
-  { id: 'chevron', label: 'Chevron mustache' },
-  { id: 'soul-patch', label: 'Soul patch' },
-];
-
-export const BEAUTY_MARKS: { id: string; label: string }[] = [
-  { id: 'none', label: 'None' },
-  { id: 'cheek', label: 'Cheek' },
-  { id: 'cheekbone', label: 'Cheekbone' },
-  { id: 'lip', label: 'Above the lip' },
-  { id: 'chin', label: 'Chin' },
-  { id: 'eye', label: 'Under the eye' },
-  { id: 'scar-cheek', label: 'Cheek scar' },
-  { id: 'scar-brow', label: 'Eyebrow scar' },
-  { id: 'scar-chin', label: 'Chin scar' },
-];
-
-export const PATTERNS: { id: string; label: string }[] = [
-  { id: 'plain', label: 'Plain' },
-  { id: 'stripes', label: 'Striped' },
-  { id: 'wide-stripes', label: 'Wide stripes' },
-  { id: 'pinstripe', label: 'Pinstripe' },
-  { id: 'checks', label: 'Checked' },
-  { id: 'gingham', label: 'Gingham' },
-  { id: 'dots', label: 'Polka dots' },
-  { id: 'camo', label: 'Camouflage' },
-  { id: 'colorblock', label: 'Color block' },
-  { id: 'raglan', label: 'Raglan sleeves' },
-];
-
-// ---------------------------------------------------------------- random
-
-/** A gentle random value for a slider: mostly near the middle. */
+/** A random value for one slider, biased toward the middle. */
 export function randomSlider(id: SliderId, rand: () => number = Math.random): number {
-  const min = sliderDef(id).min;
-  if (min === 0) return Math.round(Math.max(0, rand() * 1.2 - 0.4) * 100) / 100;
-  const v = (rand() + rand() - 1) * 0.8;
-  return Math.round(v * 100) / 100;
+  const def = sliderDef(id);
+  if (def.min === 0) return rand() < 0.7 ? 0 : Math.round(rand() * 80) / 100;
+  if (rand() < 0.45) return 0;
+  const v = (rand() + rand() + rand()) / 3;
+  return Math.round((v * 2 - 1) * 0.9 * 100) / 100;
 }
