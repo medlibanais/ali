@@ -20,7 +20,8 @@ update public.profiles set username = 'dave', first_name = 'Dave'
   where id = '00000000-0000-0000-0000-00000000000d';
 update public.profiles set username = 'erin', first_name = 'Erin'
   where id = '00000000-0000-0000-0000-00000000000e';
-update public.gamification set level = 7, total_xp = 13500, current_streak = 4, best_streak = 9
+update public.gamification set level = 7, total_xp = 13500, current_streak = 4, best_streak = 9,
+  last_active_date = public.user_today('00000000-0000-0000-0000-00000000000b')
   where user_id = '00000000-0000-0000-0000-00000000000b';
 insert into public.daily_scores (user_id, score_date, xp_earned)
   values ('00000000-0000-0000-0000-00000000000b', public.user_today('00000000-0000-0000-0000-00000000000b'), 120);
@@ -175,7 +176,7 @@ select is(pg_temp.status_of('00000000-0000-0000-0000-00000000000b', '00000000-00
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 select throws_ok(
   $$update public.gamification set total_xp = 999999, level = 100 where user_id = auth.uid()$$,
-  'direct_write_forbidden', 'XP and level cannot be edited directly from the app');
+  '42501', null, 'XP and level cannot be edited directly from the app');
 
 ---------------------------------------------------------------- anon
 reset role;

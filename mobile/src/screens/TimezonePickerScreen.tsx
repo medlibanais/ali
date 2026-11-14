@@ -79,8 +79,12 @@ export function TimezonePickerScreen() {
       await dispatch(fetchProfile());
       toast.showToast({ message: `Timezone set to ${zone}.` });
     } catch (e) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e ? String(e.message) : '';
       toast.showToast({
-        message: e instanceof Error ? e.message : 'Could not save the timezone.',
+        message: msg.includes('timezone_change_too_soon')
+          ? 'You can change your timezone once every 7 days.'
+          : msg || 'Could not save the timezone.',
       });
     } finally {
       setSaving(false);
