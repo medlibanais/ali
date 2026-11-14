@@ -107,7 +107,24 @@ function rpcError(error: { message?: string } | null, fallback: string): string 
   if (msg.includes('skip_limit_reached')) return 'You can skip 3 quests per day.';
   if (msg.includes('already_completed')) return 'This quest is already completed.';
   if (msg.includes('not_authenticated')) return 'Your session expired. Sign in again.';
+  if (msg.includes('daily_completion_limit')) {
+    return 'You reached today\'s limit of 15 completed quests. See you tomorrow.';
+  }
+  if (msg.includes('quest_not_today')) return 'This quest is from another day.';
+  if (msg.includes('quest_skipped')) return 'This quest was skipped.';
   return fallback;
+}
+
+/** Server refusals that retrying later will not fix. */
+function isPermanentCompletionError(message: string | undefined): boolean {
+  const msg = message ?? '';
+  return [
+    'daily_completion_limit',
+    'quest_not_today',
+    'quest_not_found',
+    'quest_skipped',
+    'not_your_quest',
+  ].some((code) => msg.includes(code));
 }
 
 export const fetchDailyQuests = createAsyncThunk<
@@ -272,6 +289,10 @@ export const drainCompletionQueue = createAsyncThunk<
       if (!error) {
         await dequeueCompletion(item.questId);
         synced += 1;
+      } else if (isPermanentCompletionError(error.message)) {
+        // The server will never accept this one (daily limit, old quest):
+        // drop it so it does not block the queue forever.
+        await dequeueCompletion(item.questId);
       } else {
         break; // still offline or server unhappy — retry next launch
       }
