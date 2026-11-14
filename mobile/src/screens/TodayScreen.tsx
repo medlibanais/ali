@@ -340,55 +340,6 @@ export function TodayScreen({ navigation }: Props) {
             />
           </FadeInUp>
 
-          <FadeInUp delay={160} style={styles.strip}>
-            <View style={[styles.stripCell, styles.stripFirst]}>
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                {gamification.currentTitle ?? titleForLevel(gamification.level)}
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {`${gamification.totalXp.toLocaleString()} XP`}
-              </Txt>
-              <View style={styles.xpTrack}>
-                <View
-                  style={[
-                    styles.xpFill,
-                    { width: `${Math.round(levelProgress(gamification.totalXp) * 100)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-            <View style={styles.stripDivider} />
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={
-                gamification.currentStreak > 0
-                  ? `${streakLabel(gamification.currentStreak)}. Tap to use a streak freeze`
-                  : streakLabel(gamification.currentStreak)
-              }
-              disabled={gamification.currentStreak === 0}
-              onPress={confirmFreeze}
-              style={styles.stripCell}
-            >
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                Streak
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {gamification.currentStreak > 0
-                  ? streakLabel(gamification.currentStreak)
-                  : bestStreakLabel(gamification.bestStreak)}
-              </Txt>
-            </PressableScale>
-            <View style={styles.stripDivider} />
-            <View style={styles.stripCell}>
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                {`Today · score ${Math.round(score)}`}
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {`${doneCount} of ${activeQuests.length}`}
-              </Txt>
-            </View>
-          </FadeInUp>
-
           <View style={styles.questHeader}>
             <View style={styles.questHeaderTitle}>
               {expandedPillar ? (
@@ -469,6 +420,62 @@ export function TodayScreen({ navigation }: Props) {
             </PressableScale>
           ) : null}
 
+          {/* Progress comes after today's to-dos: act first, then reflect. */}
+          <Txt variant="label" style={styles.progressLabel}>
+            Your progress
+          </Txt>
+          <FadeInUp delay={320} style={styles.strip}>
+            <View style={[styles.stripCell, styles.stripFirst]}>
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                {gamification.currentTitle ?? titleForLevel(gamification.level)}
+              </Txt>
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+                {`${gamification.totalXp.toLocaleString()} XP`}
+              </Txt>
+              <View style={styles.xpTrack}>
+                <View
+                  style={[
+                    styles.xpFill,
+                    { width: `${Math.round(levelProgress(gamification.totalXp) * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+            <View style={styles.stripDivider} />
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={
+                gamification.currentStreak > 0
+                  ? `${streakLabel(gamification.currentStreak)}. Tap to use a streak freeze`
+                  : streakLabel(gamification.currentStreak)
+              }
+              disabled={gamification.currentStreak === 0}
+              onPress={confirmFreeze}
+              style={styles.stripCell}
+            >
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                Streak
+              </Txt>
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+                {gamification.currentStreak > 0
+                  ? streakLabel(gamification.currentStreak)
+                  : bestStreakLabel(gamification.bestStreak)}
+              </Txt>
+            </PressableScale>
+            <View style={styles.stripDivider} />
+            <View style={styles.stripCell}>
+              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+                Life score
+              </Txt>
+              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+                {`${Math.round(score)}`}
+              </Txt>
+              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+                {`${doneCount} of ${activeQuests.length} done`}
+              </Txt>
+            </View>
+          </FadeInUp>
+
           {questsState.error ? (
             <Txt variant="caption" color={colors.danger} style={styles.error}>
               {questsState.error}
@@ -547,6 +554,10 @@ const styles = themed(() =>
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.sm,
     ...softSurface(2),
+  },
+  progressLabel: {
+    marginTop: spacing.xl,
+    marginLeft: spacing.xs,
   },
   stripCell: {
     flex: 1,

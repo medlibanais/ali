@@ -13,7 +13,7 @@ import {
   withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
-import { CheckGlyph, StarGlyph } from './icons';
+import { CheckGlyph, SparklesGlyph, StarGlyph } from './icons';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -92,43 +92,39 @@ export function QuestRow({
           {quest.title}
         </Txt>
         <View style={styles.metaRow}>
-          <View
-            style={[
-              styles.tag,
-              { backgroundColor: block ? withAlpha(colors.ink, 0.55) : pastel.tint },
-            ]}
+          <Txt
+            variant="caption"
+            color={block ? withAlpha(tileInk, 0.68) : colors.inkSoft}
+            style={styles.metaText}
+            numberOfLines={1}
           >
-            <Txt
-              variant="caption"
-              color={block ? tileInk : pillarColor}
-              style={styles.tagText}
-            >
-              {showPillarLabel
-                ? `${PILLAR_LABELS[quest.pillar]} · ${DIFFICULTY_LABELS[quest.difficulty]}`
-                : DIFFICULTY_LABELS[quest.difficulty]}
-            </Txt>
-          </View>
+            {showPillarLabel
+              ? `${PILLAR_LABELS[quest.pillar]} · ${DIFFICULTY_LABELS[quest.difficulty]}`
+              : DIFFICULTY_LABELS[quest.difficulty]}
+            {quest.time_estimate_minutes ? ` · ${quest.time_estimate_minutes} min` : ''}
+          </Txt>
           {quest.is_ai_generated ? (
-            <View style={[styles.tag, styles.coachTag, block && { backgroundColor: tileInk }]}>
+            <View style={[styles.coachTag, block && { backgroundColor: withAlpha(tileInk, 0.12) }]}>
+              <SparklesGlyph size={12} color={block ? tileInk : colors.accent} />
               <Txt
                 variant="caption"
-                color={block ? pillarColor : colors.accent}
-                style={styles.tagText}
+                color={block ? tileInk : colors.accent}
+                style={styles.coachText}
               >
                 Coach pick
               </Txt>
             </View>
           ) : null}
           {dimmed ? (
-            <Txt variant="caption" color={block ? tileInk : colors.inkFaint} style={styles.tagText}>
-              Skipped
+            <Txt variant="caption" color={block ? tileInk : colors.inkFaint} style={styles.metaText}>
+              {' · Skipped'}
             </Txt>
           ) : null}
         </View>
       </View>
       <View style={[styles.xpPill, block && { backgroundColor: tileInk }]}>
-        <StarGlyph size={15} />
-        <Txt variant="label" color={block ? pillarColor : colors.ink} style={styles.xp}>
+        <StarGlyph size={13} />
+        <Txt variant="bodySemi" color={block ? colors.ink : colors.ink} style={styles.xp}>
           {`+${quest.xp_reward} XP`}
         </Txt>
       </View>
@@ -151,8 +147,8 @@ const styles = themed(() =>
       opacity: 0.55,
     },
     check: {
-      width: 24,
-      height: 24,
+      width: 26,
+      height: 26,
       borderWidth: 2,
       borderColor: colors.inkFaint,
       borderRadius: radius.pill,
@@ -172,33 +168,39 @@ const styles = themed(() =>
       flexDirection: 'row',
       flexWrap: 'wrap',
       alignItems: 'center',
-      marginTop: spacing.xs,
+      marginTop: 3,
     },
-    tag: {
-      marginBottom: 2,
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.sm + 2,
-      paddingVertical: 2,
-      marginRight: spacing.sm,
+    metaText: {
+      fontSize: 13,
+      lineHeight: 18,
     },
     coachTag: {
-      backgroundColor: colors.paperAlt,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: spacing.sm,
+      paddingHorizontal: spacing.sm - 1,
+      paddingVertical: 1,
+      borderRadius: radius.pill,
+      backgroundColor: withAlpha(colors.accent, 0.12),
     },
-    tagText: {
+    coachText: {
       fontSize: 12,
       lineHeight: 16,
+      marginLeft: 4,
     },
     xpPill: {
       flexDirection: 'row',
       alignItems: 'center',
       marginLeft: spacing.md,
       paddingHorizontal: spacing.sm + 2,
-      paddingVertical: 6,
+      paddingVertical: 5,
       borderRadius: radius.pill,
-      backgroundColor: colors.paperAlt,
+      backgroundColor: colors.paper,
     },
     xp: {
-      marginLeft: 5,
+      marginLeft: 4,
+      fontSize: 13,
+      lineHeight: 17,
     },
   }),
 );

@@ -520,3 +520,33 @@ export function EyeOffGlyph({ size = 22, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 4l16 16" />;
 }
+
+/** Right arrow for forward actions (sign in, continue). */
+export function ArrowRightGlyph({ size = 20, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M4.5 12h15M13 5.5l6.5 6.5-6.5 6.5" />;
+}
+
+/** Thumbs up for coach feedback. */
+export function ThumbUpGlyph({ size = 18, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M7.5 10.5v9M7.5 10.5 11 3.5a2.2 2.2 0 0 1 2.5 2.6L13 9.5h5.3a2 2 0 0 1 2 2.4l-1.3 6a2 2 0 0 1-2 1.6H7.5M7.5 10.5h-3v9h3" />;
+}
+
+/** Thumbs down for coach feedback. */
+export function ThumbDownGlyph({ size = 18, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M16.5 13.5v-9M16.5 13.5 13 20.5a2.2 2.2 0 0 1-2.5-2.6l.5-3.4H5.7a2 2 0 0 1-2-2.4l1.3-6a2 2 0 0 1 2-1.6h9.5M16.5 13.5h3v-9h-3" />;
+}
+
+/** Envelope for email / reset link actions. */
+export function MailGlyph({ size = 20, color = colors.onAccent }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M3.5 6.5h17v11h-17v-11ZM3.5 7l8.5 6.5L20.5 7" />;
+}
+
+/** Clock face for time and timezone settings. */
+export function ClockGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM12 7.5V12l3 2" />;
+}

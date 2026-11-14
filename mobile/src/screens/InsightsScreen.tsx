@@ -5,6 +5,8 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
+import Accordion from '../components/Accordion';
+import { ShareGlyph } from '../components/icons';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import Hairline from '../components/Hairline';
@@ -146,7 +148,11 @@ function Pillars({ days }: { days: DayScore[] }) {
 
 function Momentum({ streak, best, level }: { streak: number; best: number; level: number }) {
   return (
-    <Card style={styles.card}>
+    <Accordion
+      title="Momentum"
+      summary={`${streak}-day streak · best ${best} · level ${level}`}
+      style={styles.card}
+    >
       <View style={styles.statsRow}>
         <Stat value={`${streak}`} label="day streak" color={colors.gold} />
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
@@ -154,7 +160,7 @@ function Momentum({ streak, best, level }: { streak: number; best: number; level
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
         <Stat value={`${level}`} label={titleForLevel(level)} />
       </View>
-    </Card>
+    </Accordion>
   );
 }
 
@@ -239,10 +245,13 @@ export function InsightsScreen() {
           <Headline s={summary} period={period} />
           <Takeaways items={items} />
 
-          <Card style={styles.card}>
-            <Txt variant="heading" style={styles.cardTitle}>
-              Your score, day by day
-            </Txt>
+          <Pillars days={current} />
+
+          <Accordion
+            title="Your score, day by day"
+            summary="Daily scores against your average"
+            style={styles.card}
+          >
             <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
               Tap a point to see the exact score. The dashed line is your average.
             </Txt>
@@ -251,9 +260,7 @@ export function InsightsScreen() {
               height={170}
               emptyLabel="No scores yet"
             />
-          </Card>
-
-          <Pillars days={current} />
+          </Accordion>
 
           <Momentum
             streak={streak.data?.current ?? gamification.currentStreak}
@@ -286,7 +293,12 @@ export function InsightsScreen() {
             )}
           </Card>
 
-          <Button title="Share my progress as a story" onPress={() => setShareOpen(true)} />
+          <Button
+            title="Share my progress as a story"
+            winTitle="Show it off"
+            icon={ShareGlyph}
+            onPress={() => setShareOpen(true)}
+          />
         </View>
       )}
 

@@ -62,20 +62,21 @@ export const THEMES: Record<ThemeId, AppTheme> = {
       // as the one action color, ultraviolet as the second hazard accent,
       // and loud color-block quest tiles. Based on the theverge style in
       // VoltAgent/awesome-design-md.
-      paper: '#131313',
-      paperAlt: '#2D2D2D',
-      card: '#131313',
-      ink: '#FFFFFF',
-      inkSoft: '#949494',
-      inkFaint: '#8C8C8C',
-      line: '#313131',
-      outline: '#FFFFFF',
+      // Refined (Nov 2026): three surface steps instead of one flat black,
+      // so cards lift off the canvas without loud white outlines; softer
+      // greys that still pass WCAG AA; errors read as errors (coral red).
+      paper: '#0C0C0E',
+      paperAlt: '#1F1F24',
+      card: '#16161A',
+      ink: '#F5F5F7',
+      inkSoft: '#A6A6B0',
+      inkFaint: '#7A7A84',
+      line: '#26262C',
+      outline: '#2B2B32',
       accent: '#3CFFD0',
       onAccent: '#000000',
       gold: '#FFD23C',
-      // Ultraviolet (#5200FF) lifted toward white so error text stays
-      // legible on the black canvas.
-      danger: '#9766FF',
+      danger: '#FF6B7A',
       tiles: 'block',
       flat: true,
       pillar: {

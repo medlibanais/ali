@@ -44,6 +44,25 @@ export function themed<T extends object>(factory: () => T): T {
       }
       return (built as Record<string | symbol, unknown>)[prop];
     },
+    // Spreading or Object.keys() on a themed map (navigator screenOptions,
+    // `...styles.x`) must see the real keys, or the values silently vanish.
+    ownKeys() {
+      if (built === null || builtFor !== activeColors) {
+        built = factory();
+        builtFor = activeColors;
+      }
+      return Reflect.ownKeys(built as object);
+    },
+    getOwnPropertyDescriptor(_target, prop: string | symbol) {
+      if (built === null || builtFor !== activeColors) {
+        built = factory();
+        builtFor = activeColors;
+      }
+      const value = (built as Record<string | symbol, unknown>)[prop];
+      return value === undefined
+        ? undefined
+        : { value, enumerable: true, configurable: true, writable: false };
+    },
   });
 }
 
@@ -89,13 +108,15 @@ export const borderWidth = {
   hairline: 1,
 } as const;
 
-// Neon zine type: Anton (stand-in for a heavy condensed display face) for
-// titles, Inter for running text, JetBrains Mono for small uppercase labels.
+// Neon zine type: Anton (heavy condensed display face) for screen titles
+// only, Inter for section headings and running text, JetBrains Mono for
+// small uppercase labels.
 export const fonts = {
   display: 'Anton_400Regular',
   title: 'Anton_400Regular',
   body: 'Inter_400Regular',
   bodySemi: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
   caption: 'Inter_500Medium',
   heavy: 'Inter_800ExtraBold',
   mono: 'JetBrainsMono_600SemiBold',
@@ -162,7 +183,9 @@ export function softShadow(level: 1 | 2 | 3 = 1) {
  */
 export function softSurface(level: 1 | 2 | 3 = 1) {
   return {
-    backgroundColor: activeColors.card,
+    // Dark themes: a translucent surface so the ambient glow behind the
+    // screen seeps through (the frosted Glass panel adds a real blur).
+    backgroundColor: isDarkPalette() ? withAlpha(activeColors.card, 0.72) : activeColors.card,
     borderWidth: isDarkPalette() ? borderWidth.hairline : 0,
     borderColor: activeColors.outline ?? activeColors.line,
     ...softShadow(level),

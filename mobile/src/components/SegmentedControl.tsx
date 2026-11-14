@@ -28,14 +28,13 @@ export function SegmentedControl<T extends string>({
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               styles.segment,
-              index > 0 && styles.segmentDivider,
               selected && styles.segmentSelected,
               pressed && styles.pressed,
             ]}
           >
             <Txt
               variant="bodySemi"
-              color={selected ? colors.accent : colors.inkSoft}
+              color={selected ? colors.ink : colors.inkSoft}
               style={styles.text}
               numberOfLines={1}
             >
@@ -50,33 +49,34 @@ export function SegmentedControl<T extends string>({
 
 const styles = themed(() =>
   StyleSheet.create({
+    // Recessed track with a raised thumb: the selected segment is the
+    // lightest surface, so the current choice reads at a glance.
     container: {
       flexDirection: 'row',
+      padding: 4,
       borderWidth: borderWidth.hairline,
       borderColor: colors.line,
-      borderRadius: radius.sm,
-      backgroundColor: colors.paperAlt,
-      overflow: 'hidden',
+      borderRadius: radius.sm + 2,
+      backgroundColor: colors.card,
     },
     segment: {
       flex: 1,
       minHeight: 40,
+      borderRadius: radius.sm - 2,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.xs,
     },
-    segmentDivider: {
-      borderLeftWidth: borderWidth.hairline,
-      borderLeftColor: colors.line,
-    },
     segmentSelected: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.paperAlt,
+      borderWidth: borderWidth.hairline,
+      borderColor: colors.outline ?? colors.line,
     },
     pressed: {
       opacity: 0.96,
     },
     text: {
-      fontSize: 13,
+      fontSize: 14,
     },
   }),
 );

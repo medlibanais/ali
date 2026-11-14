@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import { ArrowRightGlyph } from '../components/icons';
 import Field from '../components/Field';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import Screen from '../components/Screen';
@@ -115,19 +118,19 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
 
   return (
     <Screen scroll keyboardAvoiding>
-      <View style={styles.header}>
-        <Txt variant="display">Set a new password</Txt>
-        <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-          {linkState === 'invalid'
+      <AuthHeader
+        title="Set a new password"
+        subtitle={
+          linkState === 'invalid'
             ? 'This reset link is invalid or has expired.'
             : doneState === 'done'
               ? 'Your password was updated. Sign in with the new one.'
-              : 'Choose a strong password you do not use anywhere else.'}
-        </Txt>
-      </View>
+              : 'Choose a strong password you do not use anywhere else.'
+        }
+      />
 
       {linkState === 'ready' && doneState === 'form' ? (
-        <>
+        <Card style={styles.form}>
           <Field
             label="New password"
             value={password}
@@ -163,8 +166,14 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
               {error}
             </Txt>
           ) : null}
-          <Button title="Update password" onPress={submit} loading={busy} />
-        </>
+          <Button
+            title="Update password"
+            winTitle="Locked in"
+            icon={ArrowRightGlyph}
+            onPress={submit}
+            loading={busy}
+          />
+        </Card>
       ) : null}
 
       {linkState === 'invalid' ? (
@@ -192,8 +201,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  header: { marginTop: spacing.xxl, marginBottom: spacing.xl },
-  subtitle: { marginTop: spacing.sm },
+  form: { marginBottom: spacing.sm },
   formError: { marginBottom: spacing.md },
   backButton: { marginTop: spacing.sm },
 });

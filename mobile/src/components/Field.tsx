@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
-import { borderWidth, colors, fonts, radius, spacing, themed } from '../theme/tokens';
+import { colors, fonts, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { EyeGlyph, EyeOffGlyph } from './icons';
 import Txt from './Txt';
@@ -87,14 +87,15 @@ const styles = themed(() =>
     label: {
       marginBottom: spacing.sm,
       textTransform: 'uppercase',
+      color: colors.inkSoft,
     },
     input: {
-      minHeight: 48,
-      borderWidth: borderWidth.hairline,
+      minHeight: 52,
+      borderWidth: 1.5,
       borderColor: colors.line,
-      borderRadius: radius.sm,
+      borderRadius: 14,
       backgroundColor: colors.card,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.lg,
       fontFamily: fonts.body,
       fontSize: 16,
       color: colors.ink,
@@ -121,12 +122,13 @@ const styles = themed(() =>
     },
     inputFocused: {
       borderColor: colors.accent,
+      backgroundColor: colors.paperAlt,
     },
     inputError: {
       borderColor: colors.danger,
     },
     error: {
-      marginTop: spacing.xs,
+      marginTop: spacing.xs + 2,
     },
   }),
 );

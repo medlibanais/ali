@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import { ArrowRightGlyph } from '../components/icons';
 import Field from '../components/Field';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import Screen from '../components/Screen';
@@ -62,70 +65,76 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   return (
     <Screen scroll keyboardAvoiding>
-      <View style={styles.header}>
-        <Txt variant="display">Create account</Txt>
-        <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-          One account for your whole life, across five pillars.
-        </Txt>
-      </View>
-
-      <Field
-        label="Email"
-        value={email}
-        onChangeText={(text) => {
-          setEmail(text);
-          if (emailError) setEmailError(null);
-        }}
-        error={emailError}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-        placeholder="you@example.com"
-      />
-      <Field
-        label="Password"
-        value={password}
-        onChangeText={(text) => {
-          setPassword(text);
-          setPasswordTouched(true);
-        }}
-        secureTextEntry
-        autoCapitalize="none"
-        placeholder="Choose a password"
+      <AuthHeader
+        title="Create account"
+        subtitle="One account for your whole life, across five pillars."
       />
 
-      <PasswordStrengthMeter password={password} />
-      {passwordTouched && password.length > 0 && !allRulesMet ? (
-        <Txt variant="caption" color={colors.danger} style={styles.rulesHint}>
-          Your password does not meet every rule yet.
-        </Txt>
-      ) : null}
-
-      {error ? (
-        <Txt variant="caption" color={colors.danger} style={styles.formError}>
-          {error}
-        </Txt>
-      ) : null}
-
-      {inviteVisible ? (
+      <Card style={styles.form}>
         <Field
-          label="Invite code (optional)"
-          value={inviteCode}
-          onChangeText={(t) => setInviteCode(t.toUpperCase())}
-          placeholder="ABC12345"
-          autoCapitalize="characters"
-          autoCorrect={false}
+          label="Email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (emailError) setEmailError(null);
+          }}
+          error={emailError}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          placeholder="you@example.com"
         />
-      ) : (
-        <Button
-          title="Have an invite code?"
-          variant="ghost"
-          onPress={() => setInviteVisible(true)}
-          style={styles.inviteToggle}
+        <Field
+          label="Password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            setPasswordTouched(true);
+          }}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="Choose a password"
         />
-      )}
 
-      <Button title="Create account" onPress={submit} loading={busy} />
+        <PasswordStrengthMeter password={password} />
+        {passwordTouched && password.length > 0 && !allRulesMet ? (
+          <Txt variant="caption" color={colors.danger} style={styles.rulesHint}>
+            Your password does not meet every rule yet.
+          </Txt>
+        ) : null}
+
+        {error ? (
+          <Txt variant="caption" color={colors.danger} style={styles.formError}>
+            {error}
+          </Txt>
+        ) : null}
+
+        {inviteVisible ? (
+          <Field
+            label="Invite code (optional)"
+            value={inviteCode}
+            onChangeText={(t) => setInviteCode(t.toUpperCase())}
+            placeholder="ABC12345"
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+        ) : (
+          <Button
+            title="Have an invite code?"
+            variant="ghost"
+            onPress={() => setInviteVisible(true)}
+            style={styles.inviteToggle}
+          />
+        )}
+
+        <Button
+          title="Create account"
+          winTitle="Start growing"
+          icon={ArrowRightGlyph}
+          onPress={submit}
+          loading={busy}
+        />
+      </Card>
       <Button
         title="Back to sign in"
         variant="ghost"
@@ -138,12 +147,8 @@ export function RegisterScreen({ navigation, route }: Props) {
 
 const styles = themed(() =>
   StyleSheet.create({
-    header: {
-      marginTop: spacing.xxl,
-      marginBottom: spacing.xl,
-    },
-    subtitle: {
-      marginTop: spacing.sm,
+    form: {
+      marginBottom: spacing.md,
     },
     rulesHint: {
       marginTop: -spacing.sm,

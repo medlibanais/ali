@@ -18,7 +18,13 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
-import { ArrowUpGlyph, ComposeGlyph, MicGlyph } from '../components/icons';
+import {
+  ArrowUpGlyph,
+  ComposeGlyph,
+  MicGlyph,
+  ThumbDownGlyph,
+  ThumbUpGlyph,
+} from '../components/icons';
 import type { ChatMessage } from '../api/types';
 import {
   mergeTranscript,
@@ -115,9 +121,11 @@ function ThumbButton({
         pressed && styles.pressed,
       ]}
     >
-      <Txt variant="caption" style={styles.thumbText}>
-        {direction === 'up' ? '👍' : '👎'}
-      </Txt>
+      {direction === 'up' ? (
+        <ThumbUpGlyph size={17} color={active ? colors.accent : colors.inkSoft} />
+      ) : (
+        <ThumbDownGlyph size={17} color={active ? colors.danger : colors.inkSoft} />
+      )}
     </Pressable>
   );
 }
@@ -621,16 +629,13 @@ const styles = themed(() =>
       marginRight: spacing.sm,
     },
     thumbButton: {
-      minWidth: 30,
-      minHeight: 28,
+      minWidth: 32,
+      minHeight: 32,
       alignItems: 'center',
       justifyContent: 'center',
     },
     thumbIdle: {
-      opacity: 0.4,
-    },
-    thumbText: {
-      fontSize: 13,
+      opacity: 0.7,
     },
     regenerateButton: {
       minHeight: 28,

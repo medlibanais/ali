@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, themed } from '../theme/tokens';
+import Ambient from './Ambient';
 import { useTheme } from '../theme/useTheme';
 
 export interface ScreenProps {
@@ -72,6 +73,7 @@ export function Screen({
         barStyle={theme.dark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.paper}
       />
+      <Ambient />
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           style={styles.flex}

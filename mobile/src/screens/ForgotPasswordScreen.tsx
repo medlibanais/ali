@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import { MailGlyph } from '../components/icons';
 import Field from '../components/Field';
 import Screen from '../components/Screen';
 import Txt from '../components/Txt';
@@ -41,17 +44,17 @@ export function ForgotPasswordScreen({ navigation }: Props) {
 
   return (
     <Screen scroll keyboardAvoiding>
-      <View style={styles.header}>
-        <Txt variant="display">Reset password</Txt>
-        <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-          {sent
-            ? `If an account exists for ${email.trim()}, a reset link is on its way. Open it on this device — it expires in 1 hour.`
-            : 'Enter the email you signed up with and we will send you a reset link.'}
-        </Txt>
-      </View>
+      <AuthHeader
+        title="Reset password"
+        subtitle={
+          sent
+            ? `If an account exists for ${email.trim()}, a reset link is on its way. Open it on this device. It expires in 1 hour.`
+            : 'Enter the email you signed up with and we will send you a reset link.'
+        }
+      />
 
       {!sent ? (
-        <>
+        <Card>
           <Field
             label="Email"
             value={email}
@@ -70,8 +73,14 @@ export function ForgotPasswordScreen({ navigation }: Props) {
               {error}
             </Txt>
           ) : null}
-          <Button title="Send reset link" onPress={submit} loading={busy} />
-        </>
+          <Button
+            title="Send reset link"
+            winTitle="Sending it your way"
+            icon={MailGlyph}
+            onPress={submit}
+            loading={busy}
+          />
+        </Card>
       ) : (
         <>
           {error ? (
@@ -99,8 +108,6 @@ export function ForgotPasswordScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  header: { marginTop: spacing.xxl, marginBottom: spacing.xl },
-  subtitle: { marginTop: spacing.sm },
   formError: { marginBottom: spacing.md },
   backButton: { marginTop: spacing.sm },
 });
