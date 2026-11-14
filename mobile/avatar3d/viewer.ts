@@ -4,7 +4,7 @@
 // an ember rim. Built into assets/avatar3d/viewer.html by
 // scripts/build-avatar3d.mjs; the app talks to it with JSON messages:
 //
-//   in:  { type: 'render', model, config, mood, mode, bare, animated, snapshot }
+//   in:  { type: 'render', model, config, mood, mode, bare, animated, snapshot, eyes? }
 //   out: { type: 'ready' } | { type: 'rendered' } | { type: 'snapshot', data }
 //        | { type: 'error', message }
 
@@ -34,6 +34,8 @@ interface RenderCommand {
   bare: boolean;
   animated: boolean;
   snapshot: boolean;
+  /** 'closed' renders the blink frame the app flashes when the avatar blinks. */
+  eyes?: 'open' | 'closed';
 }
 
 declare global {
@@ -532,6 +534,23 @@ function applyMood(vrm: VRM, mood: string) {
   for (const [name, v] of Object.entries(MOODS[mood] ?? {})) em.setValue(name, v);
 }
 
+/**
+ * Shut the eyes fully on top of the mood. Moods like happy blend the blink
+ * away (overrideBlink), so lift those overrides for this frame only, and
+ * return a function that puts them back on the cached model.
+ */
+function shutEyes(vrm: VRM): () => void {
+  const em = vrm.expressionManager;
+  if (!em) return () => undefined;
+  const saved = em.expressions.map((e) => [e, e.overrideBlink] as const);
+  for (const [e] of saved) e.overrideBlink = 'none';
+  em.setValue('blink', 1);
+  return () => {
+    for (const [e, o] of saved) e.overrideBlink = o;
+    em.setValue('blink', 0);
+  };
+}
+
 // ---------------------------------------------------------------- render
 
 const HEAD_FRAME = { y: 0.08, dist: 1.65 };
@@ -589,12 +608,14 @@ async function render(cmd: RenderCommand) {
     applyColors(vrm, cmd.colors);
     applyPose(vrm, cmd.pose, cmd.build, cmd.height);
     applyMood(vrm, cmd.mood);
+    const reopen = cmd.eyes === 'closed' ? shutEyes(vrm) : null;
     scene.background = cmd.bare ? null : backdrop(cmd.colors.bgFrom, cmd.colors.bgTo);
     resize();
     frame(vrm, cmd.mode);
     renderer.render(scene, camera);
     post({ type: 'rendered' });
     if (cmd.snapshot) post({ type: 'snapshot', data: canvas.toDataURL('image/png') });
+    reopen?.();
     const wasAnimating = animating;
     animating = cmd.animated;
     if (animating && !wasAnimating) {

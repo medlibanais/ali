@@ -7,7 +7,9 @@
 // Rendering: the orbit itself only re-renders when the avatar, mood, level
 // or the tapped pillar changes. Each bubble reads its own score and quest
 // counts from the store (LivePillarBubble), so completing a quest
-// re-renders that one bubble. The float animations run on Animated values
+// re-renders that one bubble. The avatar breathes faster when the life
+// score is low, through a SharedValue (useLifeScoreValue), so a new score
+// does not re-render it either. The float animations run on Animated values
 // that survive re-renders and use the native driver on iOS/Android.
 
 import React, { memo } from 'react';
@@ -16,6 +18,7 @@ import Svg, { Ellipse } from 'react-native-svg';
 import AvatarView from '../avatar/AvatarView';
 import type { AvatarConfig, Mood } from '../avatar/types';
 import { useAppSelector } from '../store/hooks';
+import { useLifeScoreValue } from '../store/useLifeScoreValue';
 import {
   selectPillarDone,
   selectPillarScore,
@@ -106,6 +109,10 @@ const OrbitAvatar = memo(function OrbitAvatar({
   mood: Mood;
   size: number;
 }) {
+  // The breathing pace follows the life score on the UI thread: this
+  // SharedValue never changes identity, so the avatar never re-renders
+  // for a score change.
+  const lifeScore = useLifeScoreValue();
   return (
     <>
       <View style={[styles.avatarClip, { borderRadius: size / 2 }]}>
@@ -117,7 +124,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
             accessibilityLabel={name ? `Avatar of ${name}` : 'Your avatar'}
           />
         ) : (
-          <AvatarView config={avatarConfig} size={size} mood={mood} />
+          <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} />
         )}
       </View>
       {level !== undefined ? (

@@ -19,6 +19,7 @@ import { DEFAULT_AVATAR } from '../../avatar/types';
 const rowRenders: Record<string, number> = {};
 const bubbleRenders: Record<string, number> = {};
 let avatarRenders = 0;
+let avatarScore: { value: number } | undefined;
 
 jest.mock('../../lib/supabase', () => ({ supabase: {} }));
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -55,8 +56,9 @@ jest.mock('../../components/PillarBubble', () => {
 });
 jest.mock('../../avatar/AvatarView', () => {
   const { memo } = jest.requireActual('react');
-  return memo(function AvatarViewMock() {
+  return memo(function AvatarViewMock({ score }: { score?: { value: number } }) {
     avatarRenders += 1;
+    avatarScore = score;
     return null;
   });
 });
@@ -169,6 +171,14 @@ describe('Today re-renders when a quest is completed', () => {
     complete(store, quest('w1', 'work', 1));
     expect(rowRenders).toEqual({ w1: 1 });
     expect(bubbleRenders).toEqual({ work: 1 });
+    expect(avatarRenders).toBe(0);
+  });
+
+  it('speeds the breathing from the new score without re-rendering the avatar', () => {
+    const store = setup('work');
+    expect(avatarScore?.value).toBe(40);
+    complete(store, quest('w1', 'work', 1));
+    expect(avatarScore?.value).toBe(45);
     expect(avatarRenders).toBe(0);
   });
 
