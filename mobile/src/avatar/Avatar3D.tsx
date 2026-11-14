@@ -16,7 +16,7 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 import { useAliveMotion } from './alive';
 import { Asset } from 'expo-asset';
 import AnimeAvatar from './AnimeAvatar';
-import { bgStyle, hairColor, outfitColor, pantsColor, shoesColor, skinTone } from './palettes';
+import { bgStyle, eyeColor, hairColor, outfitColor, pantsColor, shoesColor, skinTone } from './palettes';
 import type { AvatarConfig, Mood } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -38,12 +38,28 @@ export interface RenderRequest {
   key: string;
   mode: Mode;
   command: Record<string, unknown>;
+  /**
+   * Requests in the same channel replace each other while they wait and
+   * jump the queue: the editor's live preview only ever wants the newest.
+   */
+  channel?: string;
 }
 
 // ---------------------------------------------------------------- store
 
 const images = new Map<string, string>();
 const queue: RenderRequest[] = [];
+// Dragging a slider asks for many looks: keep the newest images only.
+const MAX_IMAGES = 60;
+function remember(key: string, data: string) {
+  images.delete(key);
+  images.set(key, data);
+  while (images.size > MAX_IMAGES) {
+    const oldest = images.keys().next().value;
+    if (oldest === undefined) break;
+    images.delete(oldest);
+  }
+}
 const listeners = new Set<() => void>();
 let pump: (() => void) | null = null;
 
@@ -57,12 +73,26 @@ function subscribe(l: () => void) {
 }
 
 export function requestRender(req: RenderRequest) {
-  if (images.has(req.key) || queue.some((q) => q.key === req.key)) return;
-  queue.push(req);
+  if (images.has(req.key)) return;
+  if (req.channel) {
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].channel === req.channel) queue.splice(i, 1);
+    queue.unshift(req);
+  } else {
+    if (queue.some((q) => q.key === req.key)) return;
+    queue.push(req);
+  }
   pump?.();
 }
 
-function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, eyesClosed = false) {
+/** Where the camera stands: the usual 3/4 view unless the editor turns it. */
+export interface Camera {
+  /** Turn around the avatar, in radians. */
+  yaw?: number;
+  /** Head mode: 1 the bust, up to about 2 for a close-up of the face. */
+  zoom?: number;
+}
+
+function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera, eyesClosed = false) {
   const bg = bgStyle(config.bg);
   return {
     type: 'render',
@@ -72,12 +102,25 @@ function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean,
       top: outfitColor(config.outfitColor).value,
       bottom: pantsColor(config.pantsColor).value,
       shoes: shoesColor(config.shoesColor).value,
+      iris: eyeColor(config.eyeColor),
       bgFrom: bg.from,
       bgTo: bg.to,
     },
     pose: config.pose,
     build: config.bodyBuild,
     height: config.height,
+    sliders: config.sliders,
+    expression: config.expression,
+    paint: {
+      beard: config.facialHair,
+      mark: config.mark,
+      topPattern: config.topPattern,
+      top2: outfitColor(config.topColor2).value,
+      bottomPattern: config.bottomPattern,
+      bottom2: outfitColor(config.bottomColor2).value,
+    },
+    yaw: camera.yaw ?? 0.3,
+    zoom: camera.zoom ?? 1,
     mood,
     mode,
     bare,
@@ -87,11 +130,9 @@ function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean,
   };
 }
 
-export function renderKey(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean): string {
-  return JSON.stringify([
-    DEFAULT_MODEL, config.skin, config.hairColor, config.outfitColor, config.pantsColor,
-    config.shoesColor, config.bg, config.pose, config.bodyBuild, config.height, mood, mode, bare,
-  ]);
+/** Everything that changes the picture, so each look renders once. */
+export function renderKey(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera = {}): string {
+  return JSON.stringify([DEFAULT_MODEL, commandFor(config, mood, mode, bare, camera)]);
 }
 
 // ---------------------------------------------------------------- host
@@ -150,12 +191,12 @@ export function Avatar3DHost() {
       ready.current = true;
       next();
     } else if (msg.type === 'snapshot' && busy.current && msg.data) {
-      images.set(busy.current.key, msg.data);
+      remember(busy.current.key, msg.data);
       busy.current = null;
       emit();
       next();
     } else if (msg.type === 'error' && busy.current) {
-      images.set(busy.current.key, '');
+      remember(busy.current.key, '');
       busy.current = null;
       emit();
       next();
@@ -240,13 +281,19 @@ export interface Avatar3DProps {
   animated?: boolean;
   /** Life score for the breathing pace (see AvatarView). */
   score?: number | SharedValue<number>;
+  /** Editor only: turn and zoom the camera. */
+  camera?: Camera;
+  /** Editor only: a live preview that drops looks it no longer needs. */
+  live?: string;
 }
+
+const NO_CAMERA: Camera = {};
 
 /** Breath scale of the whole image, anchored at its bottom edge. */
 const BREATH_SCALE: Record<Mode, number> = { head: 0.022, 'full-body': 0.012 };
 
-export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score }: Avatar3DProps) {
-  const key = renderKey(config, mood, mode, bare);
+export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live }: Avatar3DProps) {
+  const key = renderKey(config, mood, mode, bare, camera);
   const blinkKey = `${key}:blink`;
   // The eyes-shut frame, only when it belongs to the image on screen.
   const blinkUri = useSyncExternalStore(
@@ -269,9 +316,9 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
   const uri =
     ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined);
   useEffect(() => {
-    requestRender({ key, mode, command: commandFor(config, mood, mode, bare) });
+    requestRender({ key, mode, command: commandFor(config, mood, mode, bare, camera), channel: live });
     // Queued after the open-eyes image, so the avatar shows up first.
-    if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, true) });
+    if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, camera, true) });
     // config fields are all in the key
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, animated]);

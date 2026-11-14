@@ -13,6 +13,7 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Backdrop from '../components/Backdrop';
+import BecomingCard from '../components/BecomingCard';
 import Hairline from '../components/Hairline';
 import { FadeInUp, PressableScale } from '../components/Motion';
 import PillarBubble from '../components/PillarBubble';
@@ -409,6 +410,15 @@ export function ProfileScreen({ navigation }: Props) {
               </View>
             </View>
           </FadeInUp>
+
+          {profile?.avatar_mode !== 'photo' ? (
+            <FadeInUp delay={90}>
+              <BecomingCard
+                avatarConfig={profile?.avatar_config}
+                onEdit={(who) => navigation.navigate('AvatarCreator', { who })}
+              />
+            </FadeInUp>
+          ) : null}
 
           <FadeInUp delay={120} style={styles.growth}>
             <View style={styles.growthHeader}>

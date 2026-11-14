@@ -4,13 +4,17 @@
 // an ember rim. Built into assets/avatar3d/viewer.html by
 // scripts/build-avatar3d.mjs; the app talks to it with JSON messages:
 //
-//   in:  { type: 'render', model, config, mood, mode, bare, animated, snapshot, eyes? }
+//   in:  { type: 'render', model, colors, pose, mood, mode, bare, animated,
+//          snapshot, eyes?, sliders?, expression?, paint?, yaw?, zoom? }
 //   out: { type: 'ready' } | { type: 'rendered' } | { type: 'snapshot', data }
 //        | { type: 'error', message }
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
+import { EXPRESSIONS, sv, type Sliders } from '../src/avatar/custom';
+import { applyBody, fitCloth, heightScale, prepareFace, prepareHair, sculptFace, sculptHair, type FaceRig, type HairRig } from './sculpt';
+import { paintAvatar, preparePaint, type PaintCommand, type PaintRig } from './paint';
 
 interface AvatarColors {
   skin: string;
@@ -18,6 +22,8 @@ interface AvatarColors {
   top: string;
   bottom: string;
   shoes: string;
+  /** Iris tint; missing keeps the model's own eyes. */
+  iris?: string;
   bgFrom: string;
   bgTo: string;
 }
@@ -36,6 +42,16 @@ interface RenderCommand {
   snapshot: boolean;
   /** 'closed' renders the blink frame the app flashes when the avatar blinks. */
   eyes?: 'open' | 'closed';
+  /** Proportion sliders (src/avatar/custom.ts). */
+  sliders?: Sliders;
+  /** Expression id, or 'auto' to follow the mood. */
+  expression?: string;
+  /** Painted details: facial hair, marks, freckles, clothing patterns. */
+  paint?: PaintCommand;
+  /** Camera turn around the avatar in radians (0.3 is the usual 3/4 view). */
+  yaw?: number;
+  /** Head mode only: 1 is the bust, about 1.8 a close-up of the face. */
+  zoom?: number;
 }
 
 declare global {
@@ -123,6 +139,24 @@ loader.register((parser) => new VRMLoaderPlugin(parser));
 const models = new Map<string, Promise<VRM>>();
 let current: VRM | null = null;
 
+interface Rigs {
+  face: FaceRig | null;
+  hair: HairRig;
+  paint: PaintRig;
+  /** Height of the feet in the model as made, so sliders keep them on the floor. */
+  restFoot: number;
+}
+const rigs = new Map<VRM, Rigs>();
+
+function footY(vrm: VRM): number {
+  vrm.update(0);
+  vrm.scene.updateMatrixWorld(true);
+  const ys = (['leftFoot', 'rightFoot'] as const)
+    .map((b) => vrm.humanoid.getRawBoneNode(b)?.getWorldPosition(new THREE.Vector3()).y)
+    .filter((y): y is number => typeof y === 'number');
+  return ys.length ? Math.min(...ys) : 0;
+}
+
 function loadModel(url: string): Promise<VRM> {
   let p = models.get(url);
   if (!p) {
@@ -132,6 +166,13 @@ function loadModel(url: string): Promise<VRM> {
       VRMUtils.rotateVRM0(vrm);
       prepareMaterials(vrm);
       prepareTightTop(vrm);
+      const face = prepareFace(vrm);
+      rigs.set(vrm, {
+        face,
+        hair: prepareHair(vrm, face?.eyeY ?? 1.44),
+        paint: preparePaint(vrm, face),
+        restFoot: footY(vrm),
+      });
       return vrm;
     });
     models.set(url, p);
@@ -139,12 +180,14 @@ function loadModel(url: string): Promise<VRM> {
   return p;
 }
 
-type Part = 'skin' | 'hair' | 'top' | 'bottom' | 'shoes' | null;
+type Part = 'skin' | 'hair' | 'top' | 'bottom' | 'shoes' | 'iris' | 'brow' | null;
 
 /** Which config color drives a material, from VRoid's material names. */
 function partOf(name: string): Part {
   const n = name.toLowerCase();
   if (n.includes('hair')) return 'hair';
+  if (n.includes('eyeiris')) return 'iris';
+  if (n.includes('facebrow')) return 'brow';
   if (n.includes('skin')) return 'skin';
   if (n.includes('top') || n.includes('onepiece') || n.includes('tops')) return 'top';
   if (n.includes('bottom')) return 'bottom';
@@ -240,14 +283,19 @@ function prepareMaterials(vrm: VRM) {
     if (!mesh.isMesh) return;
     mesh.frustumCulled = false;
     const mats = ([] as THREE.Material[]).concat(mesh.material);
-    if (mats[0]?.name.toLowerCase().startsWith('face_')) sphereNormals(mesh);
+    if (mats[0]?.name.toLowerCase().startsWith('face_')) {
+      sphereNormals(mesh);
+      // Expressions must not bend the ball normals back into blotches.
+      delete mesh.geometry.morphAttributes.normal;
+    }
     for (const mat of ([] as THREE.Material[]).concat(mesh.material)) {
       const m = mat as MToonLike;
       if (!m.isMToonMaterial) continue;
       const part = partOf(m.name);
       m.userData.part = part;
-      if (part && part !== 'skin' && m.map) {
+      if (part && part !== 'skin' && part !== 'iris' && m.map) {
         const gray = grayscale(m.map);
+        m.userData.gray = gray;
         m.map = gray;
         if (m.shadeMultiplyTexture) m.shadeMultiplyTexture = gray;
       }
@@ -338,6 +386,16 @@ function fitTop(vrm: VRM, tight: boolean) {
 // are applied as a multiply relative to it.
 const MODEL_SKIN = c('#F6DCCB');
 
+/** What the skin materials multiply their texture by for a skin tone. */
+function skinFactor(hex: string): THREE.Color {
+  const s = grade(hex);
+  return new THREE.Color(
+    Math.min(1, s.r / MODEL_SKIN.r),
+    Math.min(1, s.g / MODEL_SKIN.g),
+    Math.min(1, s.b / MODEL_SKIN.b),
+  );
+}
+
 function applyColors(vrm: VRM, colors: AvatarColors) {
   vrm.scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -348,14 +406,30 @@ function applyColors(vrm: VRM, colors: AvatarColors) {
       const part = m.userData.part as Part;
       if (!part) continue;
       if (part === 'skin') {
-        const s = grade(colors.skin);
-        const f = new THREE.Color(
-          Math.min(1, s.r / MODEL_SKIN.r),
-          Math.min(1, s.g / MODEL_SKIN.g),
-          Math.min(1, s.b / MODEL_SKIN.b),
-        );
+        const f = skinFactor(colors.skin);
         m.color.copy(f);
         m.shadeColorFactor?.copy(f).multiplyScalar(0.55).lerp(c('#3A1A10'), 0.15);
+      } else if (part === 'iris') {
+        // Irises keep their painted detail (pupil, rings): grayscale once,
+        // then tint. No tint keeps the model's own eye color.
+        if (!m.userData.irisMap && m.map) m.userData.irisMap = m.map;
+        if (!m.userData.irisGray && m.map) m.userData.irisGray = grayscale(m.map);
+        if (colors.iris && m.userData.irisGray) {
+          m.map = m.userData.irisGray as THREE.Texture;
+          m.color.copy(c(colors.iris).multiplyScalar(0.95));
+        } else if (m.userData.irisMap) {
+          m.map = m.userData.irisMap as THREE.Texture;
+          m.color.setRGB(1, 1, 1);
+        }
+        // The shadow side uses the same picture, so both eyes match.
+        if (m.shadeMultiplyTexture) m.shadeMultiplyTexture = m.map;
+        m.shadeColorFactor?.copy(m.color).multiplyScalar(0.7);
+        m.needsUpdate = true;
+      } else if (part === 'brow') {
+        // Brows follow the hair, a shade darker.
+        const col = grade(colors.hair).multiplyScalar(0.8);
+        m.color.copy(col);
+        m.shadeColorFactor?.copy(col).multiplyScalar(0.6);
       } else {
         const col = grade(colors[part]);
         m.color.copy(col);
@@ -388,6 +462,17 @@ const POSES: Record<string, Record<string, Rot>> = {
   wave: { rightUpperArm: [0, -0.3, 0.35], rightLowerArm: [0, 0, -2.0], rightHand: [0, 0, -0.15] },
   // Wrists bend back so the fists tuck in against the upper arms.
   'arms-crossed': {},
+  'hands-hips': {
+    rightUpperArm: [0, 0.2, 0.85], rightLowerArm: [0, 0.4, 1.75], rightHand: [0, 0, 0.3],
+    leftUpperArm: [0, -0.2, -0.85], leftLowerArm: [0, -0.4, -1.75], leftHand: [0, 0, -0.3],
+  },
+  'arms-raised': {
+    leftUpperArm: [0, 0, 0.7], rightUpperArm: [0, 0, -0.7],
+    leftLowerArm: [0, -0.2, 0.55], rightLowerArm: [0, 0.2, -0.55],
+    head: [-0.12, -0.05, 0.02],
+  },
+  'look-side': { neck: [0.05, -0.25, 0.02], head: [0.02, -0.45, 0.03] },
+  'look-up': { neck: [-0.12, -0.05, 0.02], head: [-0.25, -0.1, 0.05] },
 };
 
 /**
@@ -423,48 +508,16 @@ function aim(vrm: VRM, boneName: string, childName: string, target: THREE.Vector
   bone.quaternion.setFromUnitVectors(rest, want);
 }
 
-const BUILD_SCALE: Record<string, [number, number]> = {
-  // [shoulders/chest width, hips width]
-  slim: [0.94, 0.95],
-  athletic: [1.07, 1.0],
-  average: [1, 1],
-  curvy: [0.97, 1.08],
-  broad: [1.12, 1.06],
-};
+// Seinen proportions: a slightly smaller head than the moe default.
 const HEAD_SCALE = 0.9;
-const HEIGHT_SCALE: Record<string, number> = { short: 0.95, medium: 1, tall: 1.05 };
-
-/**
- * Body proportions. three-vrm copies only rotations from the normalized rig
- * to the model, so scale goes on the raw bones. A parent's scale passes to
- * its children, so each child undoes it: only that body part changes.
- */
-function applyProportions(vrm: VRM, build: string) {
-  const h = vrm.humanoid;
-  const [cw, hw] = BUILD_SCALE[build] ?? BUILD_SCALE.average;
-  const cd = Math.sqrt(cw);
-  const scales: Record<string, [number, number, number]> = {
-    hips: [hw, 1, hw],
-    spine: [1 / hw, 1, 1 / hw],
-    leftUpperLeg: [1 / hw, 1, 1 / hw],
-    rightUpperLeg: [1 / hw, 1, 1 / hw],
-    chest: [cw, 1, cd],
-    neck: [1 / cw, 1, 1 / cd],
-    leftShoulder: [1 / cw, 1, 1 / cd],
-    rightShoulder: [1 / cw, 1, 1 / cd],
-    // Seinen proportions: a slightly smaller head than the moe default.
-    head: [HEAD_SCALE, HEAD_SCALE, HEAD_SCALE],
-  };
-  for (const [bone, [x, y, z]] of Object.entries(scales)) {
-    h.getRawBoneNode(bone as never)?.scale.set(x, y, z);
-  }
-}
 
 const FINGERS = ['Index', 'Middle', 'Ring', 'Little'];
 const SEGMENTS = ['Proximal', 'Intermediate', 'Distal'];
 /** How far each hand closes: 0 open, 1 a loose fist. */
 const GRIP: Record<string, [number, number]> = {
   standing: [0.55, 0.55],
+  'hands-hips': [0.8, 0.8],
+  'arms-raised': [0.9, 0.9],
   hip: [0.55, 0.8],
   wave: [0.55, 0.1],
   'arms-crossed': [0.5, 0.5],
@@ -491,12 +544,16 @@ function curlFingers(vrm: VRM, pose: string) {
   }
 }
 
-function applyPose(vrm: VRM, pose: string, build: string, height: string) {
+function applyPose(vrm: VRM, pose: string, height: string, sliders: Sliders) {
   const h = vrm.humanoid;
   const all = { ...BASE, ...(POSES[pose] ?? {}) };
+  // Posture: slouched bends the back forward and pushes the head out;
+  // upright opens the chest.
+  const post = sv(sliders, 'posture');
+  const lean: Record<string, number> = { spine: -0.08 * post, chest: -0.07 * post, neck: 0.1 * post, head: 0.04 * post };
   for (const [bone, r] of Object.entries(all)) {
     const node = h.getNormalizedBoneNode(bone as never);
-    if (node) node.rotation.set(r[0], r[1], r[2]);
+    if (node) node.rotation.set(r[0] + (lean[bone] ?? 0), r[1], r[2]);
   }
   const aims = AIMS[pose];
   if (aims) {
@@ -515,9 +572,15 @@ function applyPose(vrm: VRM, pose: string, build: string, height: string) {
     }
   }
   curlFingers(vrm, pose);
-  applyProportions(vrm, build);
+  applyBody(vrm, sliders, HEAD_SCALE);
   fitTop(vrm, pose === 'arms-crossed');
-  vrm.scene.scale.setScalar(HEIGHT_SCALE[height] ?? 1);
+  fitCloth(vrm, sliders);
+  const scale = heightScale(sliders, height);
+  vrm.scene.scale.setScalar(scale);
+  // Keep the feet on the floor when legs and torso change length.
+  const rest = rigs.get(vrm)?.restFoot ?? 0;
+  vrm.scene.position.y = 0;
+  vrm.scene.position.y = rest * scale - footY(vrm);
 }
 
 const MOODS: Record<string, Record<string, number>> = {
@@ -527,11 +590,69 @@ const MOODS: Record<string, Record<string, number>> = {
   glowing: { happy: 0.6 },
 };
 
-function applyMood(vrm: VRM, mood: string) {
+/**
+ * The face: the chosen expression, or the day's mood when it follows the
+ * day ('auto'). A tired day always shows, whatever the expression.
+ */
+function applyMood(vrm: VRM, mood: string, expression: string | undefined) {
   const em = vrm.expressionManager;
+  extraMorphs = {};
   if (!em) return;
-  for (const name of ['happy', 'relaxed', 'sad', 'angry', 'surprised', 'blink']) em.setValue(name, 0);
-  for (const [name, v] of Object.entries(MOODS[mood] ?? {})) em.setValue(name, v);
+  for (const name of ['happy', 'relaxed', 'sad', 'angry', 'surprised', 'blink', 'aa']) em.setValue(name, 0);
+  const def = expression && expression !== 'auto' && mood !== 'tired' ? EXPRESSIONS.find((e) => e.id === expression) : undefined;
+  if (!def) {
+    for (const [name, v] of Object.entries(MOODS[mood] ?? {})) em.setValue(name, v);
+    return;
+  }
+  for (const [name, v] of Object.entries(def.vrm ?? {})) em.setValue(name, v);
+  extraMorphs = { ...(def.morphs ?? {}) };
+}
+
+/** VRoid shapes set on top of the expression manager, by short name. */
+let extraMorphs: Record<string, number> = {};
+
+/**
+ * Apply extraMorphs plus the eyelid and mouth-corner sliders. The
+ * expression manager resets the shapes it owns every update, so this
+ * runs after vrm.update() and right before drawing.
+ */
+const touched: [number[], number][] = [];
+
+/** Clear what applyMorphs set last time. Call before vrm.update(). */
+function resetMorphs() {
+  for (const [inf, i] of touched) inf[i] = 0;
+  touched.length = 0;
+}
+
+function applyMorphs(vrm: VRM, sliders: Sliders, eyesClosed: boolean) {
+  const w: Record<string, number> = { ...extraMorphs };
+  const add = (k: string, v: number) => {
+    if (v > 0) w[k] = Math.min(1, (w[k] ?? 0) + v);
+  };
+  const lid = sv(sliders, 'eyelid');
+  if (!eyesClosed) {
+    add('EYE_Close', 0.38 * Math.max(0, lid));
+    add('EYE_Surprised', 0.3 * Math.max(0, -lid));
+  }
+  const corners = sv(sliders, 'mouthCorners');
+  add('MTH_Up', 0.45 * Math.max(0, corners));
+  add('MTH_Down', 0.5 * Math.max(0, -corners));
+  const names = Object.keys(w);
+  if (!names.length) return;
+  vrm.scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const dict = mesh.morphTargetDictionary;
+    const inf = mesh.morphTargetInfluences;
+    if (!dict || !inf) return;
+    for (const short of names) {
+      for (const [full, i] of Object.entries(dict)) {
+        if (full.endsWith(`Fcl_${short}`)) {
+          inf[i] = Math.min(1, inf[i] + w[short]);
+          touched.push([inf, i]);
+        }
+      }
+    }
+  });
 }
 
 /**
@@ -555,15 +676,17 @@ function shutEyes(vrm: VRM): () => void {
 
 const HEAD_FRAME = { y: 0.08, dist: 1.65 };
 
-function frame(vrm: VRM, mode: 'head' | 'full-body') {
+function frame(vrm: VRM, mode: 'head' | 'full-body', yaw = 0.3, zoom = 1) {
   vrm.update(0);
   const head = vrm.humanoid.getNormalizedBoneNode('head' as never)!.getWorldPosition(new THREE.Vector3());
-  const yaw = 0.3;
   if (mode === 'head') {
     camera.fov = 18;
-    // Whole head and the top of the shoulders, like the 2D portrait.
-    const cy = head.y + HEAD_FRAME.y;
-    camera.position.set(Math.sin(yaw) * HEAD_FRAME.dist, cy + 0.02, Math.cos(yaw) * HEAD_FRAME.dist);
+    // Whole head and the top of the shoulders, like the 2D portrait;
+    // zooming in moves toward the eyes.
+    const z = Math.max(1, Math.min(2.4, zoom));
+    const cy = head.y + HEAD_FRAME.y - (z - 1) * 0.035 * vrm.scene.scale.y;
+    const dist = HEAD_FRAME.dist / z;
+    camera.position.set(Math.sin(yaw) * dist, cy + 0.02, Math.cos(yaw) * dist);
     camera.lookAt(0, cy, 0);
   } else {
     camera.fov = 24;
@@ -592,7 +715,9 @@ function loop() {
     const p = t % 4.3;
     em.setValue('blink', p < 0.12 ? Math.sin((p / 0.12) * Math.PI) : 0);
   }
+  resetMorphs();
   vrm.update(clock.getDelta());
+  applyMorphs(vrm, lastCmd.sliders ?? {}, false);
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
@@ -605,13 +730,20 @@ async function render(cmd: RenderCommand) {
     if (current && current !== vrm) scene.remove(current.scene);
     if (current !== vrm) scene.add(vrm.scene);
     current = vrm;
+    const sliders = cmd.sliders ?? {};
+    const rig = rigs.get(vrm);
+    resetMorphs();
+    if (rig?.face) sculptFace(rig.face, sliders, cmd.eyes === 'closed');
+    if (rig) sculptHair(rig.hair, sliders);
     applyColors(vrm, cmd.colors);
-    applyPose(vrm, cmd.pose, cmd.build, cmd.height);
-    applyMood(vrm, cmd.mood);
+    if (rig) paintAvatar(rig.paint, cmd.paint ?? {}, sliders, cmd.colors, grade, skinFactor(cmd.colors.skin));
+    applyPose(vrm, cmd.pose, cmd.height, sliders);
+    applyMood(vrm, cmd.mood, cmd.expression);
     const reopen = cmd.eyes === 'closed' ? shutEyes(vrm) : null;
     scene.background = cmd.bare ? null : backdrop(cmd.colors.bgFrom, cmd.colors.bgTo);
     resize();
-    frame(vrm, cmd.mode);
+    frame(vrm, cmd.mode, cmd.yaw, cmd.zoom);
+    applyMorphs(vrm, sliders, cmd.eyes === 'closed');
     renderer.render(scene, camera);
     post({ type: 'rendered' });
     if (cmd.snapshot) post({ type: 'snapshot', data: canvas.toDataURL('image/png') });

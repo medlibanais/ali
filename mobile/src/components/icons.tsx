@@ -550,3 +550,33 @@ export function ClockGlyph({ size = 20, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM12 7.5V12l3 2" />;
 }
+
+export function RotateGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4.5h-4.5" />;
+}
+
+export function ZoomGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM15.5 15.5 20 20M8 10.5h5M10.5 8v5" />;
+}
+
+export function CompareGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3v18M9 6H5.5A1.5 1.5 0 0 0 4 7.5v9A1.5 1.5 0 0 0 5.5 18H9M15 6h3.5A1.5 1.5 0 0 1 20 7.5v9a1.5 1.5 0 0 1-1.5 1.5H15" />;
+}
+
+export function ResetGlyph({ size = 18, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />;
+}
+
+export function SkinGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3.5c3 3.6 5.5 6.6 5.5 9.8a5.5 5.5 0 0 1-11 0c0-3.2 2.5-6.2 5.5-9.8ZM9.5 13.5a2.5 2.5 0 0 0 2.5 2.5" />;
+}
+
+export function SmileGlyph({ size = 22, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8.5 10h.01M15.5 10h.01M8 14.5c2 2.3 6 2.3 8 0" />;
+}
