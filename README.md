@@ -158,6 +158,17 @@ something is missing:
 | "The AI image service refused our key" | the fal key is wrong or out of credit |
 | "The AI could not be reached, so that reply came from your saved plan" | Groq was down or slow; the key is set |
 
+### What the coach remembers
+
+Each coach request carries today's quests, yesterday's quests per pillar
+(done / skipped / not done), the last 5 completed quests, the 2 weakest
+pillars of the last 7 days and the last 10 messages of the open chat. Before
+it is sent, the request is shrunk to a token budget (default 3,500 estimated
+input tokens) so it stays under Groq's per-minute limits: the oldest chat
+turns go first, then a shorter context is used. Set
+`COACH_PROMPT_TOKEN_BUDGET` with `secrets set` to raise it on a paid Groq
+tier. When a prompt is trimmed, the function logs `coach prompt trimmed`.
+
 Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 `FAL_BASE_URL` can point the functions at a mock server for offline tests.
 

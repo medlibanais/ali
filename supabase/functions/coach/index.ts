@@ -1,8 +1,10 @@
 // coach: the user's Future Self.
 // Intent-routed: crisis / acute-medical / professional-advice paths are
 // deterministic; everything else goes to Groq with the user's goals, today's
-// quests, a 7-day trend and the conversation injected (prompt lives in
-// _shared/coachText.ts). 20 messages/day, enforced here — never trust the
+// quests, yesterday per pillar, the last 5 completed quests, the 2 weakest
+// pillars of the last 7 days and the last 10 messages of this conversation
+// injected (prompt lives in _shared/coachText.ts). The request is shrunk to a
+// token budget before it is sent (_shared/tokenBudget.ts). 20 messages/day, enforced here — never trust the
 // client counter, and count it across all of the user's conversations so
 // starting a new chat does not reset it.
 
@@ -14,16 +16,21 @@ import {
 } from '../_shared/intents.ts';
 import { callGroq, type ChatTurn, hasGroqKey } from '../_shared/llm.ts';
 import {
+  buildCompactSystemPrompt,
   buildSystemPrompt,
   type CoachContext,
   type DayScore,
   fallbackReply,
   type Pillar,
+  pillarAverages,
+  type PillarDay,
   PILLARS,
   postFilter,
+  type RecentCompletion,
   suggestions,
   type TodayQuest,
 } from '../_shared/coachText.ts';
+import { fitToBudget, promptBudget } from '../_shared/tokenBudget.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +40,10 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 20;
 const INPUT_MAX = 500;
-const HISTORY_TURNS = 20; // SRS FR-5.1: last 20 messages as context
+const HISTORY_TURNS = 10; // last 10 messages of this conversation
+const HISTORY_CHARS = 600; // per message, before the token budget applies
+const RECENT_COMPLETIONS = 5;
+const DAY_MS = 86400000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req: Request) => {
@@ -164,9 +174,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- context for the LLM (and for the UI badge) ----
-    const weekAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 7 * 86400000)
-      .toISOString()
-      .slice(0, 10);
+    const todayMs = Date.parse(`${today}T00:00:00Z`);
+    const weekAgo = new Date(todayMs - 7 * DAY_MS).toISOString().slice(0, 10);
+    const yesterday = new Date(todayMs - DAY_MS).toISOString().slice(0, 10);
     const [
       goalsRes,
       gamRes,
@@ -175,6 +185,7 @@ Deno.serve(async (req: Request) => {
       historyRes,
       weekRes,
       todayQuestsRes,
+      completionsRes,
     ] = await Promise.all([
       admin.from('user_goals').select('*').eq('user_id', user.id).maybeSingle(),
       admin.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
@@ -199,7 +210,7 @@ Deno.serve(async (req: Request) => {
         .limit(HISTORY_TURNS),
       admin
         .from('quests')
-        .select('skipped, quest_completions(id, undone_at)')
+        .select('pillar, assigned_date, skipped, quest_completions(id, undone_at)')
         .eq('user_id', user.id)
         .gte('assigned_date', weekAgo)
         .lt('assigned_date', today),
@@ -209,6 +220,15 @@ Deno.serve(async (req: Request) => {
         .eq('user_id', user.id)
         .eq('assigned_date', today)
         .order('priority', { ascending: true }),
+      // Memory: the last quests actually finished (not undone), any day.
+      admin
+        .from('quest_completions')
+        .select('completed_at, xp_awarded, quests!inner(title, pillar, assigned_date, user_id)')
+        .eq('user_id', user.id)
+        .eq('quests.user_id', user.id)
+        .is('undone_at', null)
+        .order('completed_at', { ascending: false })
+        .limit(RECENT_COMPLETIONS),
     ]);
 
     type CompletionRow = { id: string; undone_at: string | null };
@@ -233,13 +253,47 @@ Deno.serve(async (req: Request) => {
     const level: number = gam.level ?? 1;
     const totalXp: number = gam.total_xp ?? 0;
     const streak: number = gam.current_streak ?? 0;
+    const pastQuests = (weekRes.data ?? []) as {
+      pillar: Pillar;
+      assigned_date: string;
+      skipped: boolean;
+      quest_completions: CompletionRow[];
+    }[];
     // Missed this week: past days' quests neither completed nor skipped.
-    const missedThisWeek = (
-      (weekRes.data ?? []) as {
-        skipped: boolean;
-        quest_completions: CompletionRow[];
+    const missedThisWeek = pastQuests.filter(
+      (q) => !q.skipped && !isDone(q.quest_completions),
+    ).length;
+
+    // Yesterday per pillar, so the coach can say "we skipped Health
+    // yesterday, but Family went great".
+    const yesterdayByPillar: Partial<Record<Pillar, PillarDay>> = {};
+    for (const q of pastQuests) {
+      if (q.assigned_date !== yesterday) continue;
+      const d = (yesterdayByPillar[q.pillar] ??= { done: 0, skipped: 0, missed: 0 });
+      if (isDone(q.quest_completions)) d.done += 1;
+      else if (q.skipped) d.skipped += 1;
+      else d.missed += 1;
+    }
+
+    type CompletedQuest = {
+      title: string;
+      pillar: Pillar;
+      assigned_date: string;
+    };
+    const recentCompletions: RecentCompletion[] = (
+      (completionsRes.data ?? []) as {
+        xp_awarded: number;
+        quests: CompletedQuest | CompletedQuest[] | null;
       }[]
-    ).filter((q) => !q.skipped && !isDone(q.quest_completions)).length;
+    ).flatMap((c) => {
+      const q = Array.isArray(c.quests) ? c.quests[0] : c.quests;
+      if (!q) return [];
+      const daysAgo = Math.max(
+        0,
+        Math.round((todayMs - Date.parse(`${q.assigned_date}T00:00:00Z`)) / DAY_MS),
+      );
+      return [{ title: q.title, pillar: q.pillar, xp: c.xp_awarded, daysAgo }];
+    });
 
     const quests: TodayQuest[] = (
       (todayQuestsRes.data ?? []) as {
@@ -287,12 +341,15 @@ Deno.serve(async (req: Request) => {
         const cat = Array.isArray(b.badge_catalog) ? b.badge_catalog[0] : b.badge_catalog;
         return cat?.name ?? b.badge_id;
       }),
+      recentCompletions,
+      yesterday: yesterdayByPillar,
     };
 
     const contextUsed = {
       user_level: level,
       daily_score: todayScore.overall,
       streak,
+      weakest_pillars: pillarAverages(ctx).weakestTwo,
     };
 
     // ---- intent routing: safety first, LLM second ----
@@ -307,20 +364,36 @@ Deno.serve(async (req: Request) => {
         .reverse()
         .map((m: { role: 'user' | 'assistant'; content: string }) => ({
           role: m.role,
-          content: m.content.slice(0, 600),
+          content: m.content.slice(0, HISTORY_CHARS),
         }));
-      const turns: ChatTurn[] = [
-        { role: 'system', content: buildSystemPrompt(ctx) },
-        ...history,
-      ];
+      const tail: ChatTurn[] = [];
       if (intent === 'wellbeing') {
-        turns.push({
+        tail.push({
           role: 'system',
           content:
             'They seem tired, stressed, unwell or low. Lead with care, offer a lighter day, no diagnosis or medication.',
         });
       }
-      turns.push({ role: 'user', content: message });
+      tail.push({ role: 'user', content: message });
+
+      // Token-limit protection: drop the oldest turns, then compact the
+      // context, so the request never exceeds Groq's per-request limits.
+      const fit = fitToBudget({
+        system: buildSystemPrompt(ctx),
+        compactSystem: buildCompactSystemPrompt(ctx),
+        history,
+        tail,
+        budget: promptBudget(Deno.env.get('COACH_PROMPT_TOKEN_BUDGET')),
+      });
+      if (fit.droppedTurns || fit.compacted || fit.truncated) {
+        console.warn('coach prompt trimmed', {
+          estimated_tokens: fit.estimatedTokens,
+          dropped_turns: fit.droppedTurns,
+          compacted: fit.compacted,
+          truncated: fit.truncated,
+        });
+      }
+      const turns = fit.turns;
 
       const llm = await callGroq(turns, {
         maxTokens: 220,
