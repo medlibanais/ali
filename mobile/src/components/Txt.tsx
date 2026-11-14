@@ -22,9 +22,9 @@ export interface TxtProps extends TextProps {
 const variantStyles = themed((): Record<TxtVariant, TextStyle> => ({
   display: {
     fontFamily: fonts.display,
-    fontSize: 34,
-    lineHeight: 40,
-    letterSpacing: 0.3,
+    fontSize: 36,
+    lineHeight: 42,
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
     color: colors.ink,
   },
@@ -36,11 +36,13 @@ const variantStyles = themed((): Record<TxtVariant, TextStyle> => ({
     textTransform: 'uppercase',
     color: colors.ink,
   },
+  // Section headings use Inter Bold: Anton is reserved for the one
+  // uppercase screen title, so each screen has a single loud voice.
   heading: {
-    fontFamily: fonts.title,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: 0.2,
+    fontFamily: fonts.bold,
+    fontSize: 19,
+    lineHeight: 25,
+    letterSpacing: -0.2,
     color: colors.ink,
   },
   body: {
@@ -57,16 +59,16 @@ const variantStyles = themed((): Record<TxtVariant, TextStyle> => ({
   },
   label: {
     fontFamily: fonts.mono,
-    fontSize: 11.5,
-    lineHeight: 16,
-    letterSpacing: 1.1,
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: colors.inkSoft,
   },
   caption: {
     fontFamily: fonts.caption,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.inkSoft,
   },
 }));

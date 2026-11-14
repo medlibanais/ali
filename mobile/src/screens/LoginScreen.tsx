@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import { ArrowRightGlyph } from '../components/icons';
 import Field from '../components/Field';
 import Screen from '../components/Screen';
 import Txt from '../components/Txt';
 import type { AuthStackParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearAuthError, login } from '../store/slices/authSlice';
-import { colors, spacing } from '../theme/tokens';
+import { colors, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -51,61 +54,76 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <Screen scroll keyboardAvoiding>
-      <View style={styles.header}>
-        <Txt variant="display">Welcome back</Txt>
-        <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-          Sign in to continue your practice.
+      <AuthHeader title="Welcome back" subtitle="Sign in to pick up today's quests." />
+
+      <Card style={styles.form}>
+        <Field
+          label="Email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (emailError) setEmailError(null);
+          }}
+          error={emailError}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          placeholder="you@example.com"
+        />
+        <Field
+          label="Password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (passwordError) setPasswordError(null);
+          }}
+          error={passwordError}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="Your password"
+          containerStyle={styles.passwordField}
+        />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Forgot password?"
+          onPress={() => navigation.navigate('ForgotPassword')}
+          style={styles.forgot}
+          hitSlop={8}
+        >
+          <Txt variant="bodySemi" color={colors.accent} style={styles.smallLink}>
+            Forgot password?
+          </Txt>
+        </Pressable>
+
+        {error ? (
+          <Txt variant="caption" color={colors.danger} style={styles.formError}>
+            {error}
+          </Txt>
+        ) : null}
+
+        <Button
+          title="Sign in"
+          winTitle="Let's grow"
+          icon={ArrowRightGlyph}
+          onPress={submit}
+          loading={busy}
+          disabled={busy}
+        />
+      </Card>
+
+      <View style={styles.divider}>
+        <View style={styles.rule} />
+        <Txt variant="label" style={styles.dividerText}>
+          New to GROW?
         </Txt>
+        <View style={styles.rule} />
       </View>
-
-      <Field
-        label="Email"
-        value={email}
-        onChangeText={(text) => {
-          setEmail(text);
-          if (emailError) setEmailError(null);
-        }}
-        error={emailError}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-        placeholder="you@example.com"
-      />
-      <Field
-        label="Password"
-        value={password}
-        onChangeText={(text) => {
-          setPassword(text);
-          if (passwordError) setPasswordError(null);
-        }}
-        error={passwordError}
-        secureTextEntry
-        autoCapitalize="none"
-        placeholder="Your password"
-      />
-
-      {error ? (
-        <Txt variant="caption" color={colors.danger} style={styles.formError}>
-          {error}
-        </Txt>
-      ) : null}
-
-      <Button
-        title="Forgot password?"
-        variant="ghost"
-        onPress={() => navigation.navigate('ForgotPassword')}
-        style={styles.forgotButton}
-      />
-
-      <Button title="Sign in" onPress={submit} loading={busy} disabled={busy} />
 
       <Button
         title="Create account"
-        variant="ghost"
+        variant="secondary"
         onPress={() => navigation.navigate('Register')}
-        style={styles.registerButton}
       />
-
       <Button
         title="Have an invite code? Join a friend"
         variant="ghost"
@@ -116,26 +134,43 @@ export function LoginScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    marginTop: spacing.xxl,
-    marginBottom: spacing.xl,
-  },
-  subtitle: {
-    marginTop: spacing.sm,
-  },
-  formError: {
-    marginBottom: spacing.md,
-  },
-  forgotButton: {
-    marginBottom: spacing.sm,
-  },
-  registerButton: {
-    marginTop: spacing.sm,
-  },
-  inviteButton: {
-    marginTop: spacing.lg,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    form: {
+      marginBottom: spacing.xl,
+    },
+    passwordField: {
+      marginBottom: spacing.sm,
+    },
+    forgot: {
+      alignSelf: 'flex-end',
+      minHeight: 44,
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    smallLink: {
+      fontSize: 14,
+    },
+    formError: {
+      marginBottom: spacing.md,
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    rule: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.line,
+    },
+    dividerText: {
+      marginHorizontal: spacing.md,
+    },
+    inviteButton: {
+      marginTop: spacing.sm,
+    },
+  }),
+);
 
 export default LoginScreen;

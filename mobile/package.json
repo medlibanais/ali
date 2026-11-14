@@ -40,6 +40,7 @@
     "axios": "^1.7.7",
     "expo": "~51.0.39",
     "expo-asset": "~10.0.10",
+    "expo-blur": "~13.0.2",
     "expo-clipboard": "~6.0.3",
     "expo-constants": "~16.0.2",
     "expo-dev-client": "~4.0.29",

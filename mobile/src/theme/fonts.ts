@@ -10,6 +10,7 @@ export const appFonts: Record<string, number> = {
   Inter_400Regular: require('@expo-google-fonts/inter/Inter_400Regular.ttf') as number,
   Inter_500Medium: require('@expo-google-fonts/inter/Inter_500Medium.ttf') as number,
   Inter_600SemiBold: require('@expo-google-fonts/inter/Inter_600SemiBold.ttf') as number,
+  Inter_700Bold: require('@expo-google-fonts/inter/Inter_700Bold.ttf') as number,
   Inter_800ExtraBold: require('@expo-google-fonts/inter/Inter_800ExtraBold.ttf') as number,
   JetBrainsMono_600SemiBold: require('@expo-google-fonts/jetbrains-mono/JetBrainsMono_600SemiBold.ttf') as number,
 };

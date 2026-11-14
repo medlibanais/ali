@@ -7,7 +7,7 @@ import Hairline from '../components/Hairline';
 import Screen from '../components/Screen';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
-import { PillarGlyph } from '../components/icons';
+import { CheckGlyph, PillarGlyph } from '../components/icons';
 import type { AppStackParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -178,6 +178,8 @@ export function QuestDetailScreen({ navigation, route }: Props) {
           <>
             <Button
               title="Mark complete"
+              winTitle={`Claim +${quest.xp_reward} XP`}
+              icon={CheckGlyph}
               onPress={markComplete}
               loading={busy}
             />

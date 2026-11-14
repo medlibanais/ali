@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 import Button from '../../components/Button';
+import { ShareGlyph } from '../../components/icons';
 import { useToast } from '../../components/Toast';
 import Txt from '../../components/Txt';
 import { titleForLevel } from '../../lib/levels';
@@ -101,7 +102,13 @@ export function ShareStorySheet({
           </View>
         </View>
         <View style={styles.actions}>
-          <Button title="Share" onPress={share} loading={busy} />
+          <Button
+            title="Share"
+            winTitle="Post it"
+            icon={ShareGlyph}
+            onPress={share}
+            loading={busy}
+          />
           <Txt variant="caption" color={colors.inkFaint} align="center" style={styles.hint}>
             Pick Instagram, WhatsApp or Snapchat, then post it to your story.
           </Txt>

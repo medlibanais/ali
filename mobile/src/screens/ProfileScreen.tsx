@@ -21,9 +21,17 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
+import Card from '../components/Card';
 import {
+  BackdropGlyph,
   BellGlyph,
+  CameraGlyph,
   ChevronGlyph,
+  FaceGlyph,
+  IconProps,
+  ClockGlyph,
+  LockGlyph,
+  StarGlyph,
   FlameGlyph,
   HelpGlyph,
   PencilGlyph,
@@ -68,7 +76,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type SectionKey = 'personal' | 'goals' | 'privacy' | 'help';
+type SectionKey = 'avatar' | 'theme' | 'goals' | 'privacy' | 'help';
 
 /** A row inside an opened "Make GROW yours" group. */
 function SubRow({
@@ -76,22 +84,32 @@ function SubRow({
   value,
   onPress,
   danger = false,
+  icon: Icon,
 }: {
   label: string;
   value?: string;
   onPress?: () => void;
   danger?: boolean;
+  icon?: (props: IconProps) => React.ReactElement;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={value ? `${label}, ${value}` : label}
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [styles.subRow, pressed && onPress && styles.pressed]}
     >
-      <Txt variant="body" color={danger ? colors.danger : colors.ink}>
-        {label}
-      </Txt>
+      <View style={styles.subLeft}>
+        {Icon ? <Icon size={18} color={danger ? colors.danger : colors.inkSoft} /> : null}
+        <Txt
+          variant="body"
+          color={danger ? colors.danger : colors.ink}
+          style={Icon ? styles.subLabel : undefined}
+        >
+          {label}
+        </Txt>
+      </View>
       <View style={styles.subRight}>
         {value ? (
           <Txt variant="caption" color={colors.inkSoft} style={styles.subValue} numberOfLines={1}>
@@ -122,6 +140,7 @@ function SettingsRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={open === undefined ? undefined : { expanded: open }}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -365,26 +384,27 @@ export function ProfileScreen({ navigation }: Props) {
               <View style={styles.identityActions}>
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel="Edit profile"
                   onPress={() => navigation.navigate('AvatarCreator')}
                   hitSlop={8}
-                  style={({ pressed }) => [styles.inline, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.actionPill, pressed && styles.pressed]}
                 >
-                  <Txt variant="label" color={colors.accent} style={styles.editText}>
-                    Edit profile
+                  <PencilGlyph size={14} />
+                  <Txt variant="bodySemi" color={colors.accent} style={styles.actionText}>
+                    Edit
                   </Txt>
-                  <PencilGlyph size={15} />
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Share profile"
                   onPress={() => setSharing(true)}
                   hitSlop={8}
-                  style={({ pressed }) => [styles.inline, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.actionPill, pressed && styles.pressed]}
                 >
-                  <Txt variant="label" color={colors.accent} style={styles.editText}>
+                  <ShareGlyph size={15} />
+                  <Txt variant="bodySemi" color={colors.accent} style={styles.actionText}>
                     Share
                   </Txt>
-                  <ShareGlyph size={16} />
                 </Pressable>
               </View>
             </View>
@@ -450,23 +470,38 @@ export function ProfileScreen({ navigation }: Props) {
             </View>
           </FadeInUp>
 
+          {/* Settings, grouped by what they are about. Only the group
+              headers and rows show; details fold away until opened. */}
           <FadeInUp delay={240}>
             <Txt variant="heading" style={styles.sectionTitle}>
               Make GROW yours
             </Txt>
-            <View style={styles.settings}>
+
+            <Txt variant="label" style={styles.groupLabel}>
+              You
+            </Txt>
+            <Card padded={false} style={styles.settings}>
               <SettingsRow
-                icon={<UserGlyph />}
-                label="Personal details"
-                detail="Make yourself at home"
-                open={openSection === 'personal'}
-                onPress={() => toggle('personal')}
+                icon={<FaceGlyph size={20} color={colors.ink} />}
+                label="Avatar & photo"
+                detail="How you show up in GROW"
+                open={openSection === 'avatar'}
+                onPress={() => toggle('avatar')}
               />
-              {openSection === 'personal' ? (
+              {openSection === 'avatar' ? (
                 <View style={styles.subList}>
-                  <SubRow label="Edit avatar" onPress={() => navigation.navigate('AvatarCreator')} />
-                  <SubRow label="AI avatar from a photo" onPress={() => navigation.navigate('AiAvatar')} />
                   <SubRow
+                    icon={PencilGlyph}
+                    label="Edit avatar"
+                    onPress={() => navigation.navigate('AvatarCreator')}
+                  />
+                  <SubRow
+                    icon={SparklesGlyph}
+                    label="AI avatar from a photo"
+                    onPress={() => navigation.navigate('AiAvatar')}
+                  />
+                  <SubRow
+                    icon={CameraGlyph}
                     label="Profile picture"
                     value={
                       profile?.avatar_mode === 'ai'
@@ -477,52 +512,61 @@ export function ProfileScreen({ navigation }: Props) {
                     }
                     onPress={() => navigation.navigate('EditPhoto')}
                   />
-                  <SubRow
-                    label="Timezone"
-                    value={profile?.timezone ?? 'UTC'}
-                    onPress={() => navigation.navigate('TimezonePicker')}
-                  />
-                  <View style={styles.themeBlock}>
-                    <Txt variant="body">App theme</Txt>
-                    <View style={styles.themeGrid}>
-                      {THEME_LIST.map((option) => {
-                        const selected = option.id === theme.id;
-                        return (
-                          <Pressable
-                            key={option.id}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected }}
-                            accessibilityLabel={`${option.name} theme`}
-                            onPress={() => dispatch(setTheme(option.id))}
-                            style={({ pressed }) => [styles.themeOption, pressed && styles.pressed]}
-                          >
-                            <View
-                              style={[
-                                styles.swatch,
-                                {
-                                  backgroundColor: option.colors.paper,
-                                  borderColor: selected ? option.colors.accent : option.colors.line,
-                                },
-                                selected && styles.swatchSelected,
-                              ]}
-                            >
-                              <View style={[styles.swatchAccent, { backgroundColor: option.colors.accent }]} />
-                            </View>
-                            <Txt
-                              variant="caption"
-                              color={selected ? colors.accent : colors.inkSoft}
-                              style={styles.themeName}
-                            >
-                              {option.name}
-                            </Txt>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
                 </View>
               ) : null}
               <Hairline style={styles.divider} />
+              <SettingsRow
+                icon={<BackdropGlyph size={20} color={colors.ink} />}
+                label="Appearance"
+                detail={`${theme.name} theme`}
+                open={openSection === 'theme'}
+                onPress={() => toggle('theme')}
+              />
+              {openSection === 'theme' ? (
+                <View style={[styles.subList, styles.themeBlock]}>
+                  <View style={styles.themeGrid}>
+                    {THEME_LIST.map((option) => {
+                      const selected = option.id === theme.id;
+                      return (
+                        <Pressable
+                          key={option.id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          accessibilityLabel={`${option.name} theme`}
+                          onPress={() => dispatch(setTheme(option.id))}
+                          style={({ pressed }) => [styles.themeOption, pressed && styles.pressed]}
+                        >
+                          <View
+                            style={[
+                              styles.swatch,
+                              {
+                                backgroundColor: option.colors.paper,
+                                borderColor: selected ? option.colors.accent : option.colors.line,
+                              },
+                              selected && styles.swatchSelected,
+                            ]}
+                          >
+                            <View style={[styles.swatchAccent, { backgroundColor: option.colors.accent }]} />
+                          </View>
+                          <Txt
+                            variant="caption"
+                            color={selected ? colors.accent : colors.inkSoft}
+                            style={styles.themeName}
+                          >
+                            {option.name}
+                          </Txt>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+            </Card>
+
+            <Txt variant="label" style={styles.groupLabel}>
+              Growth
+            </Txt>
+            <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<SettingsGlyph />}
                 label="Goals & pillars"
@@ -549,10 +593,28 @@ export function ProfileScreen({ navigation }: Props) {
                         : `${goals?.prayer_frequency ?? '-'}`
                     }
                   />
-                  <SubRow label="Achievements" onPress={() => navigation.navigate('Achievements')} />
                 </View>
               ) : null}
               <Hairline style={styles.divider} />
+              <SettingsRow
+                icon={<StarGlyph size={20} color={colors.ink} />}
+                label="Achievements"
+                detail="Badges you have earned"
+                onPress={() => navigation.navigate('Achievements')}
+              />
+              <Hairline style={styles.divider} />
+              <SettingsRow
+                icon={<UserGlyph />}
+                label="Friends"
+                detail="Invite, compare, cheer on"
+                onPress={() => navigation.navigate('Friends')}
+              />
+            </Card>
+
+            <Txt variant="label" style={styles.groupLabel}>
+              Preferences
+            </Txt>
+            <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<BellGlyph size={20} color={colors.ink} />}
                 label="Reminders"
@@ -561,24 +623,17 @@ export function ProfileScreen({ navigation }: Props) {
               />
               <Hairline style={styles.divider} />
               <SettingsRow
-                icon={<ShieldCheckGlyph />}
-                label="Privacy & account"
-                detail="Your data, your choices"
-                open={openSection === 'privacy'}
-                onPress={() => toggle('privacy')}
+                icon={<ClockGlyph size={20} color={colors.ink} />}
+                label="Timezone"
+                detail={profile?.timezone ?? 'UTC'}
+                onPress={() => navigation.navigate('TimezonePicker')}
               />
-              {openSection === 'privacy' ? (
-                <View style={styles.subList}>
-                  <SubRow label="Friends" onPress={() => navigation.navigate('Friends')} />
-                  <SubRow label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
-                  <SubRow
-                    label={exporting ? 'Preparing export' : 'Export my data'}
-                    onPress={exporting ? undefined : exportData}
-                  />
-                  <SubRow label="Delete account" danger onPress={deleteAccount} />
-                </View>
-              ) : null}
-              <Hairline style={styles.divider} />
+            </Card>
+
+            <Txt variant="label" style={styles.groupLabel}>
+              Account & help
+            </Txt>
+            <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<HelpGlyph />}
                 label="Help & support"
@@ -595,20 +650,35 @@ export function ProfileScreen({ navigation }: Props) {
                   <SubRow label="Terms of Service" onPress={() => navigation.navigate('TermsOfService')} />
                 </View>
               ) : null}
-            </View>
+              <Hairline style={styles.divider} />
+              <SettingsRow
+                icon={<ShieldCheckGlyph />}
+                label="Privacy & data"
+                detail="Your data, your choices"
+                open={openSection === 'privacy'}
+                onPress={() => toggle('privacy')}
+              />
+              {openSection === 'privacy' ? (
+                <View style={styles.subList}>
+                  <SubRow label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
+                  <SubRow
+                    label={exporting ? 'Preparing export' : 'Export my data'}
+                    onPress={exporting ? undefined : exportData}
+                  />
+                  <SubRow label="Delete account" danger onPress={deleteAccount} />
+                </View>
+              ) : null}
+              <Hairline style={styles.divider} />
+              <SettingsRow
+                icon={<LockGlyph size={20} color={colors.ink} />}
+                label="Sign out"
+                detail="You can sign back in anytime"
+                onPress={confirmLogout}
+              />
+            </Card>
           </FadeInUp>
 
           <View style={styles.footer}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={confirmLogout}
-              hitSlop={10}
-              style={({ pressed }) => pressed && styles.pressed}
-            >
-              <Txt variant="label" color={colors.inkSoft}>
-                Sign out
-              </Txt>
-            </Pressable>
             <Txt variant="caption" color={colors.inkSoft}>
               GROW · At your own pace
             </Txt>
@@ -657,14 +727,26 @@ const styles = themed(() =>
       marginLeft: 6,
       flexShrink: 1,
     },
-    editText: {
-      marginRight: 6,
+    actionPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 36,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.accent, 0.35),
+      backgroundColor: withAlpha(colors.accent, 0.08),
+    },
+    actionText: {
+      marginLeft: 6,
+      fontSize: 14,
     },
     identityActions: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      columnGap: spacing.lg,
+      columnGap: spacing.sm,
       rowGap: spacing.xs,
+      marginTop: spacing.xs,
     },
     growth: {
       marginTop: spacing.xl,
@@ -723,11 +805,22 @@ const styles = themed(() =>
       fontSize: 12,
     },
     settings: {
-      marginTop: spacing.md,
       paddingVertical: 2,
       paddingHorizontal: spacing.lg,
       borderRadius: radius.lg,
-      ...softSurface(2),
+    },
+    groupLabel: {
+      marginTop: spacing.lg,
+      marginBottom: spacing.sm,
+      marginLeft: spacing.xs,
+    },
+    subLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+    },
+    subLabel: {
+      marginLeft: spacing.md,
     },
     row: {
       flexDirection: 'row',
@@ -808,7 +901,7 @@ const styles = themed(() =>
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       marginTop: spacing.xl,
       marginBottom: spacing.lg,
     },

@@ -21,12 +21,13 @@ export function Chip({ label, selected, onPress, dotColor }: ChipProps) {
       accessibilityState={{ selected }}
       onPress={onPress}
       pressedScale={0.94}
+      hitSlop={4}
       style={[styles.chip, selected && styles.selected]}
     >
       {dotColor ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : null}
       <Txt
         variant="bodySemi"
-        color={selected ? colors.card : colors.ink}
+        color={selected ? colors.paper : colors.inkSoft}
         style={styles.text}
       >
         {label}
@@ -42,10 +43,10 @@ const styles = themed(() =>
       alignSelf: 'flex-start',
       flexDirection: 'row',
       alignItems: 'center',
-      height: 36,
+      height: 40,
       borderRadius: radius.pill,
       borderWidth: borderWidth.hairline,
-      borderColor: colors.line,
+      borderColor: colors.outline ?? colors.line,
       backgroundColor: colors.card,
       paddingHorizontal: spacing.lg - 2,
       marginRight: spacing.sm,
