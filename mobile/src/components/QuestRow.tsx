@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Quest } from '../api/types';
 import {
@@ -205,4 +205,6 @@ const styles = themed(() =>
   }),
 );
 
-export default QuestRow;
+// Memoized: with stable onPress/onComplete, a row only re-renders when its
+// own quest object changes.
+export default memo(QuestRow);

@@ -3,7 +3,7 @@
 // mode 'head' renders the classic 200x200 bust; 'full-body' renders the
 // same head stack on top of the 200x420 full-body canvas.
 
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Defs, G, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import type { AvatarConfig, Mood } from './types';
@@ -49,7 +49,7 @@ const HEAD_BOX = 200;
 // by y≈434, leaving >20 units of bottom padding.
 const BODY_BOX_H = 460;
 
-export function AvatarView({ look = '3d', bare, ...props }: AvatarViewProps) {
+function AvatarViewBase({ look = '3d', bare, ...props }: AvatarViewProps) {
   if (look === '3d') return <Avatar3D {...props} bare={bare} />;
   if (look === 'anime') {
     return <AnimeAvatar {...props} bare={bare} styleId={DEFAULT_ANIME_STYLE} />;
@@ -58,6 +58,12 @@ export function AvatarView({ look = '3d', bare, ...props }: AvatarViewProps) {
   if (look === 'soft') return <SoftAvatar {...props} />;
   return <ClassicAvatarView {...props} />;
 }
+
+/**
+ * Memoized so a parent re-render (a quest completed, a toast tick) does not
+ * redraw the avatar. Pass a stable config object (useMemo) to benefit.
+ */
+export const AvatarView = memo(AvatarViewBase);
 
 function ClassicAvatarView({
   config,

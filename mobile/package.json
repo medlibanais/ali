@@ -22,7 +22,7 @@
       "**/__tests__/**/*.test.ts?(x)"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@supabase/.*|@tanstack/.*|@reduxjs/.*|immer|redux|reselect)"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@supabase/.*|@tanstack/.*|@reduxjs/.*|immer|redux|react-redux|reselect)"
     ]
   },
   "dependencies": {
@@ -71,6 +71,7 @@
     "@types/jest": "^29.5.14",
     "@types/qrcode": "^1.5.5",
     "@types/react": "~18.2.79",
+    "@types/react-test-renderer": "^18.0.7",
     "babel-preset-expo": "~11.0.15",
     "esbuild": "^0.23.1",
     "jest": "^29.7.0",

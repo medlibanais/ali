@@ -38,11 +38,9 @@ export interface RenderRequest {
 const images = new Map<string, string>();
 const queue: RenderRequest[] = [];
 const listeners = new Set<() => void>();
-let version = 0;
 let pump: (() => void) | null = null;
 
 function emit() {
-  version++;
   listeners.forEach((l) => l());
 }
 
@@ -236,8 +234,19 @@ export interface Avatar3DProps {
 
 export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true }: Avatar3DProps) {
   const key = renderKey(config, mood, mode, bare);
-  useSyncExternalStore(subscribe, () => version, () => version);
-  const uri = images.get(key);
+  // Subscribe to this avatar's own image only: other avatars finishing
+  // their renders must not re-render this one.
+  const ready = useSyncExternalStore(
+    subscribe,
+    () => images.get(key),
+    () => images.get(key),
+  );
+  // While a new look renders (e.g. the mood changed after a quest), keep
+  // showing the previous image instead of dropping back to the 2D avatar.
+  const lastShown = useRef<{ uri: string; mode: Mode } | null>(null);
+  if (ready) lastShown.current = { uri: ready, mode };
+  const uri =
+    ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined);
   useEffect(() => {
     requestRender({ key, mode, command: commandFor(config, mood, mode, bare) });
     // config fields are all in the key

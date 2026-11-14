@@ -1,4 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
+// Today screen. Split into memoized sections that each select only the
+// state they draw, so completing a quest re-renders:
+//   - that quest's row (TodayQuestItem picks its own quest by id),
+//   - that pillar's bubble (LivePillarBubble in PillarOrbit),
+//   - the list container only if the order changes (rows inside are skipped),
+//   - the progress strip, whose numbers changed.
+// The header, the orbit and its avatar are left alone, so the avatar keeps
+// floating without a hitch. All callbacks passed down are stable.
+
+import React, {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -26,6 +44,16 @@ import { registerDeviceForPush } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  sameTodayList,
+  selectActiveCount,
+  selectDayMood,
+  selectDoneCount,
+  selectInitialLoading,
+  selectQuestById,
+  selectTodayList,
+  type TodayList,
+} from '../store/selectors/today';
 import { setPendingInviteCode } from '../store/slices/authSlice';
 import { fetchProfile } from '../store/slices/userSlice';
 import {
@@ -42,7 +70,6 @@ import {
   colors,
   fonts,
   PILLAR_LABELS,
-  PILLARS,
   radius,
   softSurface,
   spacing,
@@ -55,9 +82,6 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Today'>,
   NativeStackScreenProps<AppStackParamList>
 >;
-
-// Quests listed under the orbit before "See all quests".
-const UP_NEXT_LIMIT = 4;
 
 function greeting(firstName: string | null | undefined): string {
   const hour = new Date().getHours();
@@ -87,22 +111,333 @@ function TodaySkeleton() {
   );
 }
 
+// ------------------------------------------------------------ sections
+
+const TodayHeader = memo(function TodayHeader({
+  onBellPress,
+}: {
+  onBellPress: () => void;
+}) {
+  useTheme();
+  const firstName = useAppSelector((state) => state.user.profile?.first_name);
+  const unread = useUnreadCount();
+  return (
+    <FadeInUp style={styles.header}>
+      <View style={styles.headerTop}>
+        <View style={styles.headerTitle}>
+          <Txt variant="caption" color={colors.inkSoft}>
+            {dateLine()}
+          </Txt>
+          <Txt variant="title" style={styles.greeting}>
+            {greeting(firstName)}
+          </Txt>
+        </View>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={
+            unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
+          }
+          onPress={onBellPress}
+          pressedScale={0.9}
+          style={styles.bell}
+        >
+          <BellGlyph color={colors.ink} />
+          {unread > 0 ? <View style={styles.bellDot} /> : null}
+        </PressableScale>
+      </View>
+    </FadeInUp>
+  );
+});
+
+const TodayOrbit = memo(function TodayOrbit({
+  expandedPillar,
+  onPillarPress,
+}: {
+  expandedPillar: PillarId | null;
+  onPillarPress: (pillar: PillarId) => void;
+}) {
+  // Primitive picks: a refetched profile with the same values is a no-op.
+  const rawConfig = useAppSelector((state) => state.user.profile?.avatar_config);
+  const firstName = useAppSelector((state) => state.user.profile?.first_name);
+  const photoUrl = useAppSelector((state) => {
+    const p = state.user.profile;
+    if (p?.avatar_mode === 'ai') return p.ai_avatar_url ?? null;
+    if (p?.avatar_mode === 'photo') return p.photo_url ?? p.avatar_url ?? null;
+    return null;
+  });
+  const level = useAppSelector((state) => state.gamification.level);
+  const mood = useAppSelector(selectDayMood);
+  const avatarConfig = useMemo(
+    () => sanitizeAvatarConfig(rawConfig, VALID_OPTION_IDS),
+    [rawConfig],
+  );
+  return (
+    <FadeInUp delay={80} style={styles.orbitWrap}>
+      <PillarOrbit
+        avatarConfig={avatarConfig}
+        photoUrl={photoUrl}
+        name={firstName}
+        level={level}
+        mood={mood}
+        expandedPillar={expandedPillar}
+        onPillarPress={onPillarPress}
+      />
+    </FadeInUp>
+  );
+});
+
+/** One row of the list, subscribed to its own quest only. */
+export const TodayQuestItem = memo(function TodayQuestItem({
+  questId,
+  index,
+  showPillarLabel,
+  onOpen,
+  onComplete,
+}: {
+  questId: string;
+  index: number;
+  showPillarLabel: boolean;
+  onOpen: (quest: Quest) => void;
+  onComplete: (quest: Quest) => void;
+}) {
+  const quest = useAppSelector((state) => selectQuestById(state, questId));
+  // The entrance stagger is fixed at mount; reordering must not replay it.
+  const delay = useRef(220 + index * 50).current;
+  if (!quest) return null;
+  return (
+    <FadeInUp delay={delay}>
+      <QuestRow
+        quest={quest}
+        onPress={onOpen}
+        onComplete={onComplete}
+        showPillarLabel={showPillarLabel}
+      />
+    </FadeInUp>
+  );
+},
+// index only sets the entrance delay at mount, so a reorder that shifts it
+// is not a reason to re-render.
+(prev, next) =>
+  prev.questId === next.questId &&
+  prev.showPillarLabel === next.showPillarLabel &&
+  prev.onOpen === next.onOpen &&
+  prev.onComplete === next.onComplete);
+
+export const QuestSection = memo(function QuestSection({
+  expandedPillar,
+  onClearPillar,
+  onSeeAll,
+  onOpen,
+  onComplete,
+}: {
+  expandedPillar: PillarId | null;
+  onClearPillar: () => void;
+  onSeeAll: () => void;
+  onOpen: (quest: Quest) => void;
+  onComplete: (quest: Quest) => void;
+}) {
+  useTheme();
+  // Re-renders only when the listed ids, their order or the counts change.
+  const list = useAppSelector<TodayList>(
+    (state) => selectTodayList(state, expandedPillar),
+    sameTodayList,
+  );
+  const hiddenCount = list.inScopeCount - list.ids.length;
+  const scopeLabel =
+    expandedPillar === null ? 'Up next' : `${PILLAR_LABELS[expandedPillar]} today`;
+
+  return (
+    <>
+      <View style={styles.questHeader}>
+        <View style={styles.questHeaderTitle}>
+          {expandedPillar ? <PillarGlyph pillar={expandedPillar} size={20} /> : null}
+          <Txt
+            variant="heading"
+            style={expandedPillar ? styles.questHeaderTextIcon : undefined}
+          >
+            {scopeLabel}
+          </Txt>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={expandedPillar !== null ? 'Show all pillars' : 'See all quests'}
+          onPress={expandedPillar !== null ? onClearPillar : onSeeAll}
+          hitSlop={10}
+        >
+          <Txt variant="bodySemi" color={colors.accent}>
+            {expandedPillar !== null ? 'Show all' : 'See all'}
+          </Txt>
+        </Pressable>
+      </View>
+
+      {list.inScopeCount === 0 ? (
+        <EmptyState
+          title={
+            expandedPillar === null
+              ? 'No quests yet today'
+              : `No ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests today`
+          }
+          body={
+            expandedPillar === null
+              ? 'Pull down to refresh, or ask your coach for a quest.'
+              : 'This pillar has no quests scheduled today. Another pillar might.'
+          }
+        />
+      ) : (
+        <>
+          {list.openCount === 0 ? (
+            <Txt variant="body" color={colors.inkSoft} align="center" style={styles.allDone}>
+              {expandedPillar === null
+                ? 'Everything is done for today. Your future self thanks you.'
+                : `All ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests are done.`}
+            </Txt>
+          ) : null}
+          {list.ids.map((id, index) => (
+            <TodayQuestItem
+              key={id}
+              questId={id}
+              index={index}
+              showPillarLabel={expandedPillar === null}
+              onOpen={onOpen}
+              onComplete={onComplete}
+            />
+          ))}
+        </>
+      )}
+
+      {hiddenCount > 0 ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`See ${hiddenCount} more quests`}
+          onPress={onSeeAll}
+          style={styles.allQuests}
+        >
+          <Txt variant="bodySemi" color={colors.accent}>
+            {`${hiddenCount} more ${hiddenCount === 1 ? 'quest' : 'quests'}`}
+          </Txt>
+          <ChevronGlyph color={colors.accent} />
+        </PressableScale>
+      ) : null}
+    </>
+  );
+});
+
+const ProgressStrip = memo(function ProgressStrip({
+  onFreeze,
+}: {
+  onFreeze: () => void;
+}) {
+  useTheme();
+  const totalXp = useAppSelector((state) => state.gamification.totalXp);
+  const level = useAppSelector((state) => state.gamification.level);
+  const currentTitle = useAppSelector((state) => state.gamification.currentTitle);
+  const currentStreak = useAppSelector((state) => state.gamification.currentStreak);
+  const bestStreak = useAppSelector((state) => state.gamification.bestStreak);
+  const score = useAppSelector((state) => state.quests.dailyLifeScore);
+  const doneCount = useAppSelector(selectDoneCount);
+  const activeCount = useAppSelector(selectActiveCount);
+
+  return (
+    <>
+      {/* Progress comes after today's to-dos: act first, then reflect. */}
+      <Txt variant="label" style={styles.progressLabel}>
+        Your progress
+      </Txt>
+      <FadeInUp delay={320} style={styles.strip}>
+        <View style={[styles.stripCell, styles.stripFirst]}>
+          <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+            {currentTitle ?? titleForLevel(level)}
+          </Txt>
+          <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+            {`${totalXp.toLocaleString()} XP`}
+          </Txt>
+          <View style={styles.xpTrack}>
+            <View
+              style={[
+                styles.xpFill,
+                { width: `${Math.round(levelProgress(totalXp) * 100)}%` },
+              ]}
+            />
+          </View>
+        </View>
+        <View style={styles.stripDivider} />
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={
+            currentStreak > 0
+              ? `${streakLabel(currentStreak)}. Tap to use a streak freeze`
+              : streakLabel(currentStreak)
+          }
+          disabled={currentStreak === 0}
+          onPress={onFreeze}
+          style={styles.stripCell}
+        >
+          <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+            Streak
+          </Txt>
+          <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+            {currentStreak > 0 ? streakLabel(currentStreak) : bestStreakLabel(bestStreak)}
+          </Txt>
+        </PressableScale>
+        <View style={styles.stripDivider} />
+        <View style={styles.stripCell}>
+          <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
+            Life score
+          </Txt>
+          <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+            {`${Math.round(score)}`}
+          </Txt>
+          <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+            {`${doneCount} of ${activeCount} done`}
+          </Txt>
+        </View>
+      </FadeInUp>
+    </>
+  );
+});
+
+const QuestsError = memo(function QuestsError() {
+  useTheme();
+  const error = useAppSelector((state) => state.quests.error);
+  if (!error) return null;
+  return (
+    <Txt variant="caption" color={colors.danger} style={styles.error}>
+      {error}
+    </Txt>
+  );
+});
+
+export interface ConfettiLayerHandle {
+  fire: (color: string) => void;
+}
+
+/** Confetti keeps its own state, so a burst does not re-render the screen. */
+const ConfettiLayer = memo(
+  forwardRef<ConfettiLayerHandle>(function ConfettiLayer(_props, ref) {
+    const [burst, setBurst] = useState<{ key: number; color: string } | null>(null);
+    useImperativeHandle(ref, () => ({
+      fire: (color: string) => setBurst({ key: Date.now(), color }),
+    }), []);
+    const onDone = useCallback(() => setBurst(null), []);
+    if (!burst) return null;
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <ConfettiLite key={burst.key} visible accentColor={burst.color} onDone={onDone} />
+      </View>
+    );
+  }),
+);
+
+// ------------------------------------------------------------ screen
+
 export function TodayScreen({ navigation }: Props) {
   useTheme();
   const dispatch = useAppDispatch();
-  const toast = useToast();
-  const { profile } = useAppSelector((state) => state.user);
-  const questsState = useAppSelector((state) => state.quests);
-  const gamification = useAppSelector((state) => state.gamification);
-  const unread = useUnreadCount();
-  const [confetti, setConfetti] = useState<{
-    key: number;
-    color: string;
-  } | null>(null);
+  const { showToast } = useToast();
+  const initialLoading = useAppSelector(selectInitialLoading);
+  const refreshing = useAppSelector((state) => state.quests.refreshing);
   const [expandedPillar, setExpandedPillar] = useState<PillarId | null>(null);
-
-  const initialLoading =
-    questsState.loading && questsState.date === null;
+  const confettiRef = useRef<ConfettiLayerHandle>(null);
 
   const load = useCallback(
     (silent: boolean) => {
@@ -119,7 +454,7 @@ export function TodayScreen({ navigation }: Props) {
     dispatch(drainCompletionQueue()).then((result) => {
       const synced = (result.payload as { synced: number } | undefined)?.synced ?? 0;
       if (synced > 0) {
-        toast.showToast({
+        showToast({
           message: `Back online — synced ${synced} offline ${synced === 1 ? 'completion' : 'completions'}.`,
         });
       }
@@ -138,7 +473,7 @@ export function TodayScreen({ navigation }: Props) {
       .then((result) => {
         if (cancelled) return;
         if (result.redeemed) {
-          toast.showToast({
+          showToast({
             message: 'Invite accepted — you are now connected.',
           });
         }
@@ -162,7 +497,7 @@ export function TodayScreen({ navigation }: Props) {
     load(true);
   }, [load]);
 
-  const confirmFreeze = () => {
+  const confirmFreeze = useCallback(() => {
     Alert.alert(
       'Freeze your streak?',
       'Today counts as protected even without a completion. One freeze per week.',
@@ -178,9 +513,9 @@ export function TodayScreen({ navigation }: Props) {
                 : error.message.includes('already_active_today')
                   ? 'You are already active today — no freeze needed.'
                   : 'Could not freeze the streak right now.';
-              toast.showToast({ message: msg });
+              showToast({ message: msg });
             } else {
-              toast.showToast({
+              showToast({
                 message: 'Streak frozen for today. Back at it tomorrow.',
               });
             }
@@ -188,100 +523,65 @@ export function TodayScreen({ navigation }: Props) {
         },
       ],
     );
-  };
+  }, [showToast]);
 
-  const handleComplete = async (quest: Quest) => {
-    const result = await dispatch(completeQuest(quest));
-    if (completeQuest.fulfilled.match(result)) {
-      const xp = result.payload.xp_awarded;
-      const questId = result.payload.quest_id;
-      setConfetti({ key: Date.now(), color: colors.pillar[quest.pillar] });
-      // Level-ups and badges ride on the undo toast (their notification
-      // center entries skip the banner so they don't replace it).
-      const extras = [
-        result.payload.level_up ? `Level ${result.payload.level}!` : null,
-        result.payload.new_badges?.length
-          ? `${pluralize(result.payload.new_badges.length, 'new badge')}.`
-          : null,
-      ].filter(Boolean);
-      toast.showToast({
-        message: [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
-        actionLabel: 'Undo',
-        countdownSeconds: 10,
-        durationMs: 10000,
-        onAction: () => {
-          dispatch(undoQuest(questId));
-        },
-      });
-      if (result.payload.level_up) {
-        dispatch(fetchGamification());
+  const handleComplete = useCallback(
+    async (quest: Quest) => {
+      const result = await dispatch(completeQuest(quest));
+      if (completeQuest.fulfilled.match(result)) {
+        const xp = result.payload.xp_awarded;
+        const questId = result.payload.quest_id;
+        confettiRef.current?.fire(colors.pillar[quest.pillar]);
+        // Level-ups and badges ride on the undo toast (their notification
+        // center entries skip the banner so they don't replace it).
+        const extras = [
+          result.payload.level_up ? `Level ${result.payload.level}!` : null,
+          result.payload.new_badges?.length
+            ? `${pluralize(result.payload.new_badges.length, 'new badge')}.`
+            : null,
+        ].filter(Boolean);
+        showToast({
+          message: [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
+          actionLabel: 'Undo',
+          countdownSeconds: 10,
+          durationMs: 10000,
+          onAction: () => {
+            dispatch(undoQuest(questId));
+          },
+        });
+        if (result.payload.level_up) {
+          dispatch(fetchGamification());
+        }
+      } else {
+        showToast({
+          message: result.payload?.message ?? 'Could not complete this quest.',
+        });
       }
-    } else {
-      toast.showToast({
-        message: result.payload?.message ?? 'Could not complete this quest.',
-      });
-    }
-  };
-
-  const openQuest = (quest: Quest) => {
-    navigation.navigate('QuestDetail', { quest });
-  };
-
-  const score = questsState.dailyLifeScore;
-  const activeQuests = questsState.quests.filter((q) => !q.skipped);
-  const doneCount = activeQuests.filter((q) => q.completed).length;
-  const avatarConfig = sanitizeAvatarConfig(
-    profile?.avatar_config,
-    VALID_OPTION_IDS,
+    },
+    [dispatch, showToast],
   );
-  const photoUrl =
-    profile?.avatar_mode === 'ai'
-      ? profile.ai_avatar_url ?? null
-      : profile?.avatar_mode === 'photo'
-        ? profile.photo_url ?? profile.avatar_url ?? null
-        : null;
-  const orbitScores: Record<PillarId, number> = {
-    health: questsState.pillarScores.health ?? 0,
-    family: questsState.pillarScores.family ?? 0,
-    work: questsState.pillarScores.work ?? 0,
-    fun: questsState.pillarScores.fun ?? 0,
-    spirituality: questsState.pillarScores.spirituality ?? 0,
-  };
-  const orbitProgress = Object.fromEntries(
-    PILLARS.map((pillar) => {
-      const items = activeQuests.filter((q) => q.pillar === pillar);
-      return [
-        pillar,
-        { done: items.filter((q) => q.completed).length, total: items.length },
-      ];
-    }),
-  ) as Record<PillarId, { done: number; total: number }>;
 
-  // Quests shown under the orbit: today's open quests (all pillars, or the
-  // tapped one), most important first, then what is already done.
-  const inScope = activeQuests.filter(
-    (q) => expandedPillar === null || q.pillar === expandedPillar,
+  const openQuest = useCallback(
+    (quest: Quest) => navigation.navigate('QuestDetail', { quest }),
+    [navigation],
   );
-  const byPriority = (a: Quest, b: Quest) =>
-    (a.priority ?? 1) - (b.priority ?? 1);
-  const openQuests = inScope.filter((q) => !q.completed).sort(byPriority);
-  const doneQuests = inScope.filter((q) => q.completed).sort(byPriority);
-  const listed = [...openQuests, ...doneQuests].slice(
-    0,
-    expandedPillar === null ? UP_NEXT_LIMIT : inScope.length,
+  const openAllQuests = useCallback(() => navigation.navigate('Quests'), [navigation]);
+  const openNotifications = useCallback(
+    () => navigation.navigate('Notifications'),
+    [navigation],
   );
-  const hiddenCount = inScope.length - listed.length;
-  const scopeLabel =
-    expandedPillar === null
-      ? 'Up next'
-      : `${PILLAR_LABELS[expandedPillar]} today`;
+  const togglePillar = useCallback(
+    (id: PillarId) => setExpandedPillar((cur) => (cur === id ? null : id)),
+    [],
+  );
+  const clearPillar = useCallback(() => setExpandedPillar(null), []);
 
   return (
     <Screen
       scroll
       refreshControl={
         <RefreshControl
-          refreshing={questsState.refreshing}
+          refreshing={refreshing}
           onRefresh={onRefresh}
           tintColor={colors.accent}
           colors={[colors.accent]}
@@ -300,188 +600,17 @@ export function TodayScreen({ navigation }: Props) {
               { x: 0.9, y: 620, r: 180, color: colors.pillar.family },
             ]}
           />
-          <FadeInUp style={styles.header}>
-            <View style={styles.headerTop}>
-              <View style={styles.headerTitle}>
-                <Txt variant="caption" color={colors.inkSoft}>
-                  {dateLine()}
-                </Txt>
-                <Txt variant="title" style={styles.greeting}>
-                  {greeting(profile?.first_name)}
-                </Txt>
-              </View>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={
-                  unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
-                }
-                onPress={() => navigation.navigate('Notifications')}
-                pressedScale={0.9}
-                style={styles.bell}
-              >
-                <BellGlyph color={colors.ink} />
-                {unread > 0 ? <View style={styles.bellDot} /> : null}
-              </PressableScale>
-            </View>
-          </FadeInUp>
-
-          <FadeInUp delay={80} style={styles.orbitWrap}>
-            <PillarOrbit
-              avatarConfig={avatarConfig}
-              photoUrl={photoUrl}
-              name={profile?.first_name}
-              level={gamification.level}
-              scores={orbitScores}
-              progress={orbitProgress}
-              expandedPillar={expandedPillar}
-              onPillarPress={(id) =>
-                setExpandedPillar((cur) => (cur === id ? null : id))
-              }
-            />
-          </FadeInUp>
-
-          <View style={styles.questHeader}>
-            <View style={styles.questHeaderTitle}>
-              {expandedPillar ? (
-                <PillarGlyph pillar={expandedPillar} size={20} />
-              ) : null}
-              <Txt
-                variant="heading"
-                style={expandedPillar ? styles.questHeaderTextIcon : undefined}
-              >
-                {scopeLabel}
-              </Txt>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() =>
-                expandedPillar !== null
-                  ? setExpandedPillar(null)
-                  : navigation.navigate('Quests')
-              }
-              hitSlop={10}
-            >
-              <Txt variant="bodySemi" color={colors.accent}>
-                {expandedPillar !== null ? 'Show all' : 'See all'}
-              </Txt>
-            </Pressable>
-          </View>
-
-          {inScope.length === 0 ? (
-            <EmptyState
-              title={
-                expandedPillar === null
-                  ? 'No quests yet today'
-                  : `No ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests today`
-              }
-              body={
-                expandedPillar === null
-                  ? 'Pull down to refresh, or ask your coach for a quest.'
-                  : 'This pillar has no quests scheduled today. Another pillar might.'
-              }
-            />
-          ) : (
-            <>
-              {openQuests.length === 0 ? (
-                <Txt
-                  variant="body"
-                  color={colors.inkSoft}
-                  align="center"
-                  style={styles.allDone}
-                >
-                  {expandedPillar === null
-                    ? 'Everything is done for today. Your future self thanks you.'
-                    : `All ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests are done.`}
-                </Txt>
-              ) : null}
-              {listed.map((quest, index) => (
-                <FadeInUp key={quest.quest_id} delay={220 + index * 50}>
-                  <QuestRow
-                    quest={quest}
-                    onPress={openQuest}
-                    onComplete={handleComplete}
-                    showPillarLabel={expandedPillar === null}
-                  />
-                </FadeInUp>
-              ))}
-            </>
-          )}
-
-          {hiddenCount > 0 ? (
-            <PressableScale
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Quests')}
-              style={styles.allQuests}
-            >
-              <Txt variant="bodySemi" color={colors.accent}>
-                {`${hiddenCount} more ${hiddenCount === 1 ? 'quest' : 'quests'}`}
-              </Txt>
-              <ChevronGlyph color={colors.accent} />
-            </PressableScale>
-          ) : null}
-
-          {/* Progress comes after today's to-dos: act first, then reflect. */}
-          <Txt variant="label" style={styles.progressLabel}>
-            Your progress
-          </Txt>
-          <FadeInUp delay={320} style={styles.strip}>
-            <View style={[styles.stripCell, styles.stripFirst]}>
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                {gamification.currentTitle ?? titleForLevel(gamification.level)}
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {`${gamification.totalXp.toLocaleString()} XP`}
-              </Txt>
-              <View style={styles.xpTrack}>
-                <View
-                  style={[
-                    styles.xpFill,
-                    { width: `${Math.round(levelProgress(gamification.totalXp) * 100)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-            <View style={styles.stripDivider} />
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={
-                gamification.currentStreak > 0
-                  ? `${streakLabel(gamification.currentStreak)}. Tap to use a streak freeze`
-                  : streakLabel(gamification.currentStreak)
-              }
-              disabled={gamification.currentStreak === 0}
-              onPress={confirmFreeze}
-              style={styles.stripCell}
-            >
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                Streak
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {gamification.currentStreak > 0
-                  ? streakLabel(gamification.currentStreak)
-                  : bestStreakLabel(gamification.bestStreak)}
-              </Txt>
-            </PressableScale>
-            <View style={styles.stripDivider} />
-            <View style={styles.stripCell}>
-              <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-                Life score
-              </Txt>
-              <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-                {`${Math.round(score)}`}
-              </Txt>
-              <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
-                {`${doneCount} of ${activeQuests.length} done`}
-              </Txt>
-            </View>
-          </FadeInUp>
-
-          {questsState.error ? (
-            <Txt variant="caption" color={colors.danger} style={styles.error}>
-              {questsState.error}
-            </Txt>
-          ) : null}
-
+          <TodayHeader onBellPress={openNotifications} />
+          <TodayOrbit expandedPillar={expandedPillar} onPillarPress={togglePillar} />
+          <QuestSection
+            expandedPillar={expandedPillar}
+            onClearPillar={clearPillar}
+            onSeeAll={openAllQuests}
+            onOpen={openQuest}
+            onComplete={handleComplete}
+          />
+          <ProgressStrip onFreeze={confirmFreeze} />
+          <QuestsError />
           <Txt
             variant="caption"
             color={colors.inkFaint}
@@ -492,16 +621,7 @@ export function TodayScreen({ navigation }: Props) {
           </Txt>
         </>
       )}
-
-      {confetti ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <ConfettiLite
-            visible
-            accentColor={confetti.color}
-            onDone={() => setConfetti(null)}
-          />
-        </View>
-      ) : null}
+      <ConfettiLayer ref={confettiRef} />
     </Screen>
   );
 }
