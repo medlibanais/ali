@@ -46,6 +46,20 @@ function run(cmd, args, cwd = MOBILE) {
   }
 }
 
+if (platform === 'android') {
+  // Gradle 8.8 (Expo SDK 51) cannot run on Java 22+ ("Unsupported class
+  // file major version"). Fail early with a clear message instead.
+  const java = spawnSync('java', ['-version'], { encoding: 'utf8', shell: isWin });
+  const major = Number(/version "(\d+)/.exec(`${java.stderr}${java.stdout}`)?.[1]);
+  if (!major || major < 17 || major > 21) {
+    console.error(
+      `The Android build needs Java 17 to 21, found ${major || 'none'}. ` +
+        'Install JDK 17 and set JAVA_HOME to it (Android Studio bundles one).',
+    );
+    process.exit(1);
+  }
+}
+
 console.log(`E2E app will use Supabase at ${appUrl}`);
 
 // Metro caches transformed files, including inlined EXPO_PUBLIC_ values.
@@ -63,7 +77,9 @@ try {
 
 let bundle;
 if (platform === 'android') {
-  run(isWin ? 'gradlew.bat' : './gradlew', [
+  // Explicit relative path: cmd.exe and PowerShell do not find a bare
+  // "gradlew.bat" in the working directory.
+  run(isWin ? '.\\gradlew.bat' : './gradlew', [
     'assembleRelease',
     'assembleAndroidTest',
     '-DtestBuildType=release',

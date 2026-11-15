@@ -29,7 +29,11 @@ from the repo root clears them.
 ## One-time setup
 
 - Docker running, then from the repo root: `npm install` and `npm run db:start`.
-- **Android** (Windows, macOS or Linux): Android Studio with an emulator.
+- **Android** (Windows, macOS or Linux): Android Studio with an emulator,
+  **JDK 17** (`JAVA_HOME`; Gradle 8.8 cannot run on Java 22+) and
+  `ANDROID_HOME` set (`setx ANDROID_HOME "$env:LOCALAPPDATA\Android\Sdk"` in
+  PowerShell). Use an **API 34 emulator**: Detox 20.28's test runner crashes
+  on Android 37 (`InputManager.getInstance` was removed).
   The default AVD name is `Pixel_7_API_34`; use yours with
   `set DETOX_AVD=<name>` (Windows) or `export DETOX_AVD=<name>`.
   `emulator -list-avds` lists them. `ANDROID_HOME` must be set.
