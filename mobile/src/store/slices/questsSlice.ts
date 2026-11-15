@@ -1,12 +1,16 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
-  dequeueCompletion,
+  applyQueuedCompletions,
+  cancelQueuedQuest,
   enqueueCompletion,
+  estimateXp,
   isOfflineError,
   loadQuestsCache,
+  localDateOf,
   readCompletionQueue,
   saveQuestsCache,
 } from '../../lib/offlineQueue';
+import { isOnline, reportOffline, reportOnline } from '../../lib/connectivity';
 import { supabase } from '../../lib/supabase';
 import type {
   CompleteQuestResponse,
@@ -16,7 +20,9 @@ import type {
   UndoQuestResponse,
 } from '../../api/types';
 import type { Pillar } from '../../theme/tokens';
-import { fetchGamification } from './gamificationSlice';
+import { fetchGamification, type GamificationState } from './gamificationSlice';
+import type { SyncState } from './syncSlice';
+import { refreshPendingCompletions } from '../pendingCompletions';
 
 export const DAILY_SKIP_LIMIT = 3;
 export const UNDO_WINDOW_MS = 10000;
@@ -56,11 +62,35 @@ const initialState: QuestsState = {
 };
 
 function todayLocal(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = `${now.getMonth() + 1}`.padStart(2, '0');
-  const d = `${now.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return localDateOf(new Date());
+}
+
+/** The parts of the root state the quest thunks read. */
+export interface QuestThunkState {
+  auth: { userId: string | null };
+  gamification: GamificationState;
+  sync: SyncState;
+  quests: QuestsState;
+}
+
+/** An online completion that takes longer than this is treated as offline. */
+const COMPLETE_TIMEOUT_MS = 12000;
+
+export type CompleteQuestResult = CompleteQuestResponse & {
+  completedAt: number;
+  /** True when the completion was saved on the device, waiting to sync. */
+  offline: boolean;
+};
+
+/** Mean of the pillar scores that have quests, like recompute_daily_score. */
+function lifeScoreOf(state: QuestsState): number {
+  const pillars = new Set(state.quests.filter((q) => !q.skipped).map((q) => q.pillar));
+  if (pillars.size === 0) return state.dailyLifeScore;
+  let sum = 0;
+  pillars.forEach((p) => {
+    sum += state.pillarScores[p] ?? 0;
+  });
+  return Math.round(sum / pillars.size);
 }
 
 interface QuestRow {
@@ -115,23 +145,17 @@ function rpcError(error: { message?: string } | null, fallback: string): string 
   return fallback;
 }
 
-/** Server refusals that retrying later will not fix. */
-function isPermanentCompletionError(message: string | undefined): boolean {
-  const msg = message ?? '';
-  return [
-    'daily_completion_limit',
-    'quest_not_today',
-    'quest_not_found',
-    'quest_skipped',
-    'not_your_quest',
-  ].some((code) => msg.includes(code));
-}
-
 export const fetchDailyQuests = createAsyncThunk<
   DailyQuestsResponse,
   { silent?: boolean } | undefined,
-  { rejectValue: string }
->('quests/fetchDaily', async (args, { dispatch, rejectWithValue }) => {
+  { rejectValue: string; state: QuestThunkState }
+>('quests/fetchDaily', async (args, { dispatch, getState, rejectWithValue }) => {
+  const userId = getState().auth?.userId ?? null;
+  // Completions still waiting in the offline queue stay ticked.
+  const withQueued = async (day: DailyQuestsResponse): Promise<DailyQuestsResponse> => {
+    if (!userId) return day;
+    return applyQueuedCompletions(day, await readCompletionQueue(userId));
+  };
   try {
     const date = todayLocal();
     // Ensure today's quests exist (personalized assignment, no repeats).
@@ -157,6 +181,7 @@ export const fetchDailyQuests = createAsyncThunk<
 
     const quests = ((questsRes.data ?? []) as QuestRow[]).map(rowToQuest);
     const score = scoreRes.data;
+    reportOnline();
 
     // Fresh copy for offline days.
     saveQuestsCache({
@@ -185,7 +210,7 @@ export const fetchDailyQuests = createAsyncThunk<
         .catch(() => undefined);
     }
 
-    return {
+    return withQueued({
       date,
       daily_life_score: score?.overall ?? 0,
       pillars: score
@@ -198,12 +223,13 @@ export const fetchDailyQuests = createAsyncThunk<
           }
         : {},
       quests,
-    };
+    });
   } catch (error) {
+    if (isOfflineError(error)) reportOffline();
     // Offline: serve the last cached day so the app still works.
     const cached = await loadQuestsCache();
     if (cached && cached.date === todayLocal()) {
-      return cached;
+      return withQueued(cached);
     }
     return rejectWithValue(
       rpcError(error as { message?: string }, 'Could not load today\'s quests.'),
@@ -212,41 +238,67 @@ export const fetchDailyQuests = createAsyncThunk<
 });
 
 export const completeQuest = createAsyncThunk<
-  CompleteQuestResponse & { completedAt: number },
+  CompleteQuestResult,
   Quest,
-  { rejectValue: { questId: string; message: string } }
->('quests/complete', async (quest, { dispatch, rejectWithValue }) => {
-  // Optimistic update; rollback on failure.
+  { rejectValue: { questId: string; message: string }; state: QuestThunkState }
+>('quests/complete', async (quest, { dispatch, getState, rejectWithValue }) => {
+  const now = new Date();
+  // Optimistic update; rolled back only if the server refuses for good.
   dispatch(questCompletedLocally(quest.quest_id));
+  const userId = getState().auth.userId;
+
+  const saveOffline = async (): Promise<CompleteQuestResult> => {
+    const item = await enqueueCompletion({
+      questId: quest.quest_id,
+      userId,
+      completedAt: now.toISOString(),
+      xpEstimate: estimateXp(quest, now, getState().gamification.xpToday),
+      title: quest.title,
+      localDate: localDateOf(now),
+    });
+    await dispatch(refreshPendingCompletions());
+    const gam = getState().gamification;
+    return {
+      quest_id: quest.quest_id,
+      xp_awarded: item.xpEstimate,
+      total_xp: gam.totalXp,
+      level: gam.level,
+      level_up: false,
+      daily_score: getState().quests.dailyLifeScore,
+      current_streak: gam.currentStreak,
+      best_streak: gam.bestStreak,
+      new_badges: [],
+      completedAt: now.getTime(),
+      offline: true,
+    };
+  };
+
+  // Known offline, or older completions still waiting: queue behind them
+  // so the server sees completions in the order they happened.
+  if (!isOnline() || getState().sync.pending > 0) {
+    return saveOffline();
+  }
+
   let data: CompleteQuestResponse | null = null;
   let error: unknown = null;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), COMPLETE_TIMEOUT_MS);
   try {
-    const res = await supabase.rpc('complete_quest', {
-      p_quest_id: quest.quest_id,
-    });
+    const request = supabase.rpc('complete_quest', { p_quest_id: quest.quest_id });
+    const res = await (controller ? request.abortSignal(controller.signal) : request);
     data = res.data as CompleteQuestResponse;
     error = res.error;
   } catch (e) {
     error = e;
+  } finally {
+    clearTimeout(timer);
   }
   if (error) {
-    // Offline: keep the optimistic completion, sync when we're back.
     if (isOfflineError(error)) {
-      await enqueueCompletion(quest.quest_id);
-      dispatch(fetchGamification());
-      return {
-        quest_id: quest.quest_id,
-        xp_awarded: quest.xp_reward,
-        total_xp: 0,
-        level: 1,
-        level_up: false,
-        daily_score: 0,
-        current_streak: 0,
-        best_streak: 0,
-        new_badges: [],
-        completedAt: Date.now(),
-        offline: true,
-      } as CompleteQuestResponse & { completedAt: number; offline: boolean };
+      // If the request did reach the server, the replay is a no-op there
+      // (the quest is already completed), so nothing is counted twice.
+      reportOffline();
+      return saveOffline();
     }
     dispatch(questRolledBack(quest.quest_id));
     return rejectWithValue({
@@ -254,16 +306,28 @@ export const completeQuest = createAsyncThunk<
       message: rpcError(error as { message?: string }, 'Could not complete this quest.'),
     });
   }
+  reportOnline();
   // Server recomputed XP/level/streak/badges — sync the gamification slice.
   dispatch(fetchGamification());
-  return { ...(data as CompleteQuestResponse), completedAt: Date.now() };
+  return { ...(data as CompleteQuestResponse), completedAt: now.getTime(), offline: false };
 });
 
 export const undoQuest = createAsyncThunk<
   UndoQuestResponse & { questId: string },
   string,
-  { rejectValue: string }
->('quests/undo', async (questId, { dispatch, rejectWithValue }) => {
+  { rejectValue: string; state: QuestThunkState }
+>('quests/undo', async (questId, { dispatch, getState, rejectWithValue }) => {
+  // Still on the device: undo is just taking it out of the queue.
+  const queued = await cancelQueuedQuest(questId, getState().auth.userId);
+  if (queued) {
+    await dispatch(refreshPendingCompletions());
+    return {
+      quest_id: questId,
+      xp_refunded: queued.xpEstimate,
+      total_xp: getState().gamification.totalXp,
+      questId,
+    };
+  }
   const { data, error } = await supabase.rpc('undo_quest_completion', {
     p_quest_id: questId,
   });
@@ -272,39 +336,6 @@ export const undoQuest = createAsyncThunk<
   }
   dispatch(fetchGamification());
   return { ...(data as UndoQuestResponse), questId };
-});
-
-/** Replays queued offline completions once we're back online. */
-export const drainCompletionQueue = createAsyncThunk<
-  { synced: number },
-  void
->('quests/drainQueue', async (_, { dispatch }) => {
-  const queue = await readCompletionQueue();
-  let synced = 0;
-  for (const item of queue) {
-    try {
-      const { error } = await supabase.rpc('complete_quest', {
-        p_quest_id: item.questId,
-      });
-      if (!error) {
-        await dequeueCompletion(item.questId);
-        synced += 1;
-      } else if (isPermanentCompletionError(error.message)) {
-        // The server will never accept this one (daily limit, old quest):
-        // drop it so it does not block the queue forever.
-        await dequeueCompletion(item.questId);
-      } else {
-        break; // still offline or server unhappy — retry next launch
-      }
-    } catch {
-      break;
-    }
-  }
-  if (synced > 0) {
-    dispatch(fetchDailyQuests({ silent: true }));
-    dispatch(fetchGamification());
-  }
-  return { synced };
 });
 
 export const skipQuest = createAsyncThunk<
@@ -405,6 +436,10 @@ const questsSlice = createSlice({
               (100 * done) / remaining.length,
             );
           }
+        }
+        // Saved offline: the server has not scored the day yet.
+        if (action.payload.offline) {
+          state.dailyLifeScore = lifeScoreOf(state);
         }
       })
       .addCase(completeQuest.rejected, (state, action) => {

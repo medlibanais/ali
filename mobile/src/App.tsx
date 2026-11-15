@@ -16,6 +16,7 @@ import type { AppStackParamList, AuthStackParamList } from './navigation/types';
 import { useTheme } from './theme/useTheme';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { hydrateTheme } from './store/slices/themeSlice';
+import OfflineBanner from './features/offline/OfflineBanner';
 
 const linking: LinkingOptions<AuthStackParamList & AppStackParamList> = {
   prefixes: ['prayerlock://'],
@@ -33,6 +34,7 @@ function ThemedRoot() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const themeHydrated = useAppSelector((state) => state.theme.hydrated);
+  const signedIn = useAppSelector((state) => state.auth.userId !== null);
 
   useEffect(() => {
     dispatch(hydrateTheme());
@@ -64,6 +66,7 @@ function ThemedRoot() {
         backgroundColor={theme.colors.paper}
       />
       <RootNavigator />
+      {signedIn ? <OfflineBanner /> : null}
       <Avatar3DHost />
     </NavigationContainer>
   );
