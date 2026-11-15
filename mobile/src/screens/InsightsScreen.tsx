@@ -16,6 +16,7 @@ import SegmentedControl from '../components/SegmentedControl';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
+import YearHeatmap from '../components/charts/YearHeatmap';
 import {
   pillarAverages,
   summarizePeriod,
@@ -25,6 +26,7 @@ import {
   type DayScore,
   type PeriodSummary,
 } from '../features/analytics/api';
+import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
 import { useAppSelector } from '../store/hooks';
@@ -146,6 +148,34 @@ function Pillars({ days }: { days: DayScore[] }) {
   );
 }
 
+// The last 365 days of XP. Independent of the week/month switch above.
+function YearOfActivity() {
+  const userId = useAppSelector((state) => state.auth.userId);
+  const timezone = useAppSelector((state) => state.user.profile?.timezone ?? null);
+  const today = todayInTimezone(timezone);
+  const year = useYearXp(userId, today);
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        Your year
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        XP earned each day for the last 365 days. Tap a day for details.
+      </Txt>
+      {year.isError ? (
+        <EmptyState
+          title="Could not load your year"
+          body="Check your connection and open Insights again."
+        />
+      ) : year.data ? (
+        <YearHeatmap days={year.data} today={today} />
+      ) : (
+        <Skeleton height={150} />
+      )}
+    </Card>
+  );
+}
+
 function Momentum({ streak, best, level }: { streak: number; best: number; level: number }) {
   return (
     <Accordion
@@ -246,6 +276,8 @@ export function InsightsScreen() {
           <Takeaways items={items} />
 
           <Pillars days={current} />
+
+          <YearOfActivity />
 
           <Accordion
             title="Your score, day by day"

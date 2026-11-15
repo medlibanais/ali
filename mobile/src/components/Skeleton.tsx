@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, StyleSheet, ViewStyle } from 'react-native';
 import { colors, radius, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
@@ -52,19 +52,5 @@ const styles = themed(() =>
     },
   }),
 );
-
-export interface SkeletonGroupProps {
-  children: React.ReactNode;
-}
-
-export function SkeletonGroup({ children }: SkeletonGroupProps) {
-  return <View style={groupStyles.container}>{children}</View>;
-}
-
-const groupStyles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-});
 
 export default Skeleton;

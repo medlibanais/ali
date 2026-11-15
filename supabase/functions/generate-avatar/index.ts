@@ -1,4 +1,6 @@
-// generate-avatar: turns the user's photo into their "Future Self" avatar.
+// generate-avatar: turns the user's photo into their "Future Self" avatar,
+// or (kind 'render') turns a 3D render of the character they built in the
+// avatar editor into a photograph of that same character.
 // Client sends a small square JPEG (base64). We call fal.ai's synchronous
 // image-edit endpoint (Flux Kontext by default, ~5-10 s), copy the result
 // into Storage, and point profiles.ai_avatar_url at it. Any failure leaves
@@ -16,6 +18,7 @@ const corsHeaders = {
 const BUCKET = 'profile-photos';
 const DAILY_LIMIT = 5; // generations per rolling 24 h (cost control)
 const MAX_INPUT_CHARS = 1_400_000; // ~1 MB JPEG as base64
+const MAX_RENDER_CHARS = 4_500_000; // a large PNG render as base64
 const PROVIDER_TIMEOUT_MS = 55_000;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 // Overridable so local runs can point at a mock; production uses fal.ai.
@@ -53,17 +56,25 @@ Deno.serve(async (req: Request) => {
 
     let imageBase64 = '';
     let artStyle = '';
+    let kind: 'photo' | 'render' = 'photo';
+    let view: 'portrait' | 'full' = 'portrait';
+    let mime: 'jpeg' | 'png' = 'jpeg';
+    let details = '';
     try {
       const body = await req.json();
       imageBase64 =
         typeof body?.image_base64 === 'string' ? body.image_base64 : '';
       artStyle = typeof body?.art_style === 'string' ? body.art_style : '';
+      kind = body?.kind === 'render' ? 'render' : 'photo';
+      view = body?.view === 'full' ? 'full' : 'portrait';
+      mime = body?.mime === 'png' ? 'png' : 'jpeg';
+      details = typeof body?.details === 'string' ? body.details : '';
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
     imageBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '').trim();
     if (imageBase64.length === 0) return json({ error: 'missing_image' }, 400);
-    if (imageBase64.length > MAX_INPUT_CHARS) {
+    if (imageBase64.length > (kind === 'render' ? MAX_RENDER_CHARS : MAX_INPUT_CHARS)) {
       return json({ error: 'image_too_large' }, 413);
     }
 
@@ -86,11 +97,13 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    const prompt = buildPrompt(
-      goals?.dream_body ?? null,
-      (goals?.dream_personality as string[] | null) ?? [],
-      artStyle,
-    );
+    const prompt = kind === 'render'
+      ? buildPhotoPrompt(view, details)
+      : buildPrompt(
+        goals?.dream_body ?? null,
+        (goals?.dream_personality as string[] | null) ?? [],
+        artStyle,
+      );
 
     // ---- provider call ----
     const started = Date.now();
@@ -106,10 +119,10 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           prompt,
-          image_url: `data:image/jpeg;base64,${imageBase64}`,
+          image_url: `data:image/${mime};base64,${imageBase64}`,
           num_images: 1,
           output_format: 'jpeg',
-          aspect_ratio: '1:1',
+          aspect_ratio: kind === 'render' && view === 'full' ? '9:16' : '1:1',
           safety_tolerance: '2',
         }),
         signal: controller.signal,
@@ -164,7 +177,10 @@ Deno.serve(async (req: Request) => {
       await logAttempt(admin, user.id, false, started, `download: ${String(e).slice(0, 180)}`);
       return json({ error: 'generation_failed' }, 502);
     }
-    const path = `${user.id}/ai-avatar.jpg`;
+    // A photo of the built character is kept apart from the selfie-based one.
+    const path = kind === 'render'
+      ? `${user.id}/photoreal-${view}.jpg`
+      : `${user.id}/ai-avatar.jpg`;
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
       .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
@@ -177,9 +193,14 @@ Deno.serve(async (req: Request) => {
     } = admin.storage.from(BUCKET).getPublicUrl(path);
     const url = `${publicUrl}?t=${Date.now()}`;
 
+    // A selfie-based avatar becomes the picture at once. A photo of the
+    // built character is only saved: the person picks it in the editor.
+    const column = kind === 'render'
+      ? (view === 'full' ? { photoreal_body_url: url } : { photoreal_head_url: url })
+      : { ai_avatar_url: url, avatar_mode: 'ai' };
     const { error: updateError } = await admin
       .from('profiles')
-      .update({ ai_avatar_url: url, avatar_mode: 'ai' })
+      .update(column)
       .eq('id', user.id);
     if (updateError) {
       await logAttempt(admin, user.id, false, started, `profile: ${updateError.message}`);
@@ -216,6 +237,26 @@ const STYLE_PROMPTS: Record<string, string> = {
   storm:
     'Redraw this photo as a moody Japanese anime still of a lone warrior in heavy rain: cold blue-gray palette, sharp linework, flat cel shading, wet hair with white highlight streaks and water drops, overcast stormy sky and dark trees behind, subtle film grain.',
 };
+
+/** Allowed words for the optional detail line (hair, clothes...) so it cannot carry instructions. */
+function cleanDetails(raw: string): string {
+  return raw.replace(/[^\p{L}\p{N} ,.'-]/gu, '').slice(0, 200);
+}
+
+function buildPhotoPrompt(view: 'portrait' | 'full', details: string): string {
+  const framing = view === 'full'
+    ? 'Full-body standing photograph, the whole body visible from head to shoes, on a plain soft grey studio background.'
+    : 'Head-and-shoulders portrait photograph on a plain soft grey studio background.';
+  const extra = cleanDetails(details);
+  return [
+    'Turn this 3D character render into a real photograph of a real person.',
+    'Keep exactly the same face shape and features, skin tone, hairstyle and hair color, eye color, glasses, clothes and colors, body build, height and pose.',
+    'Natural skin with pores and fine detail, individual hair strands, real fabric texture, soft studio lighting, shot on an 85mm lens, sharp focus, photorealistic.',
+    framing,
+    extra ? `Details: ${extra}.` : '',
+    'No text, no logos, no extra people.',
+  ].filter(Boolean).join(' ');
+}
 
 function buildPrompt(
   dreamBody: string | null,

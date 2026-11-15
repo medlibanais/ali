@@ -53,14 +53,6 @@ function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export interface CompletionRow {
-  quest_id: string;
-  completed_at: string;
-  xp_awarded: number;
-  undone_at: string | null;
-  quests: { pillar: Pillar } | { pillar: Pillar }[] | null;
-}
-
 export function useScoresRange(from: string, to: string) {
   return useQuery({
     queryKey: ['analytics', 'scores', from, to],
@@ -81,23 +73,6 @@ export function useScoresLastDays(days: number) {
   const to = dateKey(new Date());
   const from = dateKey(new Date(Date.now() - (days - 1) * 86400000));
   return useScoresRange(from, to);
-}
-
-export function useCompletionsRange(from: string, to: string) {
-  return useQuery({
-    queryKey: ['analytics', 'completions', from, to],
-    queryFn: async (): Promise<CompletionRow[]> => {
-      const { data, error } = await supabase
-        .from('quest_completions')
-        .select('quest_id, completed_at, xp_awarded, undone_at, quests(pillar)')
-        .is('undone_at', null)
-        .gte('completed_at', `${from}T00:00:00Z`)
-        .lte('completed_at', `${to}T23:59:59.999Z`)
-        .order('completed_at');
-      if (error) throw error;
-      return (data ?? []) as CompletionRow[];
-    },
-  });
 }
 
 export interface StreakInfo {
@@ -170,10 +145,6 @@ export function useAiInsights() {
 
 // ---- Derived series helpers (pure functions, unit-testable) ----
 
-export function dailyXpSeries(days: DayScore[]): { date: string; xp: number }[] {
-  return days.map((d) => ({ date: d.date, xp: d.xp }));
-}
-
 export function pillarAverages(
   days: DayScore[],
 ): { pillar: Pillar; value: number }[] {
@@ -185,20 +156,6 @@ export function pillarAverages(
         ? Math.round(days.reduce((s, d) => s + d[p], 0) / days.length)
         : 0,
   }));
-}
-
-export function effortShare(
-  days: DayScore[],
-  completions: CompletionRow[],
-): { pillar: Pillar; count: number }[] {
-  const pillars: Pillar[] = ['health', 'family', 'work', 'fun', 'spirituality'];
-  const counts = new Map<Pillar, number>(pillars.map((p) => [p, 0]));
-  for (const c of completions) {
-    const q = Array.isArray(c.quests) ? c.quests[0] : c.quests;
-    if (q?.pillar) counts.set(q.pillar, (counts.get(q.pillar) ?? 0) + 1);
-  }
-  void days;
-  return pillars.map((p) => ({ pillar: p, count: counts.get(p) ?? 0 }));
 }
 
 export function weekdayPerformance(days: DayScore[]): number[] {
@@ -215,16 +172,6 @@ export function weekdayPerformance(days: DayScore[]): number[] {
   return sums.map((s, i) => (counts[i] > 0 ? Math.round(s / counts[i]) : 0));
 }
 
-export function completionHourHistogram(completions: CompletionRow[]): number[] {
-  // 24 buckets by local hour
-  const buckets = new Array(24).fill(0);
-  for (const c of completions) {
-    const h = new Date(c.completed_at).getHours();
-    buckets[h] += 1;
-  }
-  return buckets;
-}
-
 export function funnel(days: DayScore[]): {
   assigned: number;
   completed: number;
@@ -235,17 +182,6 @@ export function funnel(days: DayScore[]): {
     completed: days.reduce((s, d) => s + d.completed, 0),
     skipped: days.reduce((s, d) => s + d.skipped, 0),
   };
-}
-
-export function wowChange(current: DayScore[], previous: DayScore[]): number | null {
-  const rate = (rows: DayScore[]) => {
-    const a = rows.reduce((s, d) => s + d.assigned, 0);
-    const c = rows.reduce((s, d) => s + d.completed, 0);
-    return a > 0 ? (100 * c) / a : 0;
-  };
-  const prev = rate(previous);
-  if (prev === 0) return null;
-  return Math.round(((rate(current) - prev) / prev) * 100);
 }
 
 // ---- Plain-language summary for the simplified Insights screen ----

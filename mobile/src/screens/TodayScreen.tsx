@@ -702,9 +702,6 @@ const styles = themed(() =>
     borderRadius: 3,
     backgroundColor: colors.gold,
   },
-  pressed: {
-    opacity: 0.7,
-  },
   questHeader: {
     marginTop: spacing.xl + 4,
     marginBottom: spacing.md,

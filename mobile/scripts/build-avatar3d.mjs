@@ -1,4 +1,4 @@
-// Builds avatar3d/viewer.ts (three.js + three-vrm) into one self-contained
+// Builds avatar3d/viewer.ts (three.js) into one self-contained
 // HTML file the app loads in a WebView: assets/avatar3d/viewer.html.
 // Run after changing the viewer: npm run build:avatar3d
 import { build } from 'esbuild';
