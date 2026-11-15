@@ -165,6 +165,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
 
       <Button
         title="Back to sign in"
+        testID="verify-back-to-sign-in"
         variant="ghost"
         onPress={() => navigation.navigate('Login')}
         style={styles.backButton}

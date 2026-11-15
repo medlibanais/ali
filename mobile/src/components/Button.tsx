@@ -22,6 +22,8 @@ export interface ButtonProps {
   icon?: (props: IconProps) => React.ReactElement;
   /** Label shown while hovered or pressed: a small "you're winning" beat. */
   winTitle?: string;
+  /** Stable id for end-to-end tests (Detox `by.id`). */
+  testID?: string;
 }
 
 const useNative = Platform.OS !== 'web';
@@ -35,6 +37,7 @@ export function Button({
   style,
   icon: Icon,
   winTitle,
+  testID,
 }: ButtonProps) {
   useTheme();
   const isDisabled = disabled || loading;
@@ -104,6 +107,7 @@ export function Button({
 
   return (
     <PressableScale
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: isDisabled, busy: loading }}

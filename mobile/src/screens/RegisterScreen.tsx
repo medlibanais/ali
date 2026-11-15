@@ -73,6 +73,7 @@ export function RegisterScreen({ navigation, route }: Props) {
       <Card style={styles.form}>
         <Field
           label="Email"
+          testID="register-email"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -86,6 +87,7 @@ export function RegisterScreen({ navigation, route }: Props) {
         />
         <Field
           label="Password"
+          testID="register-password"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -129,6 +131,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
         <Button
           title="Create account"
+          testID="register-submit"
           winTitle="Start growing"
           icon={ArrowRightGlyph}
           onPress={submit}

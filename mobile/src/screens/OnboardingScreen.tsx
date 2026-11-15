@@ -300,7 +300,7 @@ export function OnboardingScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding padded={false}>
+    <Screen testID="onboarding-scroll" scroll keyboardAvoiding padded={false}>
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
@@ -518,6 +518,7 @@ export function OnboardingScreen({ navigation }: Props) {
           <View>
             <Field
               label="First name"
+              testID="onboarding-first-name"
               value={draft.firstName}
               onChangeText={(t) => {
                 update('firstName', t);
@@ -529,6 +530,7 @@ export function OnboardingScreen({ navigation }: Props) {
             />
             <Field
               label="Username"
+              testID="onboarding-username"
               value={draft.username}
               onChangeText={(t) => {
                 update('username', t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
@@ -584,6 +586,7 @@ export function OnboardingScreen({ navigation }: Props) {
           ) : null}
           <Button
             title={step === totalSteps - 1 ? 'Start my journey' : 'Continue'}
+            testID="onboarding-continue"
             onPress={goNext}
             disabled={!canContinue}
             loading={submitting}

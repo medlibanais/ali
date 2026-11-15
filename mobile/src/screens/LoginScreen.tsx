@@ -59,6 +59,7 @@ export function LoginScreen({ navigation }: Props) {
       <Card style={styles.form}>
         <Field
           label="Email"
+          testID="login-email"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -72,6 +73,7 @@ export function LoginScreen({ navigation }: Props) {
         />
         <Field
           label="Password"
+          testID="login-password"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -103,6 +105,7 @@ export function LoginScreen({ navigation }: Props) {
 
         <Button
           title="Sign in"
+          testID="login-submit"
           winTitle="Let's grow"
           icon={ArrowRightGlyph}
           onPress={submit}
@@ -121,6 +124,7 @@ export function LoginScreen({ navigation }: Props) {
 
       <Button
         title="Create account"
+        testID="login-create-account"
         variant="secondary"
         onPress={() => navigation.navigate('Register')}
       />

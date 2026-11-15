@@ -21,6 +21,8 @@ export interface ScreenProps {
   contentStyle?: ViewStyle;
   keyboardAvoiding?: boolean;
   refreshControl?: React.ReactElement;
+  /** Stable id for end-to-end tests; set on the scroll view when `scroll`. */
+  testID?: string;
 }
 
 export function Screen({
@@ -30,6 +32,7 @@ export function Screen({
   contentStyle,
   keyboardAvoiding = false,
   refreshControl,
+  testID,
 }: ScreenProps) {
   const theme = useTheme();
   // The tab bar floats over the content; keep the last items clear of it.
@@ -39,6 +42,7 @@ export function Screen({
   // centered column capped at 720 logical pixels.
   const body = scroll ? (
     <ScrollView
+      testID={testID}
       style={styles.flex}
       contentContainerStyle={[
         styles.grow,
