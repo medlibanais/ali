@@ -15,7 +15,7 @@ export type AuthStackParamList = {
 export type OnboardingStackParamList = {
   Onboarding: undefined;
   AiAvatar: { fromOnboarding?: boolean } | undefined;
-  AvatarCreator: { fromOnboarding?: boolean } | undefined;
+  AvatarCreator: { fromOnboarding?: boolean; who?: 'current' | 'future' } | undefined;
 };
 
 export type MainTabParamList = {
@@ -35,7 +35,7 @@ export type AppStackParamList = {
   PrivacyPolicy: undefined;
   QuestDetail: { quest: Quest };
   TimezonePicker: undefined;
-  AvatarCreator: { fromOnboarding?: boolean } | undefined;
+  AvatarCreator: { fromOnboarding?: boolean; who?: 'current' | 'future' } | undefined;
   AiAvatar: { fromOnboarding?: boolean } | undefined;
   EditPhoto: undefined;
   Friends: { code?: string } | undefined;
