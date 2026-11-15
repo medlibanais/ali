@@ -15,6 +15,14 @@ TONGUE = {'tongue': {'dir': 'tongue01', 'kind': 'tongue'}}
 EYELASHES = {f'lashes{i}': {'dir': f'eyelashes0{i}', 'kind': 'lashes'} for i in range(1, 4)}
 EYEBROWS = {f'brow{i}': {'dir': f'eyebrow{i:03d}', 'kind': 'brows', 'gray': True} for i in range(1, 13)}
 HAIR = {n: {'dir': n, 'kind': 'hair', 'gray': True} for n in ('short01', 'short02', 'short03', 'short04', 'bob01', 'bob02', 'long01', 'ponytail01', 'braid01')}
+# Hair from the hair01 pack: id -> asset folder.
+HAIR.update({k: {'dir': v, 'kind': 'hair', 'gray': True} for k, v in dict(
+    blunt_bob='toigo_blunt_bob', blunt_bob_bangs='toigo_blunt_bob_with_bangs', inverted_bob='toigo_inverted_bob', inverted_bob_bangs='toigo_inverted_bob_with_bangs',
+    curled_bob='toigo_curled_under_bob', curled_bob_bangs='toigo_curled_under_bob_with_bangs', straight_bangs='cortu_straight_bangs',
+    double_braid='elvs_double_mh_braid', french_braid='elvs_french_braid_variation', braid_bun='elvs_reverse_french_braid_bun',
+    bun='rehmanpolanski_hair_bun_brown', bobcut='littleright_bobcut_hair', wavy_long='culturalibre_hair_01', slick='culturalibre_hair_02',
+    tousled='culturalibre_hair_05', spiky='culturalibre_hair_06', curly_bob='cortu_strawberry_cloud_hair',
+).items()})
 
 
 def clothes(**items):
@@ -41,6 +49,18 @@ CLOTHES = {
 for _k, _v in dict(rimless='kwnet_at_optical_glasses', slim='spamrakuen_sagerfrogs_glasses_02', sunglasses='frankyaye_glasses_library_male',
                    aviator='toigo_round_glasses_leopard', bold='spamrakuen_tbm_glasses_frames_01').items():
     CLOTHES['glasses_' + _k] = {'dir': _v, 'kind': 'glasses'}
+
+CLOTHES.update(clothes(
+    dress_tiered='toigo_dress_with_tiered_skirt', dress_halter='toigo_halter_dress_knee_length', dress_camisole='toigo_camisole_dress_with_full_skirt',
+    dress_keyhole='toigo_keyhole_neck_dress', dress_shift='toigo_shift_dress', dress_lace='toigo_bodice_dress_with_lace_ruffle_skirt', dress_cutout='toigo_cut_out_dress',
+    dress_midi='toigo_halter_dress_midi', dress_ruffle='toigo_strapless_ruffle_top_dress', dress_fluted='toigo_halter_dress_with_fluted_skirt', 
+    skirt_tiered_mini='toigo_tiered_mini_skirt', skirt_mini1='frankyaye_mini_skirt_01', skirt_mini2='frankyaye_mini_skirt_02', skirt_long='toigo_long_full_skirt',
+    skirt_lace='toigo_skirt_with_lace_ruffle',
+    suit_bowtie='toigo_suit_with_jacket_and_bowtie', suit_m3='toigo_male_suit_3', suit_f1='toigo_female_suit', suit_f_double='toigo_female_double-breasted_suit',
+    suit_dinner='toigo_suit_with_dinner_jacket', suit_m_tie='toigo_male_suit_tie_and_jacket', suit_m_double='toigo_male_double-breasted_suit', suit_f2='toigo_female_suit_2',
+    boots_m_ankle='toigo_ankle_boots_male', boots_f_ankle='toigo_ankle_boots_female', cloth_shoes='toigo_mj_cloth_shoes',
+    flats='toigo_flats', ballet='toigo_ballet_flats', ballet_bows='toigo_ballet_flats_with_bows', t_bar='cortu_t-bar',
+))
 
 SKINS = {f'{e}_{g}': {'dir': f'young_{e}_{g}', 'for': g} for e in ('caucasian', 'asian', 'african') for g in ('male', 'female')}
 

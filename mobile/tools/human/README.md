@@ -9,7 +9,7 @@ The app never runs this. Run it only to add or remove hair, clothes or shapes.
   <https://github.com/makehumancommunity/makehuman> (the `makehuman/data` folder).
 - MakeHuman system assets pack (`makehuman_system_assets_cc0.zip`): skins, eyes,
   hair, eyebrows, eyelashes, teeth, default clothes and shoes.
-- Community asset packs `glasses01`, `pants01`, `shirts01` from
+- Community asset packs `glasses01`, `pants01`, `shirts01`, `hair01`, `dress01`, `skirts01`, `suits01`, `shoes01` (CC0 editions) from
   <http://www.makehumancommunity.org/content/asset_packs.html>.
 
 Only assets published as CC0 are listed in `catalog.py`. Keep it that way.
@@ -19,7 +19,7 @@ Only assets published as CC0 are listed in `catalog.py`. Keep it that way.
 ```sh
 cd mobile/tools/human
 python3 build.py --mh <makehuman checkout> \
-  --assets <system assets> <glasses01> <pants01> <shirts01> \
+  --assets <system assets> <glasses01> <pants01> <shirts01> <hair01> <dress01> <skirts01> <suits01> <shoes01> \
   --out ../../assets/avatar3d/models/human.bin
 cd ../.. && npm run build:avatar3d   # only if avatar3d/*.ts changed
 npx jest src/avatar                   # checks the app only asks for what the file holds

@@ -197,7 +197,7 @@ describe('saved avatars', () => {
   });
 
   it('load an avatar saved before the realistic model', () => {
-    const old = { look: 'anime', hair: 'spiky', hairColor: 'copper', outfitColor: 'teal', pantsColor: 'black', facialHair: 'beard', sliders: { faceWidth: 0.5 }, v: 2 };
+    const old = { look: 'anime', hair: 'anime-swoop', hairColor: 'copper', outfitColor: 'teal', pantsColor: 'black', facialHair: 'beard', sliders: { faceWidth: 0.5 }, v: 2 };
     const doc = readAvatarDoc(old, VALID_OPTION_IDS);
     expect(doc.current.hairColor).toBe('copper');
     expect(doc.current.topColor).toBe('teal');

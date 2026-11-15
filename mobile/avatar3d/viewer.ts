@@ -411,7 +411,17 @@ async function render(cmd: RenderCommand) {
     const posed = h.pose(poseFor(cmd.pose));
     root.clear();
 
-    const body = meshFor(m, '#body', () => new THREE.MeshStandardMaterial({ roughness: 0.62, metalness: 0 }));
+    // Skin: a soft warm sheen at grazing angles stands in for light
+    // scattering under the skin, and a faint clear coat for natural oil.
+    const body = meshFor(m, '#body', () => new THREE.MeshPhysicalMaterial({
+      roughness: 0.55,
+      metalness: 0,
+      sheen: 0.7,
+      sheenColor: new THREE.Color(0xff9a82),
+      sheenRoughness: 0.5,
+      clearcoat: 0.12,
+      clearcoatRoughness: 0.45,
+    }));
     setGeometry(body, h.body(posed, parts.map((p) => p.id)));
     const bm = body.material as THREE.MeshStandardMaterial;
     bm.map = skinMap;

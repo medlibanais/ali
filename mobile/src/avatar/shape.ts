@@ -3,7 +3,7 @@
 // the editor, the image cache key and the tests all agree.
 
 import { EXPRESSIONS, MOOD_EXPRESSION, SLIDERS, sv, type Sliders } from './custom';
-import { eyeColor, hairColor, outfitColor, pantsColor, skinTone } from './palettes';
+import { eyeColor, hairColor, HAIR_COLORS, OUTFIT_COLORS, outfitColor, pantsColor, skinTone } from './palettes';
 import type { AvatarConfig, Mood } from './types';
 import { BODY_TYPES, BOTTOMS, FEATURES, GLASSES, HAIR_STYLES, OUTFITS, TOPS, fits, type Sex, type WearItem } from './wardrobe';
 
@@ -134,4 +134,21 @@ export function skinFor(config: AvatarConfig): { id: string; color: string } {
 
 export function irisFor(config: AvatarConfig): string {
   return eyeColor(config.eyeColor);
+}
+
+/**
+ * A few plain words about the look (body, hair, clothes), for the photo
+ * maker. Only labels from our own catalogs, so nothing typed by a person
+ * reaches the prompt.
+ */
+export function suggestOutfitWords(config: AvatarConfig): string {
+  const worn = wornOutfit(config);
+  const hair = HAIR_STYLES.find((h) => h.id === config.hair);
+  const hairWord = config.hair === 'none' || !hair ? 'shaved head' : `${(HAIR_COLORS.find((c) => c.id === config.hairColor)?.label ?? '').toLowerCase()} hair, ${hair.label.toLowerCase()}`.trim();
+  const colorWord = (id: string) => (OUTFIT_COLORS.find((c) => c.id === id)?.label ?? '').toLowerCase();
+  const clothes = worn.outfit
+    ? worn.outfit.label.toLowerCase()
+    : [worn.top ? `${colorWord(config.topColor)} ${worn.top.label.toLowerCase()}`.trim() : '', worn.bottom ? `${colorWord(config.bottomColor)} ${worn.bottom.label.toLowerCase()}`.trim() : ''].filter(Boolean).join(' and ');
+  const glasses = config.glasses !== 'none' ? GLASSES.find((g) => g.id === config.glasses)?.label.toLowerCase() : '';
+  return [config.sex === 'male' ? 'a man' : 'a woman', hairWord, clothes ? `wearing ${clothes}` : '', glasses ? `with ${glasses} glasses` : ''].filter(Boolean).join(', ');
 }

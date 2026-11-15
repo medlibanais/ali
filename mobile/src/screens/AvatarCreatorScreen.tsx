@@ -59,8 +59,10 @@ import {
   type SavedLook,
 } from '../avatar/types';
 import ColorPicker from '../components/ColorPicker';
+import PhotorealSheet from '../components/PhotorealSheet';
 import {
   BackdropGlyph,
+  CameraGlyph,
   CloseGlyph,
   CompareGlyph,
   DiceGlyph,
@@ -134,6 +136,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const [detailed, setDetailed] = useState(false);
   const [customFor, setCustomFor] = useState<AvatarChoiceKey | null>(null);
   const [saving, setSaving] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const undoStack = useRef<Draft[]>([]);
   const redoStack = useRef<Draft[]>([]);
   // Where a slider drag started, so the whole drag is one undo step.
@@ -403,6 +406,9 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               <RoundButton label={`Zoom: now ${VIEW_LABEL[view]}, next ${VIEW_LABEL[nextView]}`} onPress={() => setView(nextView)}>
                 <ZoomGlyph />
               </RoundButton>
+              <RoundButton label="Make a photo of this avatar" onPress={() => setPhotoOpen(true)} disabled={!config}>
+                <CameraGlyph color={colors.ink} size={20} />
+              </RoundButton>
             </View>
           </View>
         </SafeAreaView>
@@ -562,6 +568,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
           </ScrollView>
         )}
       </View>
+      <PhotorealSheet visible={photoOpen} config={config} onClose={() => setPhotoOpen(false)} />
     </View>
   );
 }

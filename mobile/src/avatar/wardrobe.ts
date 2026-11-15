@@ -23,6 +23,23 @@ export const HAIR_STYLES: WearItem[] = [
   { id: 'long01', label: 'Long' },
   { id: 'ponytail01', label: 'Ponytail' },
   { id: 'braid01', label: 'Layered with braid' },
+  { id: 'blunt_bob', label: 'Blunt bob' },
+  { id: 'blunt_bob_bangs', label: 'Blunt bob with bangs' },
+  { id: 'inverted_bob', label: 'Inverted bob' },
+  { id: 'inverted_bob_bangs', label: 'Inverted bob with bangs' },
+  { id: 'curled_bob', label: 'Curled-under bob' },
+  { id: 'curled_bob_bangs', label: 'Curled bob with bangs' },
+  { id: 'straight_bangs', label: 'Straight with bangs' },
+  { id: 'bobcut', label: 'Layered bob' },
+  { id: 'wavy_long', label: 'Long waves' },
+  { id: 'curly_bob', label: 'Curls' },
+  { id: 'bun', label: 'Low bun' },
+  { id: 'braid_bun', label: 'Braided bun' },
+  { id: 'french_braid', label: 'French braid' },
+  { id: 'double_braid', label: 'Double braid' },
+  { id: 'slick', label: 'Slicked back' },
+  { id: 'tousled', label: 'Tousled' },
+  { id: 'spiky', label: 'Spiky' },
   { id: 'none', label: 'Shaved' },
 ];
 
@@ -58,10 +75,28 @@ export const OUTFITS: WearItem[] = [
   { id: 'm_jacket', label: 'Field jacket', for: 'male' },
   { id: 'm_suit', label: 'Suit and tie', for: 'male' },
   { id: 'm_overalls', label: 'Overalls', for: 'male' },
+  { id: 'suit_m3', label: 'Charcoal suit', for: 'male' },
+  { id: 'suit_bowtie', label: 'Suit with bow tie', for: 'male' },
+  { id: 'suit_m_tie', label: 'Black suit, patterned tie', for: 'male' },
+  { id: 'suit_m_double', label: 'Pinstripe suit', for: 'male' },
+  { id: 'suit_dinner', label: 'White dinner jacket', for: 'male' },
   { id: 'f_tee_jeans', label: 'T-shirt and jeans', for: 'female' },
   { id: 'f_tee_shorts', label: 'T-shirt and shorts', for: 'female' },
   { id: 'f_blouse_skirt', label: 'Blouse and skirt', for: 'female' },
   { id: 'f_sport', label: 'Sports set', for: 'female' },
+  { id: 'suit_f1', label: 'Skirt suit', for: 'female' },
+  { id: 'suit_f2', label: 'Trouser suit', for: 'female' },
+  { id: 'suit_f_double', label: 'Double-breasted suit', for: 'female' },
+  { id: 'dress_shift', label: 'Black shift dress', for: 'female' },
+  { id: 'dress_halter', label: 'Halter dress', for: 'female' },
+  { id: 'dress_midi', label: 'Midi dress', for: 'female' },
+  { id: 'dress_keyhole', label: 'Keyhole dress', for: 'female' },
+  { id: 'dress_camisole', label: 'Camisole dress', for: 'female' },
+  { id: 'dress_lace', label: 'Lace dress', for: 'female' },
+  { id: 'dress_ruffle', label: 'Ruffle dress', for: 'female' },
+  { id: 'dress_tiered', label: 'Tiered dress', for: 'female' },
+  { id: 'dress_cutout', label: 'Cut-out dress', for: 'female' },
+  { id: 'dress_fluted', label: 'Evening gown', for: 'female' },
 ];
 
 export const TOPS: WearItem[] = [
@@ -75,6 +110,11 @@ export const TOPS: WearItem[] = [
 export const BOTTOMS: WearItem[] = [
   { id: 'trousers', label: 'Trousers', tint: true },
   { id: 'cargo', label: 'Cargo pants', tint: true },
+  { id: 'skirt_mini1', label: 'Plaid mini skirt', for: 'female' },
+  { id: 'skirt_mini2', label: 'Pleated plaid skirt', for: 'female' },
+  { id: 'skirt_tiered_mini', label: 'Black tiered skirt', for: 'female' },
+  { id: 'skirt_lace', label: 'Flared skirt', for: 'female' },
+  { id: 'skirt_long', label: 'Long full skirt', for: 'female' },
 ];
 
 export const SHOES: WearItem[] = [
@@ -84,6 +124,13 @@ export const SHOES: WearItem[] = [
   { id: 'shoes4', label: 'Dark shoes' },
   { id: 'shoes5', label: 'Trainers' },
   { id: 'shoes6', label: 'Low sneakers' },
+  { id: 'boots_m_ankle', label: 'Ankle boots', for: 'male' },
+  { id: 'boots_f_ankle', label: 'Ankle boots', for: 'female' },
+  { id: 'cloth_shoes', label: 'Mary Janes', for: 'female' },
+  { id: 'flats', label: 'Flats', for: 'female' },
+  { id: 'ballet', label: 'Ballet flats', for: 'female' },
+  { id: 'ballet_bows', label: 'Ballet flats with bows', for: 'female' },
+  { id: 't_bar', label: 'T-bar shoes', for: 'female' },
 ];
 
 export const GLASSES: WearItem[] = [

@@ -26,7 +26,7 @@ const VIEWER = require('../../assets/avatar3d/viewer.html');
 const MODEL: number = require('../../assets/avatar3d/models/human.bin');
 
 /** 'head-thumb' and 'body-thumb' are the small pictures on the editor's choices. */
-export type Mode = 'head' | 'full-body' | 'head-thumb' | 'body-thumb';
+export type Mode = 'head' | 'full-body' | 'head-thumb' | 'body-thumb' | 'head-hd' | 'body-hd';
 
 /** Pixel size each mode is rendered at (the image is scaled to fit). */
 export const RENDER_SIZE: Record<Mode, { w: number; h: number }> = {
@@ -34,6 +34,9 @@ export const RENDER_SIZE: Record<Mode, { w: number; h: number }> = {
   'full-body': { w: 300, h: 660 },
   'head-thumb': { w: 144, h: 144 },
   'body-thumb': { w: 110, h: 242 },
+  // Sent to the photo maker, so they are rendered large.
+  'head-hd': { w: 768, h: 768 },
+  'body-hd': { w: 576, h: 1264 },
 };
 
 export interface RenderRequest {
@@ -99,7 +102,7 @@ export interface Camera {
 
 function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera, eyesClosed = false) {
   const bg = bgStyle(config.bg);
-  const head = mode === 'head' || mode === 'head-thumb';
+  const head = mode === 'head' || mode === 'head-thumb' || mode === 'head-hd';
   return {
     type: 'render',
     targets: targetsFor(config, mood, eyesClosed),
@@ -119,6 +122,31 @@ function commandFor(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean,
 /** Everything that changes the picture, so each look renders once. */
 export function renderKey(config: AvatarConfig, mood: Mood, mode: Mode, bare: boolean, camera: Camera = {}): string {
   return JSON.stringify([mode, commandFor(config, mood, mode, bare, camera)]);
+}
+
+/**
+ * One finished picture of this look, as a data URL, for sending to the
+ * photo maker. Rejects if the renderer cannot draw it.
+ */
+export function renderOnce(config: AvatarConfig, mood: Mood, mode: Mode, camera: Camera = {}): Promise<string> {
+  const key = renderKey(config, mood, mode, true, camera);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(new Error('The picture took too long to draw.'));
+    }, 60_000);
+    const check = () => {
+      const data = images.get(key);
+      if (data === undefined) return;
+      clearTimeout(timer);
+      unsubscribe();
+      if (data) resolve(data);
+      else reject(new Error('The picture could not be drawn.'));
+    };
+    const unsubscribe = subscribe(check);
+    requestRender({ key, mode, command: commandFor(config, mood, mode, true, camera), channel: 'editor' });
+    check();
+  });
 }
 
 // ---------------------------------------------------------------- host
@@ -276,7 +304,7 @@ export interface Avatar3DProps {
 const NO_CAMERA: Camera = {};
 
 /** Breath scale of the whole image, anchored at its bottom edge. */
-const BREATH_SCALE: Record<Mode, number> = { head: 0.012, 'full-body': 0.008, 'head-thumb': 0, 'body-thumb': 0 };
+const BREATH_SCALE: Record<Mode, number> = { head: 0.012, 'full-body': 0.008, 'head-thumb': 0, 'body-thumb': 0, 'head-hd': 0, 'body-hd': 0 };
 
 export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live }: Avatar3DProps) {
   const key = renderKey(config, mood, mode, bare, camera);
