@@ -85,11 +85,12 @@ The backend seeds this account with 30 days of real history (quests, scores, str
 
 ```
 src/
-  api/          axios client (JWT interceptor, 401 -> refresh once -> retry -> logout)
-                plus typed request/response models mirroring the OpenAPI spec
+  api/          shared TypeScript types for Supabase rows and responses
+  avatar/       realistic 3D avatar (Avatar3D, rendered in a WebView) and its config
   components/   design system: Screen, Txt, Button, Card, Field, Chip, Stepper,
-                SegmentedControl, ScoreRing, PillarBar, RadarChart, QuestRow,
-                BadgeMedallion, Skeleton, Toast, ConfettiLite, custom svg icons
+                SegmentedControl, PillarOrbit, PillarBubble, PillarBar, QuestRow,
+                BadgeMedallion, Skeleton, Toast, ConfettiLite, custom svg icons,
+                charts/ (LineChart, YearHeatmap)
   lib/          token storage (expo-secure-store on device, AsyncStorage on web)
   navigation/   RootNavigator (auth state switch), MainTabs, typed param lists
   screens/      16 screens: Splash, Login, Register, VerifyEmail, Onboarding,
@@ -121,7 +122,7 @@ src/
 - `needsOnboarding` shows Onboarding, GeneratingAvatar, AvatarReveal.
 - `ready` shows the main tabs plus pushed screens.
 
-The axios client attaches the access token, and on a 401 tries `/auth/refresh` once, retries the original request, and otherwise signs the user out.
+The Supabase client (`src/lib/supabase.ts`) stores the session and refreshes the access token itself.
 
 ### Notes on endpoints
 
