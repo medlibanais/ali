@@ -1,0 +1,14 @@
+# Netlify settings for the GROW web app (deployed by .github/workflows/deploy.yml,
+# or by dragging mobile/dist onto Netlify). Keep this file next to dist.
+[build]
+  publish = "dist"
+
+# Netlify's asset post-processing corrupts the .ttf font files. Never turn this on.
+[build.processing]
+  skip_processing = true
+
+# SPA routing: every path serves index.html (same rule as public/_redirects).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
