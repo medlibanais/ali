@@ -167,10 +167,6 @@ export function pantsColor(id: string) {
   return cloth(id, 'navy');
 }
 
-export function shoesColor(id: string) {
-  return cloth(id, 'charcoal');
-}
-
 /** Iris colour. */
 export function eyeColor(id: string): string {
   if (isHex(id)) return id;

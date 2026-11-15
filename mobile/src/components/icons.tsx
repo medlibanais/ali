@@ -223,21 +223,6 @@ export function CheckGlyph({ size = 14, color = colors.onAccent }: IconProps) {
   );
 }
 
-export function SendGlyph({ size = 20, color = colors.onAccent }: IconProps) {
-  useTheme();
-  return (
-    <Svg {...baseProps(size)}>
-      <Path
-        d="M4 12h15M13.5 5.5 20 12l-6.5 6.5"
-        stroke={color}
-        strokeWidth={STROKE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 export function MinusGlyph({ size = 16, color = colors.inkSoft }: IconProps) {
   useTheme();
   return (
@@ -405,59 +390,14 @@ export function DiceGlyph({ size = 20, color = colors.ink }: IconProps) {
   );
 }
 
-export function BodyToggleGlyph({ size = 20, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 10.5l6 1 6-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
-}
-
 export function FaceGlyph({ size = 22, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M12 3c4.4 0 7 3.4 7 8 0 5-3.2 10-7 10s-7-5-7-10c0-4.6 2.6-8 7-8ZM9.5 11h.01M14.5 11h.01M9.5 15.5c1.4 1.2 3.6 1.2 5 0" />;
 }
 
-export function HairGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M5.2 14C4 7.5 7.4 3 12 3s8 4.5 6.8 11M5.2 14c2.4-1.2 3.8-3.6 4.3-6.4 2.2 2.6 5.6 4 9.3 6.4M7 14c.2 4.2 2.4 7 5 7s4.8-2.8 5-7" />;
-}
-
 export function EyeGlyph({ size = 22, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />;
-}
-
-export function LipsGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M2.5 12c2.6-3.2 5.2-4.6 7.3-3.6l2.2 1 2.2-1c2.1-1 4.7.4 7.3 3.6-2.6 3.6-5.7 5.2-9.5 5.2S5.1 15.6 2.5 12ZM2.5 12h19" />;
-}
-
-export function BeardGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M5 5v5c0 6 3 10 7 10s7-4 7-10V5M8.5 13.5c1.2-1.2 2.4-1.2 3.5-.3 1.1-.9 2.3-.9 3.5.3M10 16.5h4" />;
-}
-
-export function GlassesGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M2 10h2M20 10h2M4 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM13 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM11 10.5c.7-.6 1.3-.6 2 0" />;
-}
-
-export function ShirtGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M8 3.5 3 6.5 5 11l2-1v10.5h10V10l2 1 2-4.5-5-3c-.5 1.5-2 2.5-4 2.5s-3.5-1-4-2.5Z" />;
-}
-
-export function PantsGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M6 3h12l1 18h-5l-2-11-2 11H5L6 3ZM6 6.5h12" />;
-}
-
-export function ShoeGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M3 17V8.5l4 .5c1 2 3 3.2 5.5 3.6L19 14c1.6.5 2.5 1.6 2.5 3v1H3v-1ZM3 15.5h18.5M10 11.5 11.5 10M13 12.5 14.5 11" />;
-}
-
-export function PersonGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM5 10.5l7 1 7-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
 }
 
 export function BackdropGlyph({ size = 22, color = colors.ink }: IconProps) {
@@ -571,12 +511,3 @@ export function ResetGlyph({ size = 18, color = colors.ink }: IconProps) {
   return <Outline size={size} color={color} d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />;
 }
 
-export function SkinGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 3.5c3 3.6 5.5 6.6 5.5 9.8a5.5 5.5 0 0 1-11 0c0-3.2 2.5-6.2 5.5-9.8ZM9.5 13.5a2.5 2.5 0 0 0 2.5 2.5" />;
-}
-
-export function SmileGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8.5 10h.01M15.5 10h.01M8 14.5c2 2.3 6 2.3 8 0" />;
-}

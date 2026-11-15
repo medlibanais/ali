@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
-import { colors, fonts, radius, spacing, themed } from '../theme/tokens';
+import { colors, fonts, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { EyeGlyph, EyeOffGlyph } from './icons';
 import Txt from './Txt';
