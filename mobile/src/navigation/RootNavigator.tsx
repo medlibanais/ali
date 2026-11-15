@@ -25,6 +25,7 @@ import EditPhotoScreen from '../screens/EditPhotoScreen';
 import FriendsScreen from '../screens/FriendsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
+import AppLockGate from '../features/appLock/AppLockGate';
 import MainTabs from './MainTabs';
 import type {
   AppStackParamList,
@@ -205,7 +206,11 @@ export function RootNavigator() {
     case 'needsOnboarding':
       return <OnboardingNavigator />;
     case 'ready':
-      return <AppNavigator />;
+      return (
+        <AppLockGate>
+          <AppNavigator />
+        </AppLockGate>
+      );
   }
 }
 
