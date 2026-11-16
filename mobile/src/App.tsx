@@ -1,5 +1,7 @@
+import './i18n';
 import { Avatar3DHost } from './avatar/Avatar3D';
 import React, { useEffect, useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -16,6 +18,8 @@ import type { AppStackParamList, AuthStackParamList } from './navigation/types';
 import { useTheme } from './theme/useTheme';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { hydrateTheme } from './store/slices/themeSlice';
+import { hydrateLanguage } from './store/slices/languageSlice';
+import { isRtlLanguage } from './i18n/languages';
 
 const linking: LinkingOptions<AuthStackParamList & AppStackParamList> = {
   prefixes: ['prayerlock://'],
@@ -33,9 +37,12 @@ function ThemedRoot() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const themeHydrated = useAppSelector((state) => state.theme.hydrated);
+  const languageHydrated = useAppSelector((state) => state.language.hydrated);
+  const language = useAppSelector((state) => state.language.language);
 
   useEffect(() => {
     dispatch(hydrateTheme());
+    dispatch(hydrateLanguage());
   }, [dispatch]);
 
   const navigationTheme = useMemo(
@@ -53,11 +60,17 @@ function ThemedRoot() {
     [theme],
   );
 
-  if (!fontsLoaded || !themeHydrated) {
+  if (!fontsLoaded || !themeHydrated || !languageHydrated) {
     return <SplashScreen />;
   }
 
+  // Setting `direction` on the root flips row layouts, start/end margins and
+  // paddings instantly, without waiting for the Android restart that
+  // I18nManager.forceRTL needs.
   return (
+    <View
+      style={[styles.root, { direction: isRtlLanguage(language) ? 'rtl' : 'ltr' }]}
+    >
     <NavigationContainer linking={linking} theme={navigationTheme}>
       <StatusBar
         style={theme.dark ? 'light' : 'dark'}
@@ -66,8 +79,13 @@ function ThemedRoot() {
       <RootNavigator />
       <Avatar3DHost />
     </NavigationContainer>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 export default function App() {
   return (

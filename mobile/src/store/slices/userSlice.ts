@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
+import { isLanguage, Language } from '../../i18n/languages';
 
 // Shapes consumed by the screens (kept stable while the backend changed).
 export interface UserProfile {
@@ -17,6 +18,8 @@ export interface UserProfile {
   invite_code: string | null;
   stats_visibility: 'friends' | 'private';
   theme_id: string;
+  /** null until the user (or this device) picks one. */
+  language: Language | null;
   dream_body: string | null;
   dream_personality: string[];
   career_goal: string | null;
@@ -98,6 +101,7 @@ export const fetchProfile = createAsyncThunk<
       invite_code: p?.invite_code ?? null,
       stats_visibility: (p?.stats_visibility as 'friends' | 'private') ?? 'friends',
       theme_id: p?.theme_id ?? 'parchment',
+      language: isLanguage(p?.language) ? p.language : null,
       dream_body: g?.dream_body ?? null,
       dream_personality: g?.dream_personality ?? [],
       career_goal: g?.career_goal ?? null,

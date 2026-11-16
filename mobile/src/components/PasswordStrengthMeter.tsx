@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Txt from './Txt';
 import {
   PASSWORD_RULES,
@@ -35,6 +36,7 @@ export function PasswordStrengthMeter({
   showRules?: boolean;
 }) {
   useTheme();
+  const { t } = useTranslation();
   const strength = passwordStrength(password);
   const filled = segmentCount(strength);
   const rules = useMemo(
@@ -50,7 +52,7 @@ export function PasswordStrengthMeter({
   return (
     <View
       style={styles.wrap}
-      accessibilityLabel={`Password strength: ${STRENGTH_LABEL[strength]}`}
+      accessibilityLabel={t('password.strengthA11y', { strength: STRENGTH_LABEL[strength] })}
     >
       <View style={styles.meterRow}>
         {[0, 1, 2, 3].map((i) => (
@@ -101,7 +103,7 @@ const styles = themed(() =>
       borderRadius: radius.sm,
       marginRight: spacing.xs,
     },
-    label: { marginLeft: spacing.sm, width: 48 },
+    label: { marginStart: spacing.sm, width: 48 },
     rules: { marginTop: spacing.xs },
     ruleRow: {
       flexDirection: 'row',

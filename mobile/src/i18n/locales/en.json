@@ -1,0 +1,119 @@
+{
+  "common": {
+    "appName": "GROW",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Done",
+    "back": "Back",
+    "next": "Next",
+    "retry": "Try again",
+    "loading": "Loading",
+    "edit": "Edit",
+    "delete": "Delete",
+    "continue": "Continue",
+    "skip": "Skip",
+    "ok": "OK",
+    "share": "Share",
+    "xp": "{{count}} XP",
+    "xpPlus": "+{{count}} XP",
+    "level": "Level {{level}}",
+    "levelShort": "Lv {{level}}",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "bestDays_one": "best {{count}} day",
+    "bestDays_other": "best {{count}} days",
+    "somethingWrong": "Something went wrong. Try again."
+  },
+  "pillars": {
+    "health": "Health",
+    "family": "Family",
+    "work": "Work",
+    "fun": "Fun",
+    "spirituality": "Spirituality"
+  },
+  "levelTitles": {
+    "legendary": "Legendary",
+    "guardian": "Guardian of Family",
+    "ironMind": "Iron Mind",
+    "disciplined": "Disciplined Human",
+    "novice": "Novice"
+  },
+  "tabs": {
+    "today": "Today",
+    "quests": "Quests",
+    "coach": "Coach",
+    "insights": "Insights",
+    "profile": "Profile"
+  },
+  "nav": {
+    "createAccount": "Create account",
+    "resetPassword": "Reset password",
+    "newPassword": "New password",
+    "verifyEmail": "Verify email",
+    "aboutYou": "About you",
+    "futureSelf": "Your future self",
+    "achievements": "Achievements",
+    "notifications": "Notifications",
+    "notificationSettings": "Notification settings",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "quest": "Quest",
+    "timezone": "Timezone",
+    "yourAvatar": "Your avatar",
+    "aiAvatar": "AI avatar",
+    "profilePhoto": "Profile photo",
+    "friends": "Friends"
+  },
+  "becoming": {
+    "question": "Who are you becoming?",
+    "currentA11y": "Current you. Edit the avatar of who you are today.",
+    "current": "Current you",
+    "today": "Today",
+    "futureA11y": "Future you. Edit the avatar of who you are becoming.",
+    "createFutureA11y": "Create your Future You avatar",
+    "createFuture": "Create your Future You",
+    "future": "Future you",
+    "becoming": "Becoming"
+  },
+  "avatar": {
+    "avatarOf": "Avatar of {{name}}",
+    "avatar": "Avatar",
+    "yours": "Your avatar"
+  },
+  "field": {
+    "hide": "Hide {{label}}",
+    "show": "Show {{label}}"
+  },
+  "password": {
+    "ruleLength": "At least 8 characters",
+    "ruleUpper": "One uppercase letter",
+    "ruleNumber": "One number",
+    "ruleSpecial": "One special character",
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong",
+    "strengthA11y": "Password strength: {{strength}}"
+  },
+  "photoreal": {
+    "portrait": "Portrait",
+    "fullBody": "Full body",
+    "remaining_one": "{{count}} more today.",
+    "remaining_other": "{{count}} more today.",
+    "lastOne": "That was the last one for today.",
+    "makeFailed": "We could not make the photo this time. Try again.",
+    "saveFailed": "We could not save that. Try again.",
+    "title": "Make a photo",
+    "intro": "Turns the avatar you are building into a photograph of that same person. It uses one of today's five.",
+    "photoA11y": "Photo of your avatar",
+    "making": "Making your photo. This takes about 20 seconds.",
+    "none": "No photo yet.",
+    "makeAnotherA11y": "Make another photo",
+    "make": "Make the photo",
+    "makeAnother": "Make another",
+    "useA11y": "Use this photo as my profile picture",
+    "isProfile": "Your profile picture",
+    "use": "Use as my profile picture"
+  }
+}

@@ -3,6 +3,7 @@
 // No icon fonts, no emoji, no third-party icon sets.
 
 import React from 'react';
+import { View } from 'react-native';
 import Svg, {
   Circle,
   Line,
@@ -12,6 +13,12 @@ import Svg, {
 } from 'react-native-svg';
 import { colors, Pillar } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import i18n from '../i18n';
+
+/** Mirrors arrows and chevrons that point "forward" in right-to-left. */
+function mirrorStyle() {
+  return i18n.dir(i18n.language) === 'rtl' ? { transform: [{ scaleX: -1 }] } : undefined;
+}
 
 export interface IconProps {
   size?: number;
@@ -245,7 +252,7 @@ export function PlusGlyph({ size = 16, color = colors.inkSoft }: IconProps) {
 export function ChevronGlyph({ size = 16, color = colors.inkFaint }: IconProps) {
   useTheme();
   return (
-    <Svg {...baseProps(size)}>
+    <Svg {...baseProps(size)} style={mirrorStyle()}>
       <Polyline
         points="9,5.5 15.5,12 9,18.5"
         stroke={color}
@@ -464,7 +471,11 @@ export function EyeOffGlyph({ size = 22, color = colors.ink }: IconProps) {
 /** Right arrow for forward actions (sign in, continue). */
 export function ArrowRightGlyph({ size = 20, color = colors.onAccent }: IconProps) {
   useTheme();
-  return <Outline size={size} color={color} d="M4.5 12h15M13 5.5l6.5 6.5-6.5 6.5" />;
+  return (
+    <View style={mirrorStyle()}>
+      <Outline size={size} color={color} d="M4.5 12h15M13 5.5l6.5 6.5-6.5 6.5" />
+    </View>
+  );
 }
 
 /** Thumbs up for coach feedback. */

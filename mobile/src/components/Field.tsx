@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, fonts, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { EyeGlyph, EyeOffGlyph } from './icons';
@@ -21,6 +22,7 @@ export function Field({
   ...inputProps
 }: FieldProps) {
   useTheme();
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   // Password fields get a show/hide toggle; the text starts hidden.
   const isPassword = secureTextEntry === true;
@@ -56,7 +58,7 @@ export function Field({
             onPress={() => setRevealed((v) => !v)}
             accessibilityRole="button"
             accessibilityLabel={
-              revealed ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`
+              revealed ? t('field.hide', { label }) : t('field.show', { label })
             }
             accessibilityState={{ checked: revealed }}
             hitSlop={4}
