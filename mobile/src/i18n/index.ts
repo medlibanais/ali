@@ -7,7 +7,7 @@ import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
 import fr from './locales/fr.json';
 import ar from './locales/ar.json';
-import { detectDeviceLanguage } from './languages';
+import { detectDeviceLanguage, localeTag } from './languages';
 
 export const resources = {
   en: { translation: en },
@@ -17,7 +17,9 @@ export const resources = {
 
 void i18n.use(initReactI18next).init({
   resources,
-  lng: detectDeviceLanguage(),
+  // Tests always run in English so string assertions don't depend on the
+  // machine's locale.
+  lng: process.env.NODE_ENV === 'test' ? 'en' : detectDeviceLanguage(),
   fallbackLng: 'en',
   supportedLngs: ['en', 'fr', 'ar'],
   interpolation: {
@@ -30,5 +32,18 @@ void i18n.use(initReactI18next).init({
     bindI18n: 'languageChanged',
   },
 });
+
+/** Locale tag for dates and numbers in the current app language. */
+export function appLocale(): string {
+  return localeTag(i18n.language);
+}
+
+/** Short month name ("Jan", "janv.", "يناير") for a 0-based month. */
+export function monthShort(month: number): string {
+  return new Date(Date.UTC(2020, month, 1)).toLocaleDateString(appLocale(), {
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
 
 export default i18n;

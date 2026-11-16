@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthHeader from '../components/AuthHeader';
@@ -19,6 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function LoginScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { busy, error } = useAppSelector((state) => state.auth);
@@ -31,13 +33,13 @@ export function LoginScreen({ navigation }: Props) {
   const validate = (): boolean => {
     let valid = true;
     if (!EMAIL_RE.test(email.trim())) {
-      setEmailError('Enter a valid email address.');
+      setEmailError(t('login.enterAValidEmail'));
       valid = false;
     } else {
       setEmailError(null);
     }
     if (password.length === 0) {
-      setPasswordError('Enter your password.');
+      setPasswordError(t('login.enterYourPassword'));
       valid = false;
     } else {
       setPasswordError(null);
@@ -54,11 +56,11 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <Screen scroll keyboardAvoiding>
-      <AuthHeader title="Welcome back" subtitle="Sign in to pick up today's quests." />
+      <AuthHeader title={t('login.welcomeBack')} subtitle={t('login.signInToPick')} />
 
       <Card style={styles.form}>
         <Field
-          label="Email"
+          label={t('login.email')}
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -71,7 +73,7 @@ export function LoginScreen({ navigation }: Props) {
           placeholder="you@example.com"
         />
         <Field
-          label="Password"
+          label={t('login.password')}
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -80,18 +82,18 @@ export function LoginScreen({ navigation }: Props) {
           error={passwordError}
           secureTextEntry
           autoCapitalize="none"
-          placeholder="Your password"
+          placeholder={t('login.yourPassword')}
           containerStyle={styles.passwordField}
         />
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel="Forgot password?"
+          accessibilityLabel={t('login.forgotPassword')}
           onPress={() => navigation.navigate('ForgotPassword')}
           style={styles.forgot}
           hitSlop={8}
         >
           <Txt variant="bodySemi" color={colors.accent} style={styles.smallLink}>
-            Forgot password?
+            {t('login.forgotPassword')}
           </Txt>
         </Pressable>
 
@@ -102,8 +104,8 @@ export function LoginScreen({ navigation }: Props) {
         ) : null}
 
         <Button
-          title="Sign in"
-          winTitle="Let's grow"
+          title={t('login.signIn')}
+          winTitle={t('login.letSGrow')}
           icon={ArrowRightGlyph}
           onPress={submit}
           loading={busy}
@@ -114,18 +116,18 @@ export function LoginScreen({ navigation }: Props) {
       <View style={styles.divider}>
         <View style={styles.rule} />
         <Txt variant="label" style={styles.dividerText}>
-          New to GROW?
+          {t('login.newToGrow')}
         </Txt>
         <View style={styles.rule} />
       </View>
 
       <Button
-        title="Create account"
+        title={t('login.createAccount')}
         variant="secondary"
         onPress={() => navigation.navigate('Register')}
       />
       <Button
-        title="Have an invite code? Join a friend"
+        title={t('login.haveAnInviteCode')}
         variant="ghost"
         onPress={() => navigation.navigate('Register', { showInvite: true })}
         style={styles.inviteButton}

@@ -1,6 +1,7 @@
 // Friends data layer: React Query hooks over the friends RPCs.
 // All heavy rules (duplicates, blocks, privacy) live in Postgres/RLS.
 
+import i18n from '../../i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { CircleRow, SearchHit } from './logic';
@@ -40,7 +41,7 @@ async function myId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  if (!user) throw new Error(i18n.t('errors.notSignedIn'));
   return user.id;
 }
 

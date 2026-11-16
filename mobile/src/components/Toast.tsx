@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import Txt from './Txt';
@@ -41,6 +42,7 @@ export function useToast(): ToastContextValue {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   useTheme();
+  const { t } = useTranslation();
   const [toast, setToast] = useState<ToastState | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,7 +106,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const actionLabel =
     toast?.actionLabel && secondsLeft !== null && secondsLeft > 0
-      ? `${toast.actionLabel} (${secondsLeft}s)`
+      ? t('toast.countdown', { action: toast.actionLabel, seconds: secondsLeft })
       : toast?.actionLabel;
 
   const actionDisabled = secondsLeft !== null && secondsLeft <= 0;

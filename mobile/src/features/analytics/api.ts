@@ -1,6 +1,7 @@
 // Analytics data layer: everything computed from daily_scores,
 // quest_completions and gamification. No mock series anywhere.
 
+import i18n from '../../i18n';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Pillar } from '../../theme/tokens';
@@ -90,7 +91,7 @@ export function useStreakInfo() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in.');
+      if (!user) throw new Error(i18n.t('errors.notSignedIn'));
       const { data: g } = await supabase
         .from('gamification')
         .select('level, total_xp, current_streak, best_streak')

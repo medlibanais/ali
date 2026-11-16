@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import {
@@ -81,7 +82,7 @@ export const fetchGamification = createAsyncThunk<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('errors.notSignedIn'));
 
     const [gamRes, achRes] = await Promise.all([
       supabase.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
@@ -123,7 +124,7 @@ export const fetchGamification = createAsyncThunk<
     };
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load your progress.',
+      error instanceof Error ? error.message : i18n.t('errors.loadProgress'),
     );
   }
 });
@@ -138,7 +139,7 @@ export const fetchAllBadges = createAsyncThunk<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('errors.notSignedIn'));
     const [catalogRes, unlockedRes] = await Promise.all([
       supabase.from('badge_catalog').select('*').order('sort'),
       supabase.from('achievements').select('badge_id, unlocked_at').eq('user_id', user.id),
@@ -168,7 +169,7 @@ export const fetchAllBadges = createAsyncThunk<
     );
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load achievements.',
+      error instanceof Error ? error.message : i18n.t('errors.loadAchievements'),
     );
   }
 });
@@ -202,7 +203,7 @@ const gamificationSlice = createSlice({
       })
       .addCase(fetchGamification.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? 'Could not load your progress.';
+        state.error = action.payload ?? i18n.t('errors.loadProgress');
       });
   },
 });

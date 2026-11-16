@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import { isLanguage, Language } from '../../i18n/languages';
@@ -69,7 +70,7 @@ async function requireUserId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  if (!user) throw new Error(i18n.t('errors.notSignedIn'));
   return user.id;
 }
 
@@ -109,7 +110,7 @@ export const fetchProfile = createAsyncThunk<
     return { profile, goals: (g as UserGoals | null) ?? null };
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load your profile.',
+      error instanceof Error ? error.message : i18n.t('errors.loadProfile'),
     );
   }
 });
@@ -124,7 +125,7 @@ export const submitOnboarding = createAsyncThunk<
     const username = payload.username.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,20}$/.test(username)) {
       throw new Error(
-        'Username must be 3-20 chars: lowercase letters, numbers, underscore.',
+        i18n.t('errors.usernameRules'),
       );
     }
 
@@ -140,7 +141,7 @@ export const submitOnboarding = createAsyncThunk<
     if (profileError) {
       if (profileError.message.toLowerCase().includes('duplicate') ||
           profileError.code === '23505') {
-        throw new Error('That username is taken. Try another one.');
+        throw new Error(i18n.t('errors.usernameTaken'));
       }
       throw profileError;
     }
@@ -159,7 +160,7 @@ export const submitOnboarding = createAsyncThunk<
     if (goalsError) throw goalsError;
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not save your answers.',
+      error instanceof Error ? error.message : i18n.t('errors.saveAnswers'),
     );
   }
 });
@@ -179,7 +180,7 @@ export const saveAvatarConfig = createAsyncThunk<
     return config;
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not save your avatar.',
+      error instanceof Error ? error.message : i18n.t('errors.saveAvatar'),
     );
   }
 });
@@ -212,7 +213,7 @@ const userSlice = createSlice({
       })
       .addCase(fetchProfile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? 'Could not load your profile.';
+        state.error = action.payload ?? i18n.t('errors.loadProfile');
       })
       .addCase(saveAvatarConfig.fulfilled, (state, action) => {
         if (state.profile) {

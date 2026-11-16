@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import type {
@@ -126,12 +127,12 @@ export const fetchDailyScore = createAsyncThunk<
       overall_score: row?.overall ?? 0,
       pillars,
       suggestion: weakest
-        ? `Next up: ${PILLAR_LABELS[weakest]} has quests waiting.`
+        ? i18n.t('analytics.nextUp', { pillar: PILLAR_LABELS[weakest] })
         : null,
     };
   } catch (e) {
     return rejectWithValue(
-      e instanceof Error ? e.message : 'Could not load today\'s breakdown.',
+      e instanceof Error ? e.message : i18n.t('analytics.loadBreakdown'),
     );
   }
 });
@@ -188,7 +189,7 @@ export const fetchWeeklyReport = createAsyncThunk<
     };
   } catch (e) {
     return rejectWithValue(
-      e instanceof Error ? e.message : 'Could not load the weekly report.',
+      e instanceof Error ? e.message : i18n.t('analytics.loadWeekly'),
     );
   }
 });
@@ -239,7 +240,7 @@ export const fetchMonthlyReport = createAsyncThunk<
     };
   } catch (e) {
     return rejectWithValue(
-      e instanceof Error ? e.message : 'Could not load the monthly report.',
+      e instanceof Error ? e.message : i18n.t('analytics.loadMonthly'),
     );
   }
 });
@@ -264,7 +265,7 @@ const analyticsSlice = createSlice({
       })
       .addCase(fetchDailyScore.rejected, (state, action) => {
         state.dailyLoading = false;
-        state.dailyError = action.payload ?? 'Could not load today\'s breakdown.';
+        state.dailyError = action.payload ?? i18n.t('analytics.loadBreakdown');
       })
       .addCase(fetchWeeklyReport.pending, (state) => {
         state.weeklyLoading = true;
@@ -276,7 +277,7 @@ const analyticsSlice = createSlice({
       })
       .addCase(fetchWeeklyReport.rejected, (state, action) => {
         state.weeklyLoading = false;
-        state.weeklyError = action.payload ?? 'Could not load the weekly report.';
+        state.weeklyError = action.payload ?? i18n.t('analytics.loadWeekly');
       })
       .addCase(fetchMonthlyReport.pending, (state) => {
         state.monthlyLoading = true;
@@ -288,7 +289,7 @@ const analyticsSlice = createSlice({
       })
       .addCase(fetchMonthlyReport.rejected, (state, action) => {
         state.monthlyLoading = false;
-        state.monthlyError = action.payload ?? 'Could not load the monthly report.';
+        state.monthlyError = action.payload ?? i18n.t('analytics.loadMonthly');
       });
   },
 });

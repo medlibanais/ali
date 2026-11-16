@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
   dequeueCompletion,
@@ -103,15 +104,15 @@ function rowToQuest(row: QuestRow): Quest {
 
 function rpcError(error: { message?: string } | null, fallback: string): string {
   const msg = error?.message ?? '';
-  if (msg.includes('undo_window_expired')) return 'The undo window has closed.';
-  if (msg.includes('skip_limit_reached')) return 'You can skip 3 quests per day.';
-  if (msg.includes('already_completed')) return 'This quest is already completed.';
-  if (msg.includes('not_authenticated')) return 'Your session expired. Sign in again.';
+  if (msg.includes('undo_window_expired')) return i18n.t('questErrors.undoClosed');
+  if (msg.includes('skip_limit_reached')) return i18n.t('questErrors.skipLimit');
+  if (msg.includes('already_completed')) return i18n.t('questErrors.alreadyCompleted');
+  if (msg.includes('not_authenticated')) return i18n.t('questErrors.sessionExpired');
   if (msg.includes('daily_completion_limit')) {
-    return 'You reached today\'s limit of 15 completed quests. See you tomorrow.';
+    return i18n.t('questErrors.dailyLimit');
   }
-  if (msg.includes('quest_not_today')) return 'This quest is from another day.';
-  if (msg.includes('quest_skipped')) return 'This quest was skipped.';
+  if (msg.includes('quest_not_today')) return i18n.t('questErrors.otherDay');
+  if (msg.includes('quest_skipped')) return i18n.t('questErrors.wasSkipped');
   return fallback;
 }
 
@@ -206,7 +207,7 @@ export const fetchDailyQuests = createAsyncThunk<
       return cached;
     }
     return rejectWithValue(
-      rpcError(error as { message?: string }, 'Could not load today\'s quests.'),
+      rpcError(error as { message?: string }, i18n.t('questErrors.loadFailed')),
     );
   }
 });
@@ -251,7 +252,7 @@ export const completeQuest = createAsyncThunk<
     dispatch(questRolledBack(quest.quest_id));
     return rejectWithValue({
       questId: quest.quest_id,
-      message: rpcError(error as { message?: string }, 'Could not complete this quest.'),
+      message: rpcError(error as { message?: string }, i18n.t('questErrors.completeFailed')),
     });
   }
   // Server recomputed XP/level/streak/badges — sync the gamification slice.
@@ -268,7 +269,7 @@ export const undoQuest = createAsyncThunk<
     p_quest_id: questId,
   });
   if (error) {
-    return rejectWithValue(rpcError(error, 'The undo window has closed.'));
+    return rejectWithValue(rpcError(error, i18n.t('questErrors.undoClosed')));
   }
   dispatch(fetchGamification());
   return { ...(data as UndoQuestResponse), questId };
@@ -316,7 +317,7 @@ export const skipQuest = createAsyncThunk<
     p_quest_id: questId,
   });
   if (error) {
-    return rejectWithValue(rpcError(error, 'Could not skip this quest.'));
+    return rejectWithValue(rpcError(error, i18n.t('questErrors.skipFailed')));
   }
   return data as SkipQuestResponse;
 });
@@ -374,7 +375,7 @@ const questsSlice = createSlice({
       .addCase(fetchDailyQuests.rejected, (state, action) => {
         state.loading = false;
         state.refreshing = false;
-        state.error = action.payload ?? 'Could not load today\'s quests.';
+        state.error = action.payload ?? i18n.t('questErrors.loadFailed');
       })
       .addCase(completeQuest.fulfilled, (state, action) => {
         state.completingId = null;
@@ -409,7 +410,7 @@ const questsSlice = createSlice({
       })
       .addCase(completeQuest.rejected, (state, action) => {
         state.completingId = null;
-        state.error = action.payload?.message ?? 'Could not complete this quest.';
+        state.error = action.payload?.message ?? i18n.t('questErrors.completeFailed');
       })
       .addCase(undoQuest.fulfilled, (state, action) => {
         const quest = state.quests.find(
@@ -424,7 +425,7 @@ const questsSlice = createSlice({
       })
       .addCase(undoQuest.rejected, (state, action) => {
         state.undo = null;
-        state.error = action.payload ?? 'The undo window has closed.';
+        state.error = action.payload ?? i18n.t('questErrors.undoClosed');
       })
       .addCase(skipQuest.fulfilled, (state, action) => {
         const quest = state.quests.find(
@@ -436,7 +437,7 @@ const questsSlice = createSlice({
         state.skipsUsed = action.payload.skips_used;
       })
       .addCase(skipQuest.rejected, (state, action) => {
-        state.error = action.payload ?? 'Could not skip this quest.';
+        state.error = action.payload ?? i18n.t('questErrors.skipFailed');
       });
   },
 });

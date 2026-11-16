@@ -3,6 +3,7 @@
 // bubble" component). Used by PillarOrbit on the Today screen.
 
 import React, { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Txt from './Txt';
@@ -37,6 +38,7 @@ export function PillarBubble({
   compact = false,
 }: PillarBubbleProps) {
   useTheme();
+  const { t } = useTranslation();
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const { ink, base, tint } = pillarPastels(pillar);
 
@@ -51,8 +53,8 @@ export function PillarBubble({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={
-        `${PILLAR_LABELS[pillar]}, ${clamped} percent` +
-        (hasCount ? `, ${done ?? 0} of ${total} quests done` : '')
+        t('pillarBubble.a11y', { pillar: PILLAR_LABELS[pillar], score: clamped }) +
+        (hasCount ? t('pillarBubble.a11yCount', { done: done ?? 0, total }) : '')
       }
       accessibilityState={{ selected: expanded }}
       onPress={() => onPress(pillar)}

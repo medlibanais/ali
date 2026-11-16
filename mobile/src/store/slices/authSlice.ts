@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -38,13 +39,13 @@ async function getOnboardingCompleted(userId: string): Promise<boolean> {
 
 function authErrorMessage(error: { message?: string } | null, fallback: string): string {
   const msg = error?.message?.toLowerCase() ?? '';
-  if (msg.includes('invalid login credentials')) return 'Email or password incorrect.';
-  if (msg.includes('email not confirmed')) return 'Please verify your email first. Check your inbox.';
+  if (msg.includes('invalid login credentials')) return i18n.t('authErrors.badCredentials');
+  if (msg.includes('email not confirmed')) return i18n.t('authErrors.verifyFirst');
   if (msg.includes('rate limit') || msg.includes('too many requests')) {
-    return 'Too many attempts. Please wait a minute and try again.';
+    return i18n.t('authErrors.tooMany');
   }
   if (msg.includes('already registered') || msg.includes('already been registered')) {
-    return 'An account with this email already exists.';
+    return i18n.t('authErrors.emailExists');
   }
   return error?.message ?? fallback;
 }
@@ -80,7 +81,7 @@ export const login = createAsyncThunk<
     password,
   });
   if (error || !data.user) {
-    return rejectWithValue(authErrorMessage(error, 'Sign in failed.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.signInFailed')));
   }
   const onboardingCompleted = await getOnboardingCompleted(data.user.id);
   return {
@@ -101,7 +102,7 @@ export const register = createAsyncThunk<
     options: { emailRedirectTo: emailRedirect('verify-email') },
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not create the account.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.createFailed')));
   }
   // Supabase returns a user with no session when email confirmation is on.
   return {
@@ -119,7 +120,7 @@ export const sendPasswordReset = createAsyncThunk<
     redirectTo: emailRedirect('reset-password'),
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not send the reset email.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.resetFailed')));
   }
 });
 
@@ -130,7 +131,7 @@ export const updatePassword = createAsyncThunk<
 >('auth/updatePassword', async ({ password }, { rejectWithValue }) => {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not update the password.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.updatePasswordFailed')));
   }
 });
 
@@ -145,7 +146,7 @@ export const resendVerification = createAsyncThunk<
     options: { emailRedirectTo: emailRedirect('verify-email') },
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not resend the email.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.resendFailed')));
   }
 });
 
@@ -207,7 +208,7 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.busy = false;
-        state.error = action.payload ?? 'Sign in failed.';
+        state.error = action.payload ?? i18n.t('authErrors.signInFailed');
       })
       .addCase(register.pending, (state) => {
         state.busy = true;
@@ -218,7 +219,7 @@ const authSlice = createSlice({
       })
       .addCase(register.rejected, (state, action) => {
         state.busy = false;
-        state.error = action.payload ?? 'Registration failed.';
+        state.error = action.payload ?? i18n.t('authErrors.registerFailed');
       })
       .addCase(logout.fulfilled, (state) => {
         state.status = 'unauthenticated';

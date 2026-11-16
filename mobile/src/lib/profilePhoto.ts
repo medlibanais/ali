@@ -1,6 +1,7 @@
 // Profile photo pipeline: pick -> crop -> compress -> upload -> profile row.
 // Photos live in the `profile-photos` bucket under {user_id}/avatar.jpg.
 
+import i18n from '../i18n';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Linking } from 'react-native';
@@ -77,7 +78,7 @@ export async function pickSquarePhoto(
   const granted = await ensurePermission(source);
   if (!granted) {
     throw new PhotoError(
-      'Permission denied. Enable access in your device settings to add a photo.',
+      i18n.t('photoErrors.permission'),
       'permission',
     );
   }
@@ -101,10 +102,10 @@ export async function pickSquarePhoto(
     throw new PhotoError('cancelled', 'cancelled');
   }
   const asset = result.assets[0];
-  if (!asset?.uri) throw new PhotoError('No photo selected.', 'unknown');
+  if (!asset?.uri) throw new PhotoError(i18n.t('photoErrors.noneSelected'), 'unknown');
   if (asset.fileSize && asset.fileSize > MAX_INPUT_BYTES) {
     throw new PhotoError(
-      'That photo is larger than 5 MB. Choose a smaller one.',
+      i18n.t('photoErrors.tooLarge'),
       'too_large',
     );
   }
@@ -135,7 +136,7 @@ export async function pickSquarePhoto(
     { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
   );
   const base64 = manipulated.base64;
-  if (!base64) throw new PhotoError('Could not read that photo.', 'unknown');
+  if (!base64) throw new PhotoError(i18n.t('photoErrors.unreadable'), 'unknown');
   // base64 is 4/3 of the byte size.
   if ((base64.length * 3) / 4 > 500 * 1024) {
     // One more squeeze if the first pass overshoots.
@@ -160,7 +161,7 @@ async function upload(bytes: Uint8Array): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new PhotoError('Not signed in.', 'upload');
+  if (!user) throw new PhotoError(i18n.t('photoErrors.notSignedIn'), 'upload');
 
   const path = `${user.id}/avatar.jpg`;
   const { error } = await supabase.storage
@@ -189,7 +190,7 @@ export async function removePhoto(): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new PhotoError('Not signed in.', 'upload');
+  if (!user) throw new PhotoError(i18n.t('photoErrors.notSignedIn'), 'upload');
 
   await supabase.storage.from(BUCKET).remove([`${user.id}/avatar.jpg`]);
   const { error } = await supabase
@@ -203,7 +204,7 @@ export async function setAvatarMode(mode: 'avatar' | 'photo' | 'ai'): Promise<vo
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new PhotoError('Not signed in.', 'upload');
+  if (!user) throw new PhotoError(i18n.t('photoErrors.notSignedIn'), 'upload');
   const { error } = await supabase
     .from('profiles')
     .update({ avatar_mode: mode })

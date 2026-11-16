@@ -114,6 +114,268 @@
     "makeAnother": "Make another",
     "useA11y": "Use this photo as my profile picture",
     "isProfile": "Your profile picture",
-    "use": "Use as my profile picture"
+    "use": "Use as my profile picture",
+    "drawFailed": "The picture could not be drawn.",
+    "signInAgain": "Sign in again to do that."
+  },
+  "pillarBubble": {
+    "a11y": "{{pillar}}, {{score}} percent",
+    "a11yCount": ", {{done}} of {{total}} quests done",
+    "orbitA11y": "Your avatar with your five pillars guarding it"
+  },
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard"
+  },
+  "questRow": {
+    "complete": "Complete {{title}}",
+    "minutes": "{{count}} min",
+    "coachPick": "Coach pick",
+    "skipped": "Skipped"
+  },
+  "stepper": {
+    "decrease": "Decrease",
+    "increase": "Increase"
+  },
+  "toast": {
+    "countdown": "{{action}} ({{seconds}}s)"
+  },
+  "colorPicker": {
+    "custom": "Custom {{title}} {{hex}}",
+    "hue": "{{title}}: hue",
+    "richness": "{{title}}: richness",
+    "lightness": "{{title}}: lightness",
+    "grey": "Grey",
+    "vivid": "Vivid",
+    "dark": "Dark",
+    "light": "Light"
+  },
+  "charts": {
+    "noData": "No data yet",
+    "average": "Average {{value}}",
+    "heatLegendA11y": "Color scale from 0 to {{max}} XP or more",
+    "heatLegendMax": "{{max}}+ XP",
+    "heatEmpty": "No XP in the last 365 days yet.",
+    "heatSummary_one": "{{xp}} XP over {{count}} active day in the last year.",
+    "heatSummary_other": "{{xp}} XP over {{count}} active days in the last year.",
+    "mon": "Mon",
+    "wed": "Wed",
+    "fri": "Fri",
+    "heatA11y": "Year of activity. {{summary}} Tap a day to see its date and XP.",
+    "heatEarned": "{{xp}} XP earned",
+    "heatNone": "No XP",
+    "heatBest": "Best day: {{date}}, {{xp}} XP"
+  },
+  "questErrors": {
+    "undoClosed": "The undo window has closed.",
+    "skipLimit": "You can skip 3 quests per day.",
+    "alreadyCompleted": "This quest is already completed.",
+    "sessionExpired": "Your session expired. Sign in again.",
+    "dailyLimit": "You reached today's limit of 15 completed quests. See you tomorrow.",
+    "otherDay": "This quest is from another day.",
+    "wasSkipped": "This quest was skipped.",
+    "loadFailed": "Could not load today's quests.",
+    "completeFailed": "Could not complete this quest.",
+    "skipFailed": "Could not skip this quest."
+  },
+  "errors": {
+    "notSignedIn": "Not signed in.",
+    "loadProfile": "Could not load your profile.",
+    "usernameRules": "Username must be 3-20 chars: lowercase letters, numbers, underscore.",
+    "usernameTaken": "That username is taken. Try another one.",
+    "saveAnswers": "Could not save your answers.",
+    "saveAvatar": "Could not save your avatar.",
+    "loadProgress": "Could not load your progress.",
+    "loadAchievements": "Could not load achievements."
+  },
+  "authErrors": {
+    "badCredentials": "Email or password incorrect.",
+    "verifyFirst": "Please verify your email first. Check your inbox.",
+    "tooMany": "Too many attempts. Please wait a minute and try again.",
+    "emailExists": "An account with this email already exists.",
+    "signInFailed": "Sign in failed.",
+    "createFailed": "Could not create the account.",
+    "resetFailed": "Could not send the reset email.",
+    "updatePasswordFailed": "Could not update the password.",
+    "resendFailed": "Could not resend the email.",
+    "registerFailed": "Registration failed."
+  },
+  "analytics": {
+    "nextUp": "Next up: {{pillar}} has quests waiting.",
+    "loadBreakdown": "Could not load today's breakdown.",
+    "loadWeekly": "Could not load the weekly report.",
+    "loadMonthly": "Could not load the monthly report."
+  },
+  "chatErrors": {
+    "rateLimit": "That is all for today — your coach rests at midnight. 20 messages per day.",
+    "notSignedIn": "Not signed in.",
+    "loadConversation": "Could not load the conversation.",
+    "newChatFailed": "Could not start a new chat. Try again.",
+    "offline": "No connection. Check your internet and tap retry.",
+    "sessionExpired": "Your session has expired. Sign out and back in, then retry.",
+    "chatGone": "That chat is no longer available. Tap retry to continue in your latest chat.",
+    "notDeployed": "The AI coach is not set up on the server yet (the \"coach\" function is not deployed).",
+    "notConfigured": "The AI coach is not switched on yet: the server is missing its GROQ_API_KEY.",
+    "tooLong": "That message is too long. Keep it under {{max}} characters.",
+    "generic": "Your future self lost the thread for a second. Tap retry.",
+    "ratingFailed": "Could not save that rating.",
+    "sendFailed": "Could not send that message."
+  },
+  "friendErrors": {
+    "ownAccount": "That is your own account.",
+    "alreadyFriends": "You are already friends.",
+    "pending": "A request is already pending.",
+    "declinedRecently": "They declined recently. You can ask again in a few days.",
+    "tooManyPending": "You have too many pending requests. Wait for some answers first.",
+    "cannotRequest": "You cannot send a request to this user.",
+    "userNotFound": "No user found with that username.",
+    "alreadyResponded": "This request was already answered.",
+    "requestGone": "This request no longer exists.",
+    "generic": "Something went wrong. Try again.",
+    "ownCode": "That is your own code.",
+    "alreadyConnected": "You are already connected.",
+    "invalidCode": "That code is not valid.",
+    "inviteMessage": "Become who you want to be with me on GROW. Add me with my code {{code}}: {{link}}"
+  },
+  "photoErrors": {
+    "permission": "Permission denied. Enable access in your device settings to add a photo.",
+    "noneSelected": "No photo selected.",
+    "tooLarge": "That photo is larger than 5 MB. Choose a smaller one.",
+    "unreadable": "Could not read that photo.",
+    "notSignedIn": "Not signed in."
+  },
+  "aiAvatarErrors": {
+    "offline": "No connection. Check your internet and try again.",
+    "session": "Your session has expired. Sign out and back in, then try again.",
+    "notDeployed": "AI avatars are not set up on the server yet (the \"generate-avatar\" function is not deployed).",
+    "tooLarge": "That photo is too large. Try another one.",
+    "dailyLimit": "You have used today’s avatar generations. Try again tomorrow.",
+    "notConfigured": "AI avatars are not switched on yet: the server is missing its FAL_KEY. Design one by hand for now.",
+    "timeout": "That took too long. Try again, or design one by hand.",
+    "providerAuth": "The AI image service refused our key (FAL_KEY is wrong or out of credit).",
+    "rejected": "The AI could not use that photo. Try a clear, well-lit selfie of your face.",
+    "generic": "We could not create your avatar this time. Try another photo."
+  },
+  "voice": {
+    "permission": "Microphone access is needed to use voice input.",
+    "offline": "Voice input needs an internet connection on this phone. Type your message instead.",
+    "unavailable": "Voice input is not available on this device.",
+    "needsBuild": "Voice input needs the installed GROW app (a development or store build). It does not run in Expo Go.",
+    "failed": "Voice input stopped. Tap the mic to try again."
+  },
+  "story": {
+    "me": "Me",
+    "lv": "LV {{level}}",
+    "titleLevel": "{{title}} · Level {{level}}",
+    "lifeScoreToday": "LIFE SCORE TODAY",
+    "dayStreak": "day streak",
+    "avgWeek": "avg this week",
+    "question": "WHO ARE YOU BECOMING?",
+    "builtWith": "BUILT DAY BY DAY WITH GROW"
+  },
+  "shareProfile": {
+    "noCode": "Your invite code is still being set up. Try again in a moment.",
+    "webOnly": "Sharing a picture works in the phone app, not in the browser.",
+    "pictureFailed": "Could not create the picture. Try again.",
+    "copied": "Invite link copied.",
+    "noWhatsApp": "WhatsApp is not available on this device.",
+    "noSharing": "Sharing is not available on this device.",
+    "copyLink": "Copy link",
+    "toInstagram": "Share to Instagram",
+    "stories": "Stories",
+    "toStory": "Share to your story",
+    "more": "More",
+    "title": "Share profile",
+    "cardLine": "Level {{level}} · {{title}}\nScan to add me on GROW",
+    "codeSoon": "Code soon",
+    "shareYour": "Share your profile",
+    "hint": "Friends who scan the code or open your link land on your invite in the app."
+  },
+  "shareStory": {
+    "webOnly": "Sharing works in the phone app, not in the browser.",
+    "dialog": "Share your progress",
+    "failed": "Could not create the image. Try again.",
+    "title": "Share as a story",
+    "postIt": "Post it",
+    "hint": "Pick Instagram, WhatsApp or Snapchat, then post it to your story."
+  },
+  "login": {
+    "enterAValidEmail": "Enter a valid email address.",
+    "enterYourPassword": "Enter your password.",
+    "welcomeBack": "Welcome back",
+    "signInToPick": "Sign in to pick up today's quests.",
+    "email": "Email",
+    "password": "Password",
+    "yourPassword": "Your password",
+    "forgotPassword": "Forgot password?",
+    "signIn": "Sign in",
+    "letSGrow": "Let's grow",
+    "newToGrow": "New to GROW?",
+    "createAccount": "Create account",
+    "haveAnInviteCode": "Have an invite code? Join a friend"
+  },
+  "register": {
+    "enterAValidEmail": "Enter a valid email address.",
+    "createAccount": "Create account",
+    "oneAccountForYour": "One account for your whole life, across five pillars.",
+    "email": "Email",
+    "password": "Password",
+    "chooseAPassword": "Choose a password",
+    "yourPasswordDoesNot": "Your password does not meet every rule yet.",
+    "inviteCodeOptional": "Invite code (optional)",
+    "haveAnInviteCode": "Have an invite code?",
+    "startGrowing": "Start growing",
+    "backToSignIn": "Back to sign in"
+  },
+  "forgotPassword": {
+    "enterAValidEmail": "Enter a valid email address.",
+    "couldNotSendThe": "Could not send the reset email.",
+    "resetPassword": "Reset password",
+    "ifAnAccountExists": "If an account exists for {{v1}}, a reset link is on its way. Open it on this device. It expires in 1 hour.",
+    "enterTheEmailYou": "Enter the email you signed up with and we will send you a reset link.",
+    "email": "Email",
+    "sendResetLink": "Send reset link",
+    "sendingItYourWay": "Sending it your way",
+    "resendLink": "Resend link",
+    "backToSignIn": "Back to sign in"
+  },
+  "resetPassword": {
+    "theTwoPasswordsDo": "The two passwords do not match.",
+    "couldNotUpdateThe": "Could not update the password.",
+    "setANewPassword": "Set a new password",
+    "thisResetLinkIs": "This reset link is invalid or has expired.",
+    "yourPasswordWasUpdated": "Your password was updated. Sign in with the new one.",
+    "chooseAStrongPassword": "Choose a strong password you do not use anywhere else.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "repeatTheNewPassword": "Repeat the new password",
+    "passwordsDoNotMatch": "Passwords do not match.",
+    "yourPasswordDoesNot": "Your password does not meet every rule yet.",
+    "updatePassword": "Update password",
+    "lockedIn": "Locked in",
+    "requestANewLink": "Request a new link",
+    "backToSignIn": "Back to sign in"
+  },
+  "verifyEmail": {
+    "yourEmailIsVerified": "Your email is verified. Setting up your account…",
+    "thatLinkIsInvalid": "That link is invalid or has expired. Request a new one below.",
+    "signInAgainTo": "Sign in again to request a new link.",
+    "aNewLinkIs": "A new link is on its way. Check spam if it does not arrive.",
+    "couldNotResendThe": "Could not resend the email.",
+    "checkYourInbox": "Check your inbox",
+    "weSentAVerification": "We sent a verification link to {{email}}.",
+    "weSentYouA": "We sent you a verification link.",
+    "openItOnThis": "Open it on this device to activate your account. The link stays valid for 24 hours.",
+    "verifyingYourLink": "Verifying your link",
+    "emailVerified": "Email verified",
+    "verificationFailed": "Verification failed",
+    "continue": "Continue",
+    "nothingArrivedYetCheck": "Nothing arrived yet. Check spam first, then request a new link.",
+    "resendVerificationEmail": "Resend verification email",
+    "backToSignIn": "Back to sign in"
+  },
+  "splash": {
+    "whoAreYouBecoming": "Who are you becoming"
   }
 }

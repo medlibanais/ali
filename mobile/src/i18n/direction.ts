@@ -22,7 +22,8 @@ export function applyDirection(language: string): boolean {
     return false;
   }
   I18nManager.allowRTL(true);
-  I18nManager.swapLeftAndRightInRTL(true);
+  // left/right stay physical (charts, sliders); layouts use start/end.
+  I18nManager.swapLeftAndRightInRTL(false);
   if (I18nManager.isRTL !== rtl) {
     I18nManager.forceRTL(rtl);
     return true;
