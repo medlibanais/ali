@@ -406,6 +406,9 @@ verify_jwt = false
 [functions.predict-streak]
 verify_jwt = false
 
+[functions.generate-insights]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
