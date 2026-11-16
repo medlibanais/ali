@@ -27,6 +27,8 @@ export interface CircleRow extends UserSearchResult {
   current_streak: number | null;
   best_streak: number | null;
   weekly_xp: number | null;
+  /** When you last cheered this friend (friends_weekly_xp view only). */
+  last_cheered_at?: string | null;
 }
 
 export interface FriendRow extends CircleRow {
@@ -63,6 +65,67 @@ export function rankLeaderboard(rows: CircleRow[]): RankedRow[] {
     if (i === 0 || row.weekly_xp !== sorted[i - 1].weekly_xp) rank = i + 1;
     return { ...row, rank };
   });
+}
+
+/** Payload of the private "xp:<user_id>" Realtime broadcast. */
+export interface XpChangedEvent {
+  user_id: string;
+  xp_delta: number;
+}
+
+export function parseXpEvent(payload: unknown): XpChangedEvent | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as { user_id?: unknown; xp_delta?: unknown };
+  if (typeof p.user_id !== 'string' || typeof p.xp_delta !== 'number') return null;
+  if (!Number.isFinite(p.xp_delta)) return null;
+  return { user_id: p.user_id, xp_delta: p.xp_delta };
+}
+
+/**
+ * Optimistic leaderboard update for one XP event. Rows with private stats
+ * are left alone, and XP never drops below 0 (a refetch from the view
+ * follows to settle the exact number).
+ */
+export function applyXpDelta(rows: CircleRow[], event: XpChangedEvent): CircleRow[] {
+  let changed = false;
+  const next = rows.map((r) => {
+    if (r.id !== event.user_id || !r.stats_shared || r.weekly_xp === null) return r;
+    changed = true;
+    return { ...r, weekly_xp: Math.max(0, r.weekly_xp + event.xp_delta) };
+  });
+  return changed ? next : rows;
+}
+
+/** User ids whose XP topic we may listen to: you + friends sharing stats. */
+export function realtimeTopicIds(rows: CircleRow[]): string[] {
+  return rows
+    .filter((r) => r.stats_shared)
+    .map((r) => r.id)
+    .sort();
+}
+
+/** Same window as public.cheer_cooldown() in migration 0016. */
+export const CHEER_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+
+/** Milliseconds until you may cheer this friend again (0 = now). */
+export function cheerCooldownLeft(lastCheeredAt: string | null | undefined, now: number): number {
+  if (!lastCheeredAt) return 0;
+  const at = Date.parse(lastCheeredAt);
+  if (Number.isNaN(at)) return 0;
+  return Math.max(0, at + CHEER_COOLDOWN_MS - now);
+}
+
+export function cheerErrorText(error: unknown): string {
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error && 'message' in error
+        ? String((error as { message: unknown }).message)
+        : String(error);
+  if (msg.includes('cheer_cooldown')) return 'You already cheered them recently. Try again later.';
+  if (msg.includes('cheer_limit')) return 'That is a lot of cheering for today. Try again tomorrow.';
+  if (msg.includes('not_friends')) return 'You can only cheer your friends.';
+  return 'Could not send your cheer. Try again.';
 }
 
 export function friendErrorText(error: unknown): string {
