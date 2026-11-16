@@ -9,7 +9,7 @@ import gamificationReducer from '../slices/gamificationSlice';
 import questsReducer, { completeQuest, fetchDailyQuests, undoQuest } from '../slices/questsSlice';
 import syncReducer from '../slices/syncSlice';
 import { syncOfflineCompletions } from '../offlineSync';
-import { readCompletionQueue } from '../../lib/offlineQueue';
+import { readOfflineQueue } from '../../lib/offlineQueue';
 import { isOnline, reportOffline, reportOnline, resetConnectivityForTests } from '../../lib/connectivity';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -119,7 +119,7 @@ it('queues offline completions with optimistic XP, then syncs them in order', as
   expect(after.sync.pending).toBe(0);
   expect(after.gamification.pendingXp).toBe(0);
   expect(after.gamification.totalXp).toBe(90); // server value, not the estimate
-  expect(await readCompletionQueue('u1')).toEqual([]);
+  expect(await readOfflineQueue('u1')).toEqual([]);
 });
 
 it('drops refused items, counts duplicates once, and stops on a network error', async () => {
@@ -145,7 +145,7 @@ it('drops refused items, counts duplicates once, and stops on a network error', 
   expect(res.payload.rejected.map((r) => r.questId)).toEqual(['b']);
   expect(res.payload.stoppedBy).toBe('offline');
   // c and d wait, still in order.
-  expect((await readCompletionQueue('u1')).map((i) => i.questId)).toEqual(['c', 'd']);
+  expect((await readOfflineQueue('u1')).map((i) => i.questId)).toEqual(['c', 'd']);
   expect(isOnline()).toBe(false);
   expect(store.getState().sync.pending).toBe(2);
 });
@@ -163,7 +163,7 @@ it('falls back to complete_quest when the database has no sync RPC yet', async (
     );
   await store.dispatch(syncOfflineCompletions());
   expect(mockCalls.map((c) => c.name)).toContain('complete_quest');
-  expect(await readCompletionQueue('u1')).toEqual([]);
+  expect(await readOfflineQueue('u1')).toEqual([]);
 });
 
 it('undo of an offline completion just leaves the queue', async () => {

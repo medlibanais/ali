@@ -7,6 +7,7 @@ import chatReducer from './slices/chatSlice';
 import analyticsReducer from './slices/analyticsSlice';
 import themeReducer from './slices/themeSlice';
 import syncReducer from './slices/syncSlice';
+import { syncMachineMiddleware } from './syncMachineMiddleware';
 import { THEMES } from '../theme/themes';
 import { applyThemeColors } from '../theme/tokens';
 
@@ -21,6 +22,7 @@ export const store = configureStore({
     theme: themeReducer,
     sync: syncReducer,
   },
+  middleware: (getDefault) => getDefault().concat(syncMachineMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

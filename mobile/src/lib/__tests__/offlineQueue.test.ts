@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyQuestsResponse, Quest } from '../../api/types';
 import {
-  applyQueuedCompletions,
+  applyQueuedActions,
+  enqueueUndo,
+  markAttempt,
+  QUEUE_KEY,
   cancelQueuedQuest,
   enqueueCompletion,
   estimateXp,
@@ -10,7 +13,7 @@ import {
   newClientId,
   pendingXpOf,
   permanentSyncReason,
-  readCompletionQueue,
+  readOfflineQueue,
   removeQueued,
 } from '../offlineQueue';
 
@@ -52,47 +55,70 @@ beforeEach(async () => {
 
 describe('completion queue', () => {
   it('keeps completions in the order they happened, with unique ids', async () => {
-    await enqueueCompletion({ ...base, questId: 'a', completedAt: '2026-11-15T10:00:00.000Z' });
-    await enqueueCompletion({ ...base, questId: 'b', completedAt: '2026-11-15T10:05:00.000Z' });
-    await enqueueCompletion({ ...base, questId: 'c', completedAt: '2026-11-15T10:01:00.000Z' });
-    const q = await readCompletionQueue('u1');
+    await enqueueCompletion({ ...base, questId: 'a', at: '2026-11-15T10:00:00.000Z' });
+    await enqueueCompletion({ ...base, questId: 'b', at: '2026-11-15T10:05:00.000Z' });
+    await enqueueCompletion({ ...base, questId: 'c', at: '2026-11-15T10:01:00.000Z' });
+    const q = await readOfflineQueue('u1');
     expect(q.map((i) => i.questId)).toEqual(['a', 'b', 'c']);
     expect(q.map((i) => i.seq)).toEqual([1, 2, 3]);
     expect(new Set(q.map((i) => i.clientId)).size).toBe(3);
   });
 
   it('does not queue the same quest twice', async () => {
-    const first = await enqueueCompletion({ ...base, questId: 'a', completedAt: 'x' });
-    const again = await enqueueCompletion({ ...base, questId: 'a', completedAt: 'y' });
+    const first = await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
+    const again = await enqueueCompletion({ ...base, questId: 'a', at: 'y' });
     expect(again.clientId).toBe(first.clientId);
-    expect(await readCompletionQueue('u1')).toHaveLength(1);
+    expect(await readOfflineQueue('u1')).toHaveLength(1);
   });
 
   it('loses nothing when writes race', async () => {
     await Promise.all(
       ['a', 'b', 'c', 'd', 'e'].map((id) =>
-        enqueueCompletion({ ...base, questId: id, completedAt: id }),
+        enqueueCompletion({ ...base, questId: id, at: id }),
       ),
     );
-    expect((await readCompletionQueue('u1')).map((i) => i.questId)).toEqual([
+    expect((await readOfflineQueue('u1')).map((i) => i.questId)).toEqual([
       'a', 'b', 'c', 'd', 'e',
     ]);
   });
 
   it('separates accounts', async () => {
-    await enqueueCompletion({ ...base, questId: 'a', completedAt: 'x' });
-    await enqueueCompletion({ ...base, userId: 'u2', questId: 'b', completedAt: 'y' });
-    expect((await readCompletionQueue('u1')).map((i) => i.questId)).toEqual(['a']);
-    expect((await readCompletionQueue('u2')).map((i) => i.questId)).toEqual(['b']);
+    await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
+    await enqueueCompletion({ ...base, userId: 'u2', questId: 'b', at: 'y' });
+    expect((await readOfflineQueue('u1')).map((i) => i.questId)).toEqual(['a']);
+    expect((await readOfflineQueue('u2')).map((i) => i.questId)).toEqual(['b']);
   });
 
   it('cancels and removes items', async () => {
-    const a = await enqueueCompletion({ ...base, questId: 'a', completedAt: 'x' });
-    await enqueueCompletion({ ...base, questId: 'b', completedAt: 'y' });
+    const a = await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
+    await enqueueCompletion({ ...base, questId: 'b', at: 'y' });
     expect((await cancelQueuedQuest('b', 'u1'))?.questId).toBe('b');
     expect(await cancelQueuedQuest('b', 'u1')).toBeNull();
     await removeQueued(a.clientId);
-    expect(await readCompletionQueue('u1')).toEqual([]);
+    expect(await readOfflineQueue('u1')).toEqual([]);
+  });
+
+  it('queues undos after completions and replays both in order', async () => {
+    await enqueueCompletion({ ...base, questId: 'a', at: '2026-11-15T10:00:00.000Z' });
+    await enqueueUndo({ ...base, questId: 'b', at: '2026-11-15T10:01:00.000Z', xpRefund: 20 });
+    await enqueueCompletion({ ...base, questId: 'b', at: '2026-11-15T10:02:00.000Z' });
+    const q = await readOfflineQueue('u1');
+    expect(q.map((i) => `${i.kind}:${i.questId}`)).toEqual(['complete:a', 'undo:b', 'complete:b']);
+  });
+
+  it('lives in AsyncStorage under offline_queue, so it survives a restart', async () => {
+    await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
+    const raw = await AsyncStorage.getItem(QUEUE_KEY);
+    expect(QUEUE_KEY).toMatch(/offline_queue/);
+    expect(JSON.parse(raw ?? '[]')).toHaveLength(1);
+  });
+
+  it('keeps a failed item with its attempt count', async () => {
+    const a = await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
+    await markAttempt(a.clientId, 'server error');
+    const [item] = await readOfflineQueue('u1');
+    expect(item.attempts).toBe(1);
+    expect(item.lastError).toBe('server error');
   });
 
   it('carries over the old v1 queue', async () => {
@@ -100,10 +126,11 @@ describe('completion queue', () => {
       'prayerlock.completionQueue.v1',
       JSON.stringify([{ questId: 'old', queuedAt: Date.UTC(2026, 10, 14, 9) }]),
     );
-    const q = await readCompletionQueue('u1');
+    const q = await readOfflineQueue('u1');
     expect(q).toHaveLength(1);
     expect(q[0].questId).toBe('old');
-    expect(q[0].completedAt).toBe('2026-11-14T09:00:00.000Z');
+    expect(q[0].at).toBe('2026-11-14T09:00:00.000Z');
+    expect(q[0].kind).toBe('complete');
     expect(await AsyncStorage.getItem('prayerlock.completionQueue.v1')).toBeNull();
   });
 });
@@ -123,23 +150,44 @@ describe('optimistic helpers', () => {
       pillars: { health: 0, work: 0 },
       quests: [quest('h1', 'health'), quest('h2', 'health'), quest('w1', 'work')],
     };
-    const out = applyQueuedCompletions(day, [
-      { ...base, questId: 'h1', clientId: 'c1', seq: 1, completedAt: 'T1' },
-      { ...base, questId: 'w1', clientId: 'c2', seq: 2, completedAt: 'T2' },
+    const out = applyQueuedActions(day, [
+      { ...base, kind: 'complete', questId: 'h1', clientId: 'c1', seq: 1, at: 'T1', attempts: 0, lastError: null },
+      { ...base, kind: 'complete', questId: 'w1', clientId: 'c2', seq: 2, at: 'T2', attempts: 0, lastError: null },
     ]);
     expect(out.quests.filter((q) => q.completed).map((q) => q.quest_id)).toEqual(['h1', 'w1']);
     expect(out.quests[0].completed_at).toBe('T1');
     expect(out.pillars).toEqual({ health: 50, work: 100 });
     expect(out.daily_life_score).toBe(75);
-    expect(applyQueuedCompletions(day, [])).toBe(day);
+    expect(applyQueuedActions(day, [])).toBe(day);
+  });
+
+  it('applies a queued undo after the completion it cancels', () => {
+    const day: DailyQuestsResponse = {
+      date: '2026-11-15',
+      daily_life_score: 100,
+      pillars: { health: 100 },
+      quests: [quest('h1', 'health', { completed: true, completed_at: 'T0' })],
+    };
+    const out = applyQueuedActions(day, [
+      { ...base, kind: 'undo', xpRefund: 15, questId: 'h1', clientId: 'u', seq: 1, at: 'T1', attempts: 0, lastError: null },
+    ]);
+    expect(out.quests[0].completed).toBe(false);
+    expect(out.pillars.health).toBe(0);
+    expect(out.daily_life_score).toBe(0);
   });
 
   it('sums pending XP for today and in total', () => {
-    const items = [
-      { ...base, questId: 'a', clientId: '1', seq: 1, completedAt: '', localDate: '2026-11-14' },
-      { ...base, questId: 'b', clientId: '2', seq: 2, completedAt: '' },
-    ];
-    expect(pendingXpOf(items, '2026-11-15')).toEqual({ total: 30, today: 15 });
+    const common = { attempts: 0, lastError: null, at: '' };
+    expect(
+      pendingXpOf(
+        [
+          { ...base, ...common, kind: 'complete', questId: 'a', clientId: '1', seq: 1, localDate: '2026-11-14' },
+          { ...base, ...common, kind: 'complete', questId: 'b', clientId: '2', seq: 2 },
+          { ...base, ...common, kind: 'undo', xpRefund: 25, questId: 'c', clientId: '3', seq: 3 },
+        ],
+        '2026-11-15',
+      ),
+    ).toEqual({ total: 5, today: -10 });
   });
 
   it('makes v4 uuids', () => {

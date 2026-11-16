@@ -1,13 +1,14 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
-  applyQueuedCompletions,
+  applyQueuedActions,
   cancelQueuedQuest,
   enqueueCompletion,
+  enqueueUndo,
   estimateXp,
   isOfflineError,
   loadQuestsCache,
   localDateOf,
-  readCompletionQueue,
+  readOfflineQueue,
   saveQuestsCache,
 } from '../../lib/offlineQueue';
 import { isOnline, reportOffline, reportOnline } from '../../lib/connectivity';
@@ -151,10 +152,10 @@ export const fetchDailyQuests = createAsyncThunk<
   { rejectValue: string; state: QuestThunkState }
 >('quests/fetchDaily', async (args, { dispatch, getState, rejectWithValue }) => {
   const userId = getState().auth?.userId ?? null;
-  // Completions still waiting in the offline queue stay ticked.
+  // Actions still waiting in the offline queue stay applied on screen.
   const withQueued = async (day: DailyQuestsResponse): Promise<DailyQuestsResponse> => {
     if (!userId) return day;
-    return applyQueuedCompletions(day, await readCompletionQueue(userId));
+    return applyQueuedActions(day, await readOfflineQueue(userId));
   };
   try {
     const date = todayLocal();
@@ -251,7 +252,7 @@ export const completeQuest = createAsyncThunk<
     const item = await enqueueCompletion({
       questId: quest.quest_id,
       userId,
-      completedAt: now.toISOString(),
+      at: now.toISOString(),
       xpEstimate: estimateXp(quest, now, getState().gamification.xpToday),
       title: quest.title,
       localDate: localDateOf(now),
@@ -317,8 +318,10 @@ export const undoQuest = createAsyncThunk<
   string,
   { rejectValue: string; state: QuestThunkState }
 >('quests/undo', async (questId, { dispatch, getState, rejectWithValue }) => {
-  // Still on the device: undo is just taking it out of the queue.
-  const queued = await cancelQueuedQuest(questId, getState().auth.userId);
+  const now = new Date();
+  const userId = getState().auth.userId;
+  // Completion still on the device: the two cancel out.
+  const queued = await cancelQueuedQuest(questId, userId);
   if (queued) {
     await dispatch(refreshPendingCompletions());
     return {
@@ -328,12 +331,54 @@ export const undoQuest = createAsyncThunk<
       questId,
     };
   }
-  const { data, error } = await supabase.rpc('undo_quest_completion', {
-    p_quest_id: questId,
-  });
+
+  // The server has the completion: queue the undo for when we reconnect.
+  const saveOffline = async () => {
+    const { undo, lastCompleted, quests } = getState().quests;
+    const xpRefund =
+      undo?.questId === questId
+        ? undo.xpAwarded
+        : lastCompleted?.questId === questId
+          ? lastCompleted.xpAwarded
+          : 0;
+    await enqueueUndo({
+      questId,
+      userId,
+      at: now.toISOString(),
+      xpRefund,
+      title: quests.find((q) => q.quest_id === questId)?.title ?? '',
+      localDate: localDateOf(now),
+    });
+    await dispatch(refreshPendingCompletions());
+    return {
+      quest_id: questId,
+      xp_refunded: xpRefund,
+      total_xp: getState().gamification.totalXp,
+      questId,
+    };
+  };
+  if (!isOnline() || getState().sync.pending > 0) {
+    return saveOffline();
+  }
+
+  let data: UndoQuestResponse | null = null;
+  let error: { message?: string } | null = null;
+  let thrown: unknown = null;
+  try {
+    const res = await supabase.rpc('undo_quest_completion', { p_quest_id: questId });
+    data = res.data as UndoQuestResponse;
+    error = res.error;
+  } catch (e) {
+    thrown = e;
+  }
+  if (thrown || (error && isOfflineError(error))) {
+    reportOffline();
+    return saveOffline();
+  }
   if (error) {
     return rejectWithValue(rpcError(error, 'The undo window has closed.'));
   }
+  reportOnline();
   dispatch(fetchGamification());
   return { ...(data as UndoQuestResponse), questId };
 });
@@ -363,6 +408,18 @@ const questsSlice = createSlice({
         quest.completed_at = new Date().toISOString();
       }
       state.completingId = action.payload;
+    },
+    /** The server's answer wins over an optimistic change (sync conflicts). */
+    questServerState(
+      state,
+      action: PayloadAction<{ questId: string; completed: boolean }>,
+    ) {
+      const quest = state.quests.find((q) => q.quest_id === action.payload.questId);
+      if (quest) {
+        quest.completed = action.payload.completed;
+        if (!action.payload.completed) quest.completed_at = null;
+      }
+      if (state.undo?.questId === action.payload.questId) state.undo = null;
     },
     questRolledBack(state, action: PayloadAction<string>) {
       const quest = state.quests.find((q) => q.quest_id === action.payload);
@@ -479,6 +536,7 @@ const questsSlice = createSlice({
 export const {
   questCompletedLocally,
   questRolledBack,
+  questServerState,
   undoCleared,
   questsErrorCleared,
 } = questsSlice.actions;

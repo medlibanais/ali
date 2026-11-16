@@ -1,4 +1,4 @@
--- Offline sync rules from 0014: idempotent replays, day attribution,
+-- Offline sync rules from 0015: idempotent replays, day attribution,
 -- streak repair, and the bounds on the client's claimed time.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;

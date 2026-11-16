@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
+import { initialSyncContext, type SyncMachineView } from '../syncMachine';
 
-// The drain thunk lives in store/offlineSync.ts; matching its action types
+// The flush thunk lives in store/offlineSync.ts; matching its action types
 // by name keeps this slice free of an import cycle.
 const DRAIN = 'sync/drain';
 
@@ -11,24 +12,29 @@ export interface SyncRejection {
 }
 
 export interface SyncState {
+  /** From NetInfo (and failed requests). */
   online: boolean;
-  /** Completions saved on this device, waiting for the server. */
+  /** Actions saved on this device, waiting for the server. */
   pending: number;
+  /** A flush is running right now. */
   syncing: boolean;
-  /** Completions confirmed by the last sync (shown briefly in the banner). */
-  justSynced: number;
-  /** Completions the server refused for good during the last sync. */
-  rejected: SyncRejection[];
   lastSyncAt: number | null;
+  /** Mirror of the XState sync machine (store/syncMachine.ts). */
+  machine: SyncMachineView;
 }
 
 const initialState: SyncState = {
   online: true,
   pending: 0,
   syncing: false,
-  justSynced: 0,
-  rejected: [],
   lastSyncAt: null,
+  machine: {
+    state: 'Idle',
+    pending: initialSyncContext.pending,
+    errorKind: null,
+    errorMessage: null,
+    failedQuest: null,
+  },
 };
 
 const syncSlice = createSlice({
@@ -41,18 +47,17 @@ const syncSlice = createSlice({
     pendingChanged(state, action: PayloadAction<number>) {
       state.pending = Math.max(0, action.payload);
     },
-    syncFinished(
-      state,
-      action: PayloadAction<{ synced: number; rejected: SyncRejection[] }>,
-    ) {
+    syncFinished(state) {
       state.lastSyncAt = Date.now();
-      state.justSynced = action.payload.synced;
-      state.rejected = action.payload.rejected;
     },
-    syncNoticeCleared(state) {
-      state.justSynced = 0;
-      state.rejected = [];
+    /** Written only by the sync machine middleware. */
+    machineChanged(state, action: PayloadAction<SyncMachineView>) {
+      state.machine = action.payload;
     },
+    /** The banner's Retry button (handled by the machine middleware). */
+    syncRetryRequested() {},
+    /** The banner's OK button on a conflict notice. */
+    syncNoticeDismissed() {},
     syncReset() {
       return initialState;
     },
@@ -78,7 +83,9 @@ export const {
   connectivityChanged,
   pendingChanged,
   syncFinished,
-  syncNoticeCleared,
+  machineChanged,
+  syncRetryRequested,
+  syncNoticeDismissed,
   syncReset,
 } = syncSlice.actions;
 

@@ -1,35 +1,52 @@
-// Offline-first quest completions.
+// Offline-first quest actions.
 //
-// Completions made without a connection are written to a persistent,
-// ordered queue (AsyncStorage: SQLite/files on native, localStorage on
-// web, no extra native module) and replayed in the exact order they
-// happened once the app is back online. Today's quests are cached too,
-// so a cold start in airplane mode still shows the day.
+// Quest completions and undos made without a connection are written to a
+// persistent, ordered queue ("offline_queue" in MMKV on Android and in
+// localStorage on web, see kvStore.ts, so it survives app restarts) and replayed in the exact order they happened once the app
+// is back online. Today's quests are cached too, so a cold start on the
+// subway still shows the day.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { kvStore, readJson, writeJson } from './kvStore';
 import type { DailyQuestsResponse, Quest } from '../api/types';
 import type { Pillar } from '../theme/tokens';
 
 const CACHE_KEY = 'prayerlock.dailyQuests.v1';
-const QUEUE_KEY = 'prayerlock.completionQueue.v2';
+export const QUEUE_KEY = 'prayerlock.offline_queue';
 const LEGACY_QUEUE_KEY = 'prayerlock.completionQueue.v1';
 
-export interface QueuedCompletion {
-  /** Idempotency key: the server awards each clientId at most once. */
+interface QueuedBase {
+  /** Idempotency key: the server applies each clientId at most once. */
   clientId: string;
   questId: string;
-  /** Owner of the completion; null only for items from the old v1 queue. */
+  /** Owner of the action; null only for items from the old v1 queue. */
   userId: string | null;
-  /** ISO time the user tapped "complete", from the device clock. */
-  completedAt: string;
-  /** Monotonic order of completion; the sync replays by this. */
+  /** ISO time the user tapped, from the device clock. */
+  at: string;
+  /** Monotonic order; the sync replays by this. */
   seq: number;
+  title: string;
+  /** Failed sync attempts so far (the item stays queued). */
+  attempts: number;
+  lastError: string | null;
+}
+
+export interface QueuedCompletion extends QueuedBase {
+  kind: 'complete';
   /** Optimistic XP shown until the server answers. */
   xpEstimate: number;
-  title: string;
   /** Device-local day (YYYY-MM-DD) the completion happened on. */
   localDate: string;
 }
+
+export interface QueuedUndo extends QueuedBase {
+  kind: 'undo';
+  /** XP the server gave for the completion being undone. */
+  xpRefund: number;
+  localDate: string;
+}
+
+export type QueuedAction = QueuedCompletion | QueuedUndo;
 
 interface LegacyQueuedCompletion {
   questId: string;
@@ -80,42 +97,40 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-function sortQueue(items: QueuedCompletion[]): QueuedCompletion[] {
-  return [...items].sort(
-    (a, b) => a.seq - b.seq || a.completedAt.localeCompare(b.completedAt),
-  );
+function sortQueue(items: QueuedAction[]): QueuedAction[] {
+  return [...items].sort((a, b) => a.seq - b.seq || a.at.localeCompare(b.at));
 }
 
-async function readRaw(): Promise<QueuedCompletion[]> {
-  let items: QueuedCompletion[] = [];
-  try {
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    if (raw) items = JSON.parse(raw) as QueuedCompletion[];
-  } catch {
-    items = [];
-  }
-  // One-time carry-over of completions queued by the previous version.
+function nextSeq(items: QueuedAction[]): number {
+  return items.reduce((max, i) => Math.max(max, i.seq), 0) + 1;
+}
+
+async function readRaw(): Promise<QueuedAction[]> {
+  const items: QueuedAction[] = readJson<QueuedAction[]>(QUEUE_KEY) ?? [];
+  // One-time carry-over of completions the previous app version queued in
+  // AsyncStorage.
   try {
     const legacyRaw = await AsyncStorage.getItem(LEGACY_QUEUE_KEY);
     if (legacyRaw) {
       const legacy = JSON.parse(legacyRaw) as LegacyQueuedCompletion[];
-      let seq = items.reduce((max, i) => Math.max(max, i.seq), 0);
       for (const old of legacy) {
         if (items.some((i) => i.questId === old.questId)) continue;
-        seq += 1;
         const at = new Date(old.queuedAt);
         items.push({
+          kind: 'complete',
           clientId: newClientId(),
           questId: old.questId,
           userId: null,
-          completedAt: at.toISOString(),
-          seq,
+          at: at.toISOString(),
+          seq: nextSeq(items),
           xpEstimate: 0,
           title: '',
           localDate: localDateOf(at),
+          attempts: 0,
+          lastError: null,
         });
       }
-      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+      writeJson(QUEUE_KEY, items);
       await AsyncStorage.removeItem(LEGACY_QUEUE_KEY);
     }
   } catch {
@@ -124,41 +139,47 @@ async function readRaw(): Promise<QueuedCompletion[]> {
   return sortQueue(items);
 }
 
-async function writeRaw(items: QueuedCompletion[]): Promise<void> {
-  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(sortQueue(items)));
+async function writeRaw(items: QueuedAction[]): Promise<void> {
+  if (items.length === 0) kvStore.delete(QUEUE_KEY);
+  else writeJson(QUEUE_KEY, sortQueue(items));
 }
 
-function belongsTo(item: QueuedCompletion, userId: string | null): boolean {
+function belongsTo(item: QueuedAction, userId: string | null): boolean {
   return userId === null || item.userId === null || item.userId === userId;
 }
 
 // ------------------------------------------------------------------ queue
 
-/** Queued completions in completion order, optionally for one user. */
-export function readCompletionQueue(userId: string | null = null): Promise<QueuedCompletion[]> {
+/** Queued actions in the order they happened, optionally for one user. */
+export function readOfflineQueue(userId: string | null = null): Promise<QueuedAction[]> {
   return withLock(async () => (await readRaw()).filter((i) => belongsTo(i, userId)));
 }
 
-export type NewQueuedCompletion = Omit<QueuedCompletion, 'seq' | 'clientId'> & {
+type NewItem<T extends QueuedAction> = Omit<T, 'seq' | 'clientId' | 'attempts' | 'lastError' | 'kind'> & {
   clientId?: string;
 };
 
 /**
- * Appends a completion. A quest already in the queue is not added twice.
- * Returns the stored item (with its order and idempotency key).
+ * Appends a completion. A quest already waiting to be completed is not
+ * added twice. Returns the stored item (with its order and key).
  */
-export function enqueueCompletion(item: NewQueuedCompletion): Promise<QueuedCompletion> {
+export function enqueueCompletion(item: NewItem<QueuedCompletion>): Promise<QueuedCompletion> {
   return withLock(async () => {
     const items = await readRaw();
     const existing = items.find(
-      (i) => i.questId === item.questId && belongsTo(i, item.userId),
+      (i): i is QueuedCompletion =>
+        i.kind === 'complete' && i.questId === item.questId && belongsTo(i, item.userId),
     );
-    if (existing) return existing;
-    const seq = items.reduce((max, i) => Math.max(max, i.seq), 0) + 1;
+    if (existing && !items.some((u) => u.kind === 'undo' && u.questId === item.questId && u.seq > existing.seq)) {
+      return existing;
+    }
     const stored: QueuedCompletion = {
       ...item,
+      kind: 'complete',
       clientId: item.clientId ?? newClientId(),
-      seq,
+      seq: nextSeq(items),
+      attempts: 0,
+      lastError: null,
     };
     items.push(stored);
     await writeRaw(items);
@@ -166,7 +187,25 @@ export function enqueueCompletion(item: NewQueuedCompletion): Promise<QueuedComp
   });
 }
 
-/** Removes one queued completion by its idempotency key. */
+/** Appends an undo of a completion the server already has. */
+export function enqueueUndo(item: NewItem<QueuedUndo>): Promise<QueuedUndo> {
+  return withLock(async () => {
+    const items = await readRaw();
+    const stored: QueuedUndo = {
+      ...item,
+      kind: 'undo',
+      clientId: item.clientId ?? newClientId(),
+      seq: nextSeq(items),
+      attempts: 0,
+      lastError: null,
+    };
+    items.push(stored);
+    await writeRaw(items);
+    return stored;
+  });
+}
+
+/** Removes one queued action by its key. */
 export function removeQueued(clientId: string): Promise<void> {
   return withLock(async () => {
     const items = await readRaw();
@@ -174,14 +213,35 @@ export function removeQueued(clientId: string): Promise<void> {
   });
 }
 
-/** Cancels a queued completion (offline undo). Returns what was removed. */
+/** Keeps a failed action queued, noting the attempt. */
+export function markAttempt(clientId: string, error: string): Promise<void> {
+  return withLock(async () => {
+    const items = await readRaw();
+    await writeRaw(
+      items.map((i) =>
+        i.clientId === clientId ? { ...i, attempts: i.attempts + 1, lastError: error } : i,
+      ),
+    );
+  });
+}
+
+/**
+ * Offline undo of a completion that never left the device: both cancel
+ * out, so the completion is simply taken out of the queue.
+ */
 export function cancelQueuedQuest(
   questId: string,
   userId: string | null,
 ): Promise<QueuedCompletion | null> {
   return withLock(async () => {
     const items = await readRaw();
-    const found = items.find((i) => i.questId === questId && belongsTo(i, userId)) ?? null;
+    const found =
+      [...items]
+        .reverse()
+        .find(
+          (i): i is QueuedCompletion =>
+            i.kind === 'complete' && i.questId === questId && belongsTo(i, userId),
+        ) ?? null;
     if (found) await writeRaw(items.filter((i) => i.clientId !== found.clientId));
     return found;
   });
@@ -190,23 +250,31 @@ export function cancelQueuedQuest(
 // ---------------------------------------------------------- optimistic UI
 
 /**
- * Overlays queued completions on a day of quests: marks them completed
- * and recomputes pillar and life scores the way the server does
- * (pillar % = completed / non-skipped; life score = mean of pillars).
+ * Replays queued actions on a day of quests, in order: completions tick
+ * quests, undos untick them. Pillar and life scores are recomputed the
+ * way the server does (pillar % = completed / non-skipped; life score =
+ * mean of pillars).
  */
-export function applyQueuedCompletions(
+export function applyQueuedActions(
   day: DailyQuestsResponse,
-  queue: QueuedCompletion[],
+  queue: QueuedAction[],
 ): DailyQuestsResponse {
-  const pending = new Map(queue.map((i) => [i.questId, i]));
+  if (queue.length === 0) return day;
+  const byId = new Map(day.quests.map((q) => [q.quest_id, q]));
   let changed = false;
-  const quests = day.quests.map((q) => {
-    const item = pending.get(q.quest_id);
-    if (!item || q.completed || q.skipped) return q;
-    changed = true;
-    return { ...q, completed: true, completed_at: item.completedAt };
-  });
+  for (const item of sortQueue(queue)) {
+    const q = byId.get(item.questId);
+    if (!q || q.skipped) continue;
+    if (item.kind === 'complete' && !q.completed) {
+      byId.set(q.quest_id, { ...q, completed: true, completed_at: item.at });
+      changed = true;
+    } else if (item.kind === 'undo' && q.completed) {
+      byId.set(q.quest_id, { ...q, completed: false, completed_at: null });
+      changed = true;
+    }
+  }
   if (!changed) return day;
+  const quests = day.quests.map((q) => byId.get(q.quest_id) ?? q);
 
   const totals: Partial<Record<Pillar, { total: number; done: number }>> = {};
   for (const q of quests) {
@@ -237,14 +305,15 @@ export function applyQueuedCompletions(
 
 /** XP still waiting for the server, in total and for today. */
 export function pendingXpOf(
-  queue: QueuedCompletion[],
+  queue: QueuedAction[],
   today: string,
 ): { total: number; today: number } {
   let total = 0;
   let todayXp = 0;
   for (const item of queue) {
-    total += item.xpEstimate;
-    if (item.localDate === today) todayXp += item.xpEstimate;
+    const xp = item.kind === 'complete' ? item.xpEstimate : -item.xpRefund;
+    total += xp;
+    if (item.localDate === today) todayXp += xp;
   }
   return { total, today: todayXp };
 }
@@ -252,20 +321,11 @@ export function pendingXpOf(
 // ------------------------------------------------------------- day cache
 
 export async function saveQuestsCache(payload: DailyQuestsResponse): Promise<void> {
-  try {
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch {
-    // storage full or unavailable: caching is best-effort
-  }
+  writeJson(CACHE_KEY, payload);
 }
 
 export async function loadQuestsCache(): Promise<DailyQuestsResponse | null> {
-  try {
-    const raw = await AsyncStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as DailyQuestsResponse) : null;
-  } catch {
-    return null;
-  }
+  return readJson<DailyQuestsResponse>(CACHE_KEY);
 }
 
 // ----------------------------------------------------------------- errors
@@ -291,6 +351,8 @@ export function isOfflineError(error: unknown): boolean {
 
 /** Server refusals that retrying later will not fix. */
 const PERMANENT_SYNC_ERRORS: Record<string, string> = {
+  undo_window_expired: 'the undo reached the server too late, so the completion stays',
+  offline_undo_too_old: 'the undo was saved more than 24 hours ago, so the completion stays',
   daily_completion_limit: 'the daily limit of 15 quests was already reached',
   quest_not_today: 'the quest belongs to another day',
   offline_completion_too_old: 'it was saved more than 24 hours ago',
@@ -307,12 +369,12 @@ export function permanentSyncReason(message: string | undefined): string | null 
   return code ? PERMANENT_SYNC_ERRORS[code] : null;
 }
 
-/** True when the database does not have sync_quest_completion yet (0014 not pushed). */
+/** True when the database does not have the sync RPCs yet (0015 not pushed). */
 export function isMissingSyncRpc(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
+  const msg = error.message ?? '';
   return (
     error.code === 'PGRST202' ||
-    ((error.message ?? '').includes('sync_quest_completion') &&
-      (error.message ?? '').toLowerCase().includes('could not find'))
+    (/sync_quest_(completion|undo)/.test(msg) && msg.toLowerCase().includes('could not find'))
   );
 }

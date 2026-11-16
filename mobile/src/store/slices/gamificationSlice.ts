@@ -95,6 +95,18 @@ function catalogOf(
   return Array.isArray(c) ? (c[0] ?? null) : c;
 }
 
+/**
+ * Why the progress is being refetched. 'sync' means the offline queue was
+ * just replayed or rolled back: the XP/level change is the server catching
+ * up with something the user already saw, so reward animations must not
+ * fire again. Middleware reads it from action.meta.arg.reason.
+ */
+export type GamificationRefreshReason = 'sync';
+
+export interface FetchGamificationArgs {
+  reason?: GamificationRefreshReason;
+}
+
 export const fetchGamification = createAsyncThunk<
   {
     level: number;
@@ -104,7 +116,7 @@ export const fetchGamification = createAsyncThunk<
     best_streak: number;
     achievements: Achievement[];
   },
-  void,
+  FetchGamificationArgs | void,
   { rejectValue: string }
 >('gamification/fetch', async (_, { rejectWithValue }) => {
   try {

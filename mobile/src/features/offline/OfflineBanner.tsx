@@ -4,84 +4,75 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Txt from '../../components/Txt';
 import { probeConnectivity } from '../../lib/connectivity';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { syncNoticeCleared } from '../../store/slices/syncSlice';
+import { syncNoticeDismissed, syncRetryRequested } from '../../store/slices/syncSlice';
+import type { SyncMachineView } from '../../store/syncMachine';
+import { useToast } from '../../components/Toast';
 import { borderWidth, colors, radius, spacing, themed } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { useOfflineSync } from './useOfflineSync';
 
-function quests(n: number): string {
-  return `${n} ${n === 1 ? 'quest' : 'quests'}`;
+function actions(n: number): string {
+  return `${n} ${n === 1 ? 'action' : 'actions'}`;
 }
 
 export interface BannerContent {
   tone: 'offline' | 'syncing' | 'done' | 'warning';
   title: string;
   detail: string | null;
-  action: 'retry' | 'dismiss' | null;
+  action: 'recheck' | 'retry' | 'dismiss' | null;
 }
 
-/** What the banner says for a sync state, or null when it stays hidden. */
+/** What the global sync indicator says, or null when it stays hidden. */
 export function bannerContent(s: {
   online: boolean;
   pending: number;
   syncing: boolean;
-  justSynced: number;
-  rejected: { title: string; reason: string }[];
+  machine: SyncMachineView;
 }): BannerContent | null {
+  const m = s.machine;
+  if (m.state === 'Error') {
+    return m.errorKind === 'conflict'
+      ? { tone: 'warning', title: 'Sync conflict', detail: m.errorMessage, action: 'dismiss' }
+      : { tone: 'warning', title: 'Sync failed', detail: m.errorMessage, action: 'retry' };
+  }
   if (!s.online) {
     return {
       tone: 'offline',
-      title: 'Offline',
-      detail:
-        s.pending > 0
-          ? `${quests(s.pending)} saved on this device. They sync when you are back online.`
-          : 'Quests you complete are saved on this device.',
-      action: 'retry',
+      title: 'You are offline. Quests will sync when you reconnect',
+      detail: s.pending > 0 ? `${actions(s.pending)} waiting on this device.` : null,
+      action: 'recheck',
     };
   }
-  if (s.rejected.length > 0) {
-    const first = s.rejected[0];
-    const name = first.title ? `"${first.title}"` : 'A quest';
-    const more = s.rejected.length > 1 ? ` (+${s.rejected.length - 1} more)` : '';
-    return {
-      tone: 'warning',
-      title: `${quests(s.rejected.length)} could not sync`,
-      detail: `${name} was not counted: ${first.reason}.${more}`,
-      action: 'dismiss',
-    };
+  if (m.state === 'Syncing' && s.pending > 0) {
+    return { tone: 'syncing', title: `Syncing ${actions(s.pending)}...`, detail: null, action: null };
   }
-  if (s.pending > 0 && s.syncing) {
-    return { tone: 'syncing', title: `Syncing ${quests(s.pending)}…`, detail: null, action: null };
-  }
-  if (s.justSynced > 0) {
-    return {
-      tone: 'done',
-      title: `Back online · ${quests(s.justSynced)} synced`,
-      detail: null,
-      action: null,
-    };
+  if (m.state === 'Synced') {
+    return { tone: 'done', title: 'All synced', detail: null, action: null };
   }
   return null;
 }
 
-/** Top-of-screen status for offline mode and background sync. */
+const ACTION_LABEL: Record<NonNullable<BannerContent['action']>, { text: string; a11y: string }> = {
+  recheck: { text: 'Retry', a11y: 'Check the connection again' },
+  retry: { text: 'Retry', a11y: 'Retry syncing your quests' },
+  dismiss: { text: 'OK', a11y: 'Dismiss the sync notice' },
+};
+
+/** Top-of-screen indicator for the global sync state. */
 export function OfflineBanner() {
   useTheme();
   useOfflineSync();
   const dispatch = useAppDispatch();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const sync = useAppSelector((s) => s.sync);
   const content = bannerContent(sync);
 
-  // "Synced" and "could not sync" notices fade on their own.
+  // Conflicts also get a toast, once per message.
+  const { errorKind, errorMessage } = sync.machine;
   useEffect(() => {
-    if (!sync.online || (sync.justSynced === 0 && sync.rejected.length === 0)) return undefined;
-    const t = setTimeout(
-      () => dispatch(syncNoticeCleared()),
-      sync.rejected.length > 0 ? 9000 : 3500,
-    );
-    return () => clearTimeout(t);
-  }, [dispatch, sync.online, sync.justSynced, sync.rejected]);
+    if (errorKind === 'conflict' && errorMessage) showToast({ message: errorMessage, durationMs: 6000 });
+  }, [errorKind, errorMessage, showToast]);
 
   if (!content) return null;
 
@@ -92,12 +83,13 @@ export function OfflineBanner() {
         ? colors.danger
         : colors.accent;
   const label = [content.title, content.detail].filter(Boolean).join('. ');
+  const action = content.action;
 
   return (
     <View style={[styles.wrap, { top: insets.top + spacing.xs }]} pointerEvents="box-none">
       <View
         style={styles.banner}
-        accessible
+        accessible={action === null}
         accessibilityRole="alert"
         accessibilityLiveRegion="polite"
         accessibilityLabel={label}
@@ -113,21 +105,20 @@ export function OfflineBanner() {
             </Txt>
           ) : null}
         </View>
-        {content.action ? (
+        {action ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={
-              content.action === 'retry' ? 'Check connection again' : 'Dismiss sync notice'
-            }
+            accessibilityLabel={ACTION_LABEL[action].a11y}
             hitSlop={8}
             onPress={() => {
-              if (content.action === 'retry') probeConnectivity().catch(() => undefined);
-              else dispatch(syncNoticeCleared());
+              if (action === 'recheck') probeConnectivity().catch(() => undefined);
+              else if (action === 'retry') dispatch(syncRetryRequested());
+              else dispatch(syncNoticeDismissed());
             }}
             style={({ pressed }) => [styles.action, pressed && styles.pressed]}
           >
             <Txt variant="bodySemi" color={colors.accent}>
-              {content.action === 'retry' ? 'Retry' : 'OK'}
+              {ACTION_LABEL[action].text}
             </Txt>
           </Pressable>
         ) : null}

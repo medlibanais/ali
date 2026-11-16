@@ -1,9 +1,10 @@
-// Lightweight connectivity tracking without a native module (NetInfo would
-// need a new dev build). The app is "offline" when a request fails with a
-// network error, or when the browser says so on web. While offline, the
-// sync hook probes the Supabase health endpoint until it answers.
+// Online/offline status from @react-native-community/netinfo, which works
+// on Android and web. A request that fails with a network error also
+// marks the app offline straight away (NetInfo can lag a few seconds when
+// a train enters a tunnel); NetInfo's next "connected and reachable"
+// event brings it back.
 
-import { Platform } from 'react-native';
+import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 
 type Listener = (online: boolean) => void;
 
@@ -14,6 +15,11 @@ function set(next: boolean): void {
   if (next === online) return;
   online = next;
   listeners.forEach((l) => l(next));
+}
+
+/** Connected, and the internet is not known to be unreachable. */
+export function isOnlineState(state: Pick<NetInfoState, 'isConnected' | 'isInternetReachable'>): boolean {
+  return state.isConnected !== false && state.isInternetReachable !== false;
 }
 
 export function isOnline(): boolean {
@@ -35,56 +41,21 @@ export function subscribeConnectivity(listener: Listener): () => void {
   };
 }
 
-/**
- * Asks the backend whether it is reachable. Any HTTP answer counts as
- * online; a thrown fetch or a timeout counts as offline.
- */
-export async function probeConnectivity(timeoutMs = 5000): Promise<boolean> {
-  if (
-    Platform.OS === 'web' &&
-    typeof navigator !== 'undefined' &&
-    navigator.onLine === false
-  ) {
-    set(false);
-    return false;
-  }
-  const base = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-  if (!base) return online;
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = setTimeout(() => controller?.abort(), timeoutMs);
-  try {
-    await fetch(`${base}/auth/v1/health`, {
-      method: 'GET',
-      headers: { apikey: key },
-      signal: controller?.signal,
-    });
-    set(true);
-    return true;
-  } catch {
-    set(false);
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
+/** Follows NetInfo for the life of the app. Returns the unsubscribe. */
+export function watchNetInfo(): () => void {
+  return NetInfo.addEventListener((state) => set(isOnlineState(state)));
 }
 
-/** Web only: follow the browser's online/offline events. */
-export function watchBrowserConnectivity(): () => void {
-  if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.addEventListener) {
-    return () => undefined;
+/** Asks NetInfo again (Retry button, app back in the foreground). */
+export async function probeConnectivity(): Promise<boolean> {
+  try {
+    const state = await NetInfo.refresh();
+    const next = isOnlineState(state);
+    set(next);
+    return next;
+  } catch {
+    return online;
   }
-  const goOnline = () => {
-    probeConnectivity().catch(() => undefined);
-  };
-  const goOffline = () => set(false);
-  window.addEventListener('online', goOnline);
-  window.addEventListener('offline', goOffline);
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) set(false);
-  return () => {
-    window.removeEventListener('online', goOnline);
-    window.removeEventListener('offline', goOffline);
-  };
 }
 
 /** Test helper. */

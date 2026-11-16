@@ -1,5 +1,5 @@
 // Runs the offline sync in the background while signed in: follows
-// connectivity, probes while offline, and drains the completion queue
+// NetInfo, re-checks while offline, and drains the completion queue
 // (in order) whenever the app is online with completions waiting.
 
 import { useEffect, useRef, useState } from 'react';
@@ -8,7 +8,7 @@ import {
   isOnline,
   probeConnectivity,
   subscribeConnectivity,
-  watchBrowserConnectivity,
+  watchNetInfo,
 } from '../../lib/connectivity';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { syncOfflineCompletions } from '../../store/offlineSync';
@@ -39,8 +39,7 @@ export function useOfflineSync(): void {
     const unsubscribe = subscribeConnectivity((next) => {
       dispatch(connectivityChanged(next));
     });
-    const unwatch = watchBrowserConnectivity();
-    probeConnectivity().catch(() => undefined);
+    const unwatch = watchNetInfo();
     return () => {
       unsubscribe();
       unwatch();
@@ -60,7 +59,7 @@ export function useOfflineSync(): void {
     return () => sub.remove();
   }, []);
 
-  // While offline, knock every 15 s.
+  // While offline, ask NetInfo again every 15 s as a safety net.
   useEffect(() => {
     if (online) return undefined;
     const id = setInterval(() => {

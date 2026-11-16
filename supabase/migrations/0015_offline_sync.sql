@@ -1,4 +1,4 @@
--- PrayerLock 0014: offline quest completions.
+-- PrayerLock 0015: offline quest completions.
 --
 -- The app queues completions made without a connection and replays them
 -- in order when it is back online, through sync_quest_completion():

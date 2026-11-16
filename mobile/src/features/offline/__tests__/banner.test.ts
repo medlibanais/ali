@@ -14,8 +14,8 @@ describe('offline banner', () => {
   });
   it('says Offline and how many quests wait', () => {
     const c = bannerContent({ ...base, online: false, pending: 2 });
-    expect(c?.title).toBe('Offline');
-    expect(c?.detail).toMatch(/2 quests saved/);
+    expect(c?.title).toBe('You are offline. Quests will sync when you reconnect');
+    expect(c?.detail).toMatch(/2 waiting/);
     expect(c?.action).toBe('retry');
   });
   it('shows syncing, then synced', () => {
@@ -28,7 +28,7 @@ describe('offline banner', () => {
       rejected: [{ title: 'Walk', reason: 'the daily limit of 15 quests was already reached' }],
     });
     expect(c?.tone).toBe('warning');
-    expect(c?.detail).toMatch(/"Walk" was not counted: the daily limit/);
+    expect(c?.detail).toMatch(/"Walk": the daily limit/);
   });
   it('backs off on server errors', () => {
     expect(retryDelayMs(0)).toBe(0);

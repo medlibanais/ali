@@ -2,7 +2,7 @@
 // offline queue on disk. Imported by the quests slice and the sync thunk.
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { localDateOf, pendingXpOf, readCompletionQueue } from '../lib/offlineQueue';
+import { localDateOf, pendingXpOf, readOfflineQueue } from '../lib/offlineQueue';
 import { pendingXpChanged } from './slices/gamificationSlice';
 import { pendingChanged } from './slices/syncSlice';
 
@@ -16,7 +16,7 @@ export const refreshPendingCompletions = createAsyncThunk<
   { state: AuthSlice }
 >('sync/refreshPending', async (_, { dispatch, getState }) => {
   const userId = getState().auth.userId;
-  const queue = userId ? await readCompletionQueue(userId) : [];
+  const queue = userId ? await readOfflineQueue(userId) : [];
   dispatch(pendingChanged(queue.length));
   dispatch(pendingXpChanged(pendingXpOf(queue, localDateOf(new Date()))));
   return queue.length;
