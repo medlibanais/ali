@@ -40,7 +40,6 @@ import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
 import { levelProgress } from '../lib/levels';
-import { registerDeviceForPush } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -430,7 +429,7 @@ const ConfettiLayer = memo(
 
 // ------------------------------------------------------------ screen
 
-export function TodayScreen({ navigation }: Props) {
+export function TodayScreen({ navigation, route }: Props) {
   useTheme();
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
@@ -488,10 +487,13 @@ export function TodayScreen({ navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInvite]);
 
-  // Push registration is best-effort and silent.
+  // A tapped streak alert opens Today with its weakest pillar expanded.
+  const pillarParam = route.params?.pillar;
   useEffect(() => {
-    registerDeviceForPush().catch(() => undefined);
-  }, []);
+    if (!pillarParam) return;
+    setExpandedPillar(pillarParam);
+    navigation.setParams({ pillar: undefined });
+  }, [pillarParam, navigation]);
 
   const onRefresh = useCallback(() => {
     load(true);

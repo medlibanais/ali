@@ -5,9 +5,8 @@
 // max_per_day (never more than 3) pushes have gone out today in their
 // timezone. Pushes go through the Expo push API (FCM/APNs behind it).
 
-import type { createClient } from 'jsr:@supabase/supabase-js@2';
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
-type SupabaseClient = ReturnType<typeof createClient>;
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 export const PUSH_DAILY_CAP = 3;
@@ -31,6 +30,11 @@ export interface Delivery {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+}
+
+interface PushTicket {
+  status?: 'ok' | 'error';
+  details?: { error?: string };
 }
 
 export interface DeliveryResult {
@@ -131,15 +135,30 @@ export async function deliver(
             title,
             body,
             sound: 'default',
+            channelId: 'default',
+            priority: 'high',
             data: { type: msg.type, ...(msg.data ?? {}) },
           })),
         ),
       });
       const payload = await res.json();
-      sent = (payload?.data ?? []).filter(
-        (t: { status?: string }) => t.status === 'ok',
-      ).length;
+      const tickets: PushTicket[] = Array.isArray(payload?.data) ? payload.data : [];
+      sent = tickets.filter((t) => t.status === 'ok').length;
       if (sent === 0) pushReason = 'push_failed';
+
+      // Tickets come back in the same order as the messages. Drop tokens
+      // Expo says are dead (app uninstalled, token rotated) so they stop
+      // counting as devices.
+      const dead = tokens.filter(
+        (_, i) => tickets[i]?.details?.error === 'DeviceNotRegistered',
+      );
+      if (dead.length > 0) {
+        await admin
+          .from('device_tokens')
+          .delete()
+          .eq('user_id', userId)
+          .in('token', dead);
+      }
     } catch {
       pushReason = 'push_failed';
     }
