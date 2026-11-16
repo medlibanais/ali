@@ -6,6 +6,8 @@ import gamificationReducer from './slices/gamificationSlice';
 import chatReducer from './slices/chatSlice';
 import analyticsReducer from './slices/analyticsSlice';
 import themeReducer from './slices/themeSlice';
+import celebrationsReducer from './slices/celebrationsSlice';
+import { celebrationMiddleware } from './celebrationMiddleware';
 import { THEMES } from '../theme/themes';
 import { applyThemeColors } from '../theme/tokens';
 
@@ -18,7 +20,10 @@ export const store = configureStore({
     chat: chatReducer,
     analytics: analyticsReducer,
     theme: themeReducer,
+    celebrations: celebrationsReducer,
   },
+  middleware: (getDefault) =>
+    getDefault().prepend(celebrationMiddleware.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

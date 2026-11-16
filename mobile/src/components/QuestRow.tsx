@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Quest } from '../api/types';
 import {
@@ -13,7 +13,9 @@ import {
   withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
-import { CheckGlyph, SparklesGlyph, StarGlyph } from './icons';
+import { rememberCompletionOrigin } from '../features/celebrations/anchors';
+import DrawnCheck from './DrawnCheck';
+import { SparklesGlyph, StarGlyph } from './icons';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -41,6 +43,12 @@ export function QuestRow({
   const pillarColor = colors.pillar[quest.pillar];
   const pastel = pillarPastels(quest.pillar);
   const dimmed = quest.skipped === true;
+  // Done while this row is on screen: the tick draws itself.
+  const wasDone = useRef(quest.completed);
+  const justDone = quest.completed && !wasDone.current;
+  useEffect(() => {
+    wasDone.current = quest.completed;
+  }, [quest.completed]);
   // Block tiles: the whole row takes the pillar color with black text.
   const block = blockTiles();
   const tileInk = colors.onAccent;
@@ -61,7 +69,14 @@ export function QuestRow({
           accessibilityRole="checkbox"
           accessibilityState={{ checked: false }}
           accessibilityLabel={`Complete ${quest.title}`}
-          onPress={() => onComplete(quest)}
+          onPress={(e) => {
+            // XP particles start where the finger was.
+            const { pageX, pageY } = e.nativeEvent;
+            if (Number.isFinite(pageX) && Number.isFinite(pageY)) {
+              rememberCompletionOrigin(quest.quest_id, { x: pageX, y: pageY });
+            }
+            onComplete(quest);
+          }}
           hitSlop={11}
           style={({ pressed }) => [
             styles.check,
@@ -71,17 +86,23 @@ export function QuestRow({
             pressed && { backgroundColor: block ? withAlpha(tileInk, 0.15) : pastel.tint },
           ]}
         />
+      ) : quest.completed ? (
+        <DrawnCheck
+          animate={justDone}
+          color={block ? pillarColor : colors.onAccent}
+          style={[
+            styles.check,
+            styles.checkDone,
+            block && { backgroundColor: tileInk, borderColor: tileInk },
+          ]}
+        />
       ) : (
         <View
           style={[
             styles.check,
             block && { borderColor: tileInk, backgroundColor: 'transparent' },
-            quest.completed && styles.checkDone,
-            quest.completed && block && { backgroundColor: tileInk, borderColor: tileInk },
           ]}
-        >
-          {quest.completed ? <CheckGlyph size={14} /> : null}
-        </View>
+        />
       )}
       <View style={styles.body}>
         <Txt
