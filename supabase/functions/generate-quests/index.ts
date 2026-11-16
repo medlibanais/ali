@@ -2,12 +2,26 @@
 // Two entry modes:
 //   - on-demand: authenticated user generates for their own today
 //   - nightly:   cron secret generates tomorrow's quests for all users
-// On success it converts up to AI_TARGET untouched predefined quests of
-// the day into AI ones, keeping the day at ~15 quests with a real mix.
-// JSON output is schema-validated; one retry; failures log 'fallback'.
+// Before calling Groq it asks calculate_user_difficulty (migration 0015)
+// for the user's adaptive level and puts it in the system prompt. Groq
+// returns 15 quests (3 per pillar) biased to that level; the reply is
+// validated against QUEST_SCHEMA plus the level's Easy/Hard caps before
+// anything is inserted. One retry with the validation errors; failures
+// log 'fallback'. On success the AI quests replace the day's untouched
+// predefined quests.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callGroq } from '../_shared/llm.ts';
+import {
+  type DifficultyProfile,
+  difficultyInstruction,
+  extractJson,
+  type GeneratedQuest,
+  PILLARS,
+  profileForLevel,
+  QUEST_COUNT,
+  validateGenerated,
+} from './questSchema.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,69 +29,8 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-const AI_TARGET = 5;
-const PILLARS = ['health', 'family', 'work', 'fun', 'spirituality'] as const;
-const DIFFICULTY_XP: Record<string, number> = { easy: 10, medium: 20, hard: 50 };
-
-interface GeneratedQuest {
-  pillar: string;
-  title: string;
-  description: string;
-  difficulty: string;
-  xp_reward: number;
-  time_estimate_minutes: number;
-  why_this_matters: string;
-}
-
-function validQuests(raw: unknown): GeneratedQuest[] | null {
-  if (!Array.isArray(raw)) return null;
-  const out: GeneratedQuest[] = [];
-  for (const q of raw) {
-    if (!q || typeof q !== 'object') return null;
-    const o = q as Record<string, unknown>;
-    if (
-      typeof o.pillar !== 'string' ||
-      !PILLARS.includes(o.pillar as (typeof PILLARS)[number]) ||
-      typeof o.title !== 'string' ||
-      o.title.trim().length < 4 ||
-      o.title.length > 80 ||
-      typeof o.description !== 'string' ||
-      o.description.length > 240 ||
-      typeof o.difficulty !== 'string' ||
-      !(o.difficulty in DIFFICULTY_XP) ||
-      DIFFICULTY_XP[o.difficulty as string] !== o.xp_reward
-    ) {
-      return null;
-    }
-    out.push({
-      pillar: o.pillar,
-      title: (o.title as string).trim(),
-      description: (o.description as string).trim(),
-      difficulty: o.difficulty,
-      xp_reward: o.xp_reward as number,
-      time_estimate_minutes:
-        typeof o.time_estimate_minutes === 'number'
-          ? Math.min(480, Math.max(5, Math.round(o.time_estimate_minutes)))
-          : 30,
-      why_this_matters:
-        typeof o.why_this_matters === 'string'
-          ? o.why_this_matters.slice(0, 200)
-          : '',
-    });
-  }
-  return out.length >= 4 && out.length <= 7 ? out : null;
-}
-
-function extractJson(text: string): unknown | null {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start < 0 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
-}
+// Rough output budget for 15 quests (~150 tokens each) plus JSON overhead.
+const MAX_OUTPUT_TOKENS = 3000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -196,9 +149,22 @@ async function generateForUser(
   const scores = scoresRes.data ?? [];
   const weakest = weakestPillar(scores);
 
-  const prompt = buildPrompt(goals, level, weakest, recentTitles, target);
+  // Adaptive difficulty. If the RPC fails (e.g. migration 0015 not
+  // applied yet) generation still runs at Beginner and the log says why.
+  const { data: diffRow, error: diffError } = await admin
+    .rpc('calculate_user_difficulty', { p_user_id: userId })
+    .maybeSingle();
+  if (diffError) {
+    console.warn('calculate_user_difficulty failed', diffError.message);
+  }
+  const profile = profileForLevel(
+    (diffRow as { level?: number } | null)?.level,
+  );
+
+  const prompt = buildPrompt(goals, level, weakest, recentTitles, target, profile);
   let quests: GeneratedQuest[] | null = null;
-  let lastError = '';
+  let lastError = diffError ? `difficulty_rpc: ${diffError.message}` : '';
+  let feedback = '';
 
   for (let attempt = 0; attempt < 2 && !quests; attempt += 1) {
     const llm = await callGroq(
@@ -206,18 +172,35 @@ async function generateForUser(
         { role: 'system', content: prompt },
         {
           role: 'user',
-          content: `Generate today's ${AI_TARGET} quests as a JSON array only.${attempt > 0 ? ' Previous output was invalid — return ONLY valid JSON matching the schema.' : ''}`,
+          content: `Generate the ${QUEST_COUNT} quests now as one JSON object {"quests": [...]}.${feedback}`,
         },
       ],
-      { maxTokens: 900, temperature: 0.8 },
+      {
+        maxTokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.8,
+        timeoutMs: 30000,
+        retries: 1,
+        useFallbackModel: true,
+        jsonObject: true,
+      },
     );
     if (!llm.ok) {
       lastError = llm.error ?? 'llm_error';
       continue;
     }
     const parsed = extractJson(llm.text);
-    quests = parsed ? validQuests(parsed) : null;
-    if (!quests) lastError = 'invalid_schema';
+    if (parsed === null) {
+      lastError = 'invalid_json';
+      feedback = ' Your previous reply was not valid JSON. Return ONLY the JSON object.';
+      continue;
+    }
+    const checked = validateGenerated(parsed, profile);
+    if (checked.ok) {
+      quests = checked.quests;
+    } else {
+      lastError = `invalid_schema: ${checked.errors.join('; ')}`.slice(0, 500);
+      feedback = ` Your previous reply broke these rules, fix them: ${checked.errors.join('; ')}`.slice(0, 800);
+    }
   }
 
   if (!quests) {
@@ -226,6 +209,7 @@ async function generateForUser(
       target_date: target,
       status: 'fallback',
       generated_count: 0,
+      difficulty_level: profile.level,
       error: lastError,
       duration_ms: Date.now() - started,
     });
@@ -258,6 +242,7 @@ async function generateForUser(
       target_date: target,
       status: 'failed',
       generated_count: 0,
+      difficulty_level: profile.level,
       error: insertError.message,
       duration_ms: Date.now() - started,
     });
@@ -303,13 +288,15 @@ async function generateForUser(
     target_date: target,
     status: 'ok',
     generated_count: aiCount,
+    difficulty_level: profile.level,
+    error: diffError ? `difficulty_rpc: ${diffError.message}`.slice(0, 500) : null,
     duration_ms: Date.now() - started,
   });
   await admin.rpc('recompute_daily_score', {
     p_user: userId,
     p_date: target,
   });
-  return `ok:${aiCount}`;
+  return `ok:${aiCount}:${profile.label}`;
 }
 
 function weakestPillar(scores: Record<string, number>[]): string {
@@ -329,24 +316,27 @@ function buildPrompt(
   weakest: string,
   recentTitles: string[],
   target: string,
+  profile: DifficultyProfile,
 ): string {
   const hobbies = Array.isArray(goals.hobbies)
     ? (goals.hobbies as string[]).join(', ')
     : 'reading, sports';
   return `You generate daily quests for an identity-based habit tracker. Date: ${target}.
 
+DIFFICULTY: ${difficultyInstruction(profile)}
+
 USER CONTEXT:
 - Level ${level}; goals: ${goals.workouts_per_week ?? 3} workouts/week, ${goals.sleep_target_hours ?? 8}h sleep, deep work ${goals.deep_work_hours_per_week ?? 20}h/week toward "${goals.career_goal ?? 'their career goal'}"${goals.skill_to_develop ? `, learning ${goals.skill_to_develop}` : ''}
 - Hobbies: ${hobbies}
 - Family: call parents ${goals.call_parents_frequency ?? 'weekly'}
 - Spirituality: ${goals.religion ?? 'general'}${goals.prayer_frequency ? `, ${goals.prayer_frequency}` : ''}${goals.spiritual_practice ? `, ${goals.spiritual_practice}` : ''}
-- Weakest pillar lately: ${weakest} (include 1-2 quests there, but keep balance)
+- Weakest pillar lately: ${weakest} (make its quests especially concrete and inviting)
 - DO NOT repeat or rephrase these recent titles: ${recentTitles.slice(0, 25).join('; ') || 'none'}
 
-TASK: output a JSON array of exactly ${AI_TARGET} quests. Each:
-{"pillar": "health|family|work|fun|spirituality", "title": "<4-80 chars, action verb first>", "description": "<specific, measurable, max 200 chars>", "difficulty": "easy|medium|hard", "xp_reward": 10 for easy, 20 for medium, 50 for hard, "time_estimate_minutes": 5-240, "why_this_matters": "<one sentence tied to THEIR goals, max 160 chars>"}
+TASK: output ONE JSON object {"quests": [...]} with exactly ${QUEST_COUNT} quests, exactly 3 per pillar (${PILLARS.join(', ')}). Each quest:
+{"pillar": "health|family|work|fun|spirituality", "title": "<4-80 chars, action verb first>", "description": "<specific, measurable, max 200 chars>", "difficulty": "easy|medium|hard", "xp_reward": 10 for easy, 20 for medium, 50 for hard, "time_estimate_minutes": integer 5-240, "why_this_matters": "<one sentence tied to THEIR goals, max 160 chars>"}
 
-RULES: valid JSON only, no markdown, no commentary. At most 2 hard quests. Mix difficulties (~1 easy, 3 medium, 1 hard). Quests must be completable in one day. Personalize to hobbies/religion/career above — never generic.`;
+RULES: valid JSON only, no markdown, no commentary, no extra keys. All titles different. Easy = under 15 minutes, Medium = 15-45 minutes of focus, Hard = a real stretch (45+ minutes or uncomfortable). Quests must be completable in one day. Personalize to hobbies/religion/career above — never generic.`;
 }
 
 function json(body: unknown, status: number): Response {
