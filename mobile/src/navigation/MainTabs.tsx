@@ -20,12 +20,22 @@ import {
   QuestsIcon,
   TodayIcon,
 } from '../components/icons';
-import TodayScreen from '../screens/TodayScreen';
-import QuestsScreen from '../screens/QuestsScreen';
-import CoachScreen from '../screens/CoachScreen';
-import InsightsScreen from '../screens/InsightsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import TodayScreenBase from '../screens/TodayScreen';
+import QuestsScreenBase from '../screens/QuestsScreen';
+import CoachScreenBase from '../screens/CoachScreen';
+import InsightsScreenBase from '../screens/InsightsScreen';
+import ProfileScreenBase from '../screens/ProfileScreen';
+import { withTabTransition } from '../components/TabScene';
+import { playHaptic } from '../lib/haptics';
+import { launchHero } from '../lib/hero';
 import type { MainTabParamList } from './types';
+
+// Each tab rises into place on focus (custom transition, UI thread).
+const TodayScreen = withTabTransition(TodayScreenBase);
+const QuestsScreen = withTabTransition(QuestsScreenBase);
+const CoachScreen = withTabTransition(CoachScreenBase);
+const InsightsScreen = withTabTransition(InsightsScreenBase);
+const ProfileScreen = withTabTransition(ProfileScreenBase);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -61,6 +71,16 @@ export function MainTabs() {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
+      screenListeners={({ navigation, route }) => ({
+        tabPress: () => {
+          const state = navigation.getState();
+          const current = state.routes[state.index]?.name;
+          if (current === route.name) return;
+          playHaptic('tab');
+          // Today -> Profile: the avatar flies across (components/Hero).
+          if (current === 'Today' && route.name === 'Profile') launchHero('avatar');
+        },
+      })}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
