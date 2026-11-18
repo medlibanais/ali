@@ -112,6 +112,7 @@ function rpcError(error: { message?: string } | null, fallback: string): string 
   }
   if (msg.includes('quest_not_today')) return 'This quest is from another day.';
   if (msg.includes('quest_skipped')) return 'This quest was skipped.';
+  if (msg.includes('rate_limited')) return 'Slow down a little, then try again.';
   return fallback;
 }
 
@@ -124,6 +125,8 @@ function isPermanentCompletionError(message: string | undefined): boolean {
     'quest_not_found',
     'quest_skipped',
     'not_your_quest',
+    // Already recorded on the server: the XP was given, nothing to resend.
+    'already_completed',
   ].some((code) => msg.includes(code));
 }
 
@@ -248,7 +251,14 @@ export const completeQuest = createAsyncThunk<
         offline: true,
       } as CompleteQuestResponse & { completedAt: number; offline: boolean };
     }
-    dispatch(questRolledBack(quest.quest_id));
+    const message = (error as { message?: string }).message ?? '';
+    if (message.includes('already_completed')) {
+      // The server already has it (e.g. a retry after a dropped reply):
+      // keep the tick and refresh XP instead of un-ticking it.
+      dispatch(fetchGamification());
+    } else {
+      dispatch(questRolledBack(quest.quest_id));
+    }
     return rejectWithValue({
       questId: quest.quest_id,
       message: rpcError(error as { message?: string }, 'Could not complete this quest.'),
@@ -274,6 +284,9 @@ export const undoQuest = createAsyncThunk<
   return { ...(data as UndoQuestResponse), questId };
 });
 
+/** Server window for complete_quest's rate limit (10 calls / 5 s), plus slack. */
+const RATE_LIMIT_WAIT_MS = 5500;
+
 /** Replays queued offline completions once we're back online. */
 export const drainCompletionQueue = createAsyncThunk<
   { synced: number },
@@ -281,11 +294,17 @@ export const drainCompletionQueue = createAsyncThunk<
 >('quests/drainQueue', async (_, { dispatch }) => {
   const queue = await readCompletionQueue();
   let synced = 0;
+  const send = (questId: string) =>
+    supabase.rpc('complete_quest', { p_quest_id: questId });
   for (const item of queue) {
     try {
-      const { error } = await supabase.rpc('complete_quest', {
-        p_quest_id: item.questId,
-      });
+      let { error } = await send(item.questId);
+      if (error?.message?.includes('rate_limited')) {
+        // The server takes 10 completions per 5 s; a long offline queue
+        // can hit that. Wait for the window to pass and try once more.
+        await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
+        ({ error } = await send(item.questId));
+      }
       if (!error) {
         await dequeueCompletion(item.questId);
         synced += 1;

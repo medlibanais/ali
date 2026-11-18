@@ -31,6 +31,13 @@ import {
   type TodayQuest,
 } from '../_shared/coachText.ts';
 import { fitToBudget, promptBudget } from '../_shared/tokenBudget.ts';
+import {
+  INPUT_MAX_CHARS,
+  leaksSystemPrompt,
+  sanitizeGoals,
+  sanitizeUserInput,
+  wrapSystemPrompt,
+} from '../_shared/promptGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +46,7 @@ const corsHeaders = {
 };
 
 const DAILY_LIMIT = 20;
-const INPUT_MAX = 500;
+const INPUT_MAX = INPUT_MAX_CHARS; // 500, see _shared/promptGuard.ts
 const HISTORY_TURNS = 10; // last 10 messages of this conversation
 const HISTORY_CHARS = 600; // per message, before the token budget applies
 const RECENT_COMPLETIONS = 5;
@@ -89,6 +96,13 @@ Deno.serve(async (req: Request) => {
     if (message.length > INPUT_MAX) {
       return json({ error: 'message_too_long', max: INPUT_MAX }, 400);
     }
+    // Prompt-injection guard. Safety routing below still reads the
+    // original words; the model and the stored chat get the cleaned text.
+    const guarded = sanitizeUserInput(message);
+    if (guarded.flagged.length) {
+      console.warn('coach input sanitized', { rules: guarded.flagged });
+    }
+    const safeMessage = guarded.text.length ? guarded.text : '[removed]';
 
     // Safety replies are rule-based and always work. Anything that needs the
     // model fails loudly when the key is missing, instead of quietly
@@ -235,7 +249,7 @@ Deno.serve(async (req: Request) => {
     const isDone = (c: CompletionRow[] | null) =>
       (c ?? []).some((x) => x.undone_at === null);
 
-    const goals = goalsRes.data ?? {};
+    const goals = sanitizeGoals((goalsRes.data ?? {}) as Record<string, unknown>);
     const gam = gamRes.data ?? {};
     const scoreRows = (scoresRes.data ?? []) as Record<string, unknown>[];
     const toDay = (r: Record<string, unknown> | undefined, d: string): DayScore => ({
@@ -364,7 +378,10 @@ Deno.serve(async (req: Request) => {
         .reverse()
         .map((m: { role: 'user' | 'assistant'; content: string }) => ({
           role: m.role,
-          content: m.content.slice(0, HISTORY_CHARS),
+          // Older user messages were stored before the guard existed.
+          content: (m.role === 'user'
+            ? sanitizeUserInput(m.content).text
+            : m.content).slice(0, HISTORY_CHARS),
         }));
       const tail: ChatTurn[] = [];
       if (intent === 'wellbeing') {
@@ -374,13 +391,13 @@ Deno.serve(async (req: Request) => {
             'They seem tired, stressed, unwell or low. Lead with care, offer a lighter day, no diagnosis or medication.',
         });
       }
-      tail.push({ role: 'user', content: message });
+      tail.push({ role: 'user', content: safeMessage });
 
       // Token-limit protection: drop the oldest turns, then compact the
       // context, so the request never exceeds Groq's per-request limits.
       const fit = fitToBudget({
-        system: buildSystemPrompt(ctx),
-        compactSystem: buildCompactSystemPrompt(ctx),
+        system: wrapSystemPrompt(buildSystemPrompt(ctx)),
+        compactSystem: wrapSystemPrompt(buildCompactSystemPrompt(ctx)),
         history,
         tail,
         budget: promptBudget(Deno.env.get('COACH_PROMPT_TOKEN_BUDGET')),
@@ -402,7 +419,9 @@ Deno.serve(async (req: Request) => {
         retries: 1,
         useFallbackModel: true,
       });
-      const filtered = llm.ok ? postFilter(llm.text) : null;
+      const filtered = llm.ok && !leaksSystemPrompt(llm.text)
+        ? postFilter(llm.text)
+        : null;
       if (filtered) {
         reply = filtered;
         model = llm.model ?? 'groq';
@@ -418,7 +437,7 @@ Deno.serve(async (req: Request) => {
     // ---- persist both messages ----
     const { data: userRow, error: userInsertError } = await admin
       .from('messages')
-      .insert({ conversation_id: conversationId, role: 'user', content: message })
+      .insert({ conversation_id: conversationId, role: 'user', content: safeMessage })
       .select('id, content, created_at')
       .single();
     const { data: aiRow, error: aiInsertError } = userRow

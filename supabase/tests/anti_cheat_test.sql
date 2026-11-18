@@ -24,6 +24,15 @@ insert into public.quests (user_id, pillar, title, difficulty, xp_reward, assign
 values ('00000000-0000-0000-0000-0000000000a3', 'fun', 'Tia quest', 'medium', 20,
         public.user_today('00000000-0000-0000-0000-0000000000a3'));
 
+-- 0030 added a rate limit (10 calls / 5 s) and a 0.5 s delay to
+-- complete_quest. This file makes 20+ calls inside one transaction, so
+-- lift both here (rolled back at the end); security_hardening_test.sql
+-- tests them.
+create or replace function public.complete_quest_rate_max()
+returns int language sql immutable as $$ select 1000 $$;
+create or replace function public.complete_quest_delay()
+returns interval language sql immutable as $$ select interval '0' $$;
+
 create function pg_temp.act_as(p uuid) returns void language sql as $$
   select set_config('request.jwt.claim.sub', p::text, true),
          set_config('request.jwt.claims', json_build_object('sub', p, 'role', 'authenticated')::text, true),
@@ -75,9 +84,9 @@ select is(
   (10 + case when extract(hour from now() at time zone 'UTC') < 18 then 5 else 0 end + 10)::text,
   'first completion: easy 10 + time bonus + streak bonus for day 1');
 select is((pg_temp.gam(auth.uid())).current_streak, 1, 'streak starts at 1');
-select is(
-  (public.complete_quest(pg_temp.q('Quest 1')))->>'quest_id',
-  pg_temp.q('Quest 1')::text, 'completing the same quest again is idempotent');
+select throws_ok(
+  $$select public.complete_quest(pg_temp.q('Quest 1'))$$,
+  'already_completed', 'completing the same quest again is refused (0030)');
 select lives_ok($$select public.undo_quest_completion(pg_temp.q('Quest 1'))$$, 'undo still works');
 select is((pg_temp.gam(auth.uid())).xp_today, 0, 'undo refunds the quest XP');
 select lives_ok($$select public.complete_quest(pg_temp.q('Quest 1'))$$, 'the quest can be completed again');
@@ -92,9 +101,9 @@ select is(
 select throws_ok(
   $$select public.complete_quest(pg_temp.q('Quest 15'))$$,
   'daily_completion_limit', 'the 16th completion of the day is refused');
-select lives_ok(
+select throws_ok(
   $$select public.complete_quest(pg_temp.q('Quest 3'))$$,
-  're-sending an already completed quest is still fine at the limit');
+  'already_completed', 're-sending an already completed quest at the limit gives no XP');
 select ok((pg_temp.gam(auth.uid())).xp_today <= 500, 'the 500 XP daily cap still holds');
 select throws_ok(
   $$select public.complete_quest(pg_temp.q('Old quest'))$$,
