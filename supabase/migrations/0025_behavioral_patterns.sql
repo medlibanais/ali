@@ -1,7 +1,7 @@
--- PrayerLock 0016: behavioral pattern detection for Insights.
+-- PrayerLock 0025: behavioral pattern detection for Insights.
 --
--- (0015 is left free on purpose: open PR #34 ships a 0014 that collides
--- with main and will need renumbering.)
+-- (Numbered 0025: 0015-0024 are on main or claimed by open branches.
+-- Gaps are fine for supabase db push.)
 --
 -- 1. View public.user_behavioral_patterns: one row for the signed-in user.
 --    * The weekday they most often miss quests (last 8 weeks).
