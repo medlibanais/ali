@@ -48,6 +48,8 @@ Deno.serve(async (req: Request) => {
         .from('profile-photos')
         .remove(files.map((f) => `${user.id}/${f.name}`));
     }
+    // A selfie left behind by "Make it look like me" (usually already gone).
+    await admin.storage.from('selfies').remove([`${user.id}.jpg`]);
 
     // Delete the auth user; all app data cascades.
     const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
