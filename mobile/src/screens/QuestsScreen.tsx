@@ -182,8 +182,10 @@ export function QuestsScreen({ navigation }: Props) {
     [openQuest, showPillarLabel, filter, completedOpen, toggleCompleted],
   );
 
-  const header = (
-    <>
+  // Fixed above the list, so the search field keeps focus while the body
+  // below switches between the list, the skeleton and search results.
+  const top = (
+    <View style={styles.padded}>
       <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
         {`${summary.doneCount} of ${summary.total} done · ${summary.xpLeft} XP left today`}
       </Txt>
@@ -208,41 +210,41 @@ export function QuestsScreen({ navigation }: Props) {
         onChangeText={setSearchText}
         searching={search.searching}
       />
-      {initialLoading || searchActive ? null : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContent}
-        >
-          {FILTER_OPTIONS.map((option) => (
-            <Chip
-              key={option.value}
-              label={option.label}
-              selected={filter === option.value}
-              onPress={() => setFilter(option.value)}
-              dotColor={option.value === 'all' ? undefined : pillarPastels(option.value).base}
-            />
-          ))}
-        </ScrollView>
-      )}
-    </>
+    </View>
+  );
+
+  const chips = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterScroll}
+      contentContainerStyle={styles.filterContent}
+    >
+      {FILTER_OPTIONS.map((option) => (
+        <Chip
+          key={option.value}
+          label={option.label}
+          selected={filter === option.value}
+          onPress={() => setFilter(option.value)}
+          dotColor={option.value === 'all' ? undefined : pillarPastels(option.value).base}
+        />
+      ))}
+    </ScrollView>
   );
 
   return (
     <Screen padded={false}>
+      {top}
       {searchActive ? (
         <ScrollView
           contentContainerStyle={styles.padded}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {header}
           <QuestSearchResults search={search} />
         </ScrollView>
       ) : initialLoading ? (
         <View style={styles.padded}>
-          {header}
           <QuestsSkeleton />
         </View>
       ) : (
@@ -255,7 +257,7 @@ export function QuestsScreen({ navigation }: Props) {
           getItemType={rowType}
           estimatedItemSize={ESTIMATED_ROW}
           extraData={completedOpen}
-          ListHeaderComponent={header}
+          ListHeaderComponent={chips}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
