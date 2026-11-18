@@ -23,6 +23,8 @@ export interface LlmOptions {
   retries?: number;
   /** Try GROQ_FALLBACK_MODEL if the primary model keeps failing. */
   useFallbackModel?: boolean;
+  /** Ask Groq for a JSON object reply (response_format json_object). */
+  jsonObject?: boolean;
 }
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
@@ -66,6 +68,7 @@ async function attempt(
           // the visible answer is never starved to an empty string.
           max_tokens: (options.maxTokens ?? 320) + (reasoning ? 400 : 0),
           temperature: options.temperature ?? 0.7,
+          ...(options.jsonObject ? { response_format: { type: 'json_object' } } : {}),
         }),
       },
     );
