@@ -1,4 +1,7 @@
--- PrayerLock 0030: backend hardening against client-side manipulation.
+-- PrayerLock 0031: backend hardening against client-side manipulation.
+-- (Renumbered from 0030: main had two 0030 files, and db push refuses a
+-- duplicate version. 0030_avatar_generation_jobs sorts first, so on a
+-- project where one 0030 already ran, it is that one; this file still runs.)
 --
 -- Builds on 0012 (friends hardening) and 0013 (anti-cheat), which already
 -- made XP, completions, quests, scores and badges RPC-only. This adds:

@@ -1,6 +1,6 @@
--- Offline sync RPCs share complete_quest's rate limit (migration 0030).
+-- Offline sync RPCs share complete_quest's rate limit (migration 0031_security_hardening).
 --
--- 0022 added sync_quest_completion and sync_quest_undo. 0030 then put a
+-- 0022 added sync_quest_completion and sync_quest_undo. 0031 (security hardening) then put a
 -- rate limit on complete_quest (10 calls per 5 s, 'complete_quest'
 -- bucket). Without this migration the sync RPCs would be a way around it.
 --

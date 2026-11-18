@@ -4,7 +4,7 @@
 begin;
 select plan(40);
 
--- 0031 puts the sync RPCs under complete_quest's rate limit (10 / 5 s).
+-- 0033 puts the sync RPCs under complete_quest's rate limit (10 / 5 s).
 -- now() does not move inside this transaction, so lift it until the
 -- rate limit section at the end.
 create or replace function public.complete_quest_rate_max()
@@ -242,7 +242,7 @@ select lives_ok(
       '44444444-4444-4444-8444-000000000002', now())$$,
   'and does not spill into today');
 
----------------------------------------------------------------- rate limit (0031)
+---------------------------------------------------------------- rate limit (0033)
 select pg_temp.as_admin();
 create or replace function public.complete_quest_rate_max()
 returns int language sql immutable as $$ select 10 $$;
