@@ -72,15 +72,19 @@ export function eventForAction(action: UnknownAction): SyncMachineEvent | null {
 
 export const syncMachineMiddleware: Middleware<object, QuestThunkState> = (api) => {
   const actor = createActor(syncMachine);
-  let last = '';
+  // Redux forbids dispatching while middleware is being built, so the
+  // initial snapshot (which equals the slice's initial state) is not sent.
+  let constructing = true;
+  let last = JSON.stringify(viewOf(actor.getSnapshot()));
   actor.subscribe((snapshot) => {
     const view = viewOf(snapshot);
     const key = JSON.stringify(view);
-    if (key === last) return;
+    if (key === last || constructing) return;
     last = key;
     api.dispatch(machineChanged(view));
   });
   actor.start();
+  constructing = false;
 
   return (next) => (action) => {
     const result = next(action);
