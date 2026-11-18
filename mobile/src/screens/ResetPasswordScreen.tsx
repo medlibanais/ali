@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';

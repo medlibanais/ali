@@ -39,11 +39,6 @@ export async function describeFunctionError(
   return { kind: 'http', status, code };
 }
 
-/** 401 from the gateway or from our own session check. */
-export function isAuthFailure(failure: FunctionFailure): boolean {
-  return failure.status === 401;
-}
-
 /**
  * 404 that is not one of our own codes: the function is not deployed on
  * this Supabase project (the gateway answers NOT_FOUND).

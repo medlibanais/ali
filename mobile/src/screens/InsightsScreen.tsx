@@ -16,6 +16,8 @@ import SegmentedControl from '../components/SegmentedControl';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
+import YearHeatmap from '../components/charts/YearHeatmap';
+import StreakGauge from '../components/charts/StreakGauge';
 import {
   pillarAverages,
   summarizePeriod,
@@ -25,6 +27,12 @@ import {
   type DayScore,
   type PeriodSummary,
 } from '../features/analytics/api';
+import {
+  explainPrediction,
+  predictionA11yLabel,
+  useStreakPrediction,
+} from '../features/analytics/streakPrediction';
+import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
 import { useAppSelector } from '../store/hooks';
@@ -146,6 +154,70 @@ function Pillars({ days }: { days: DayScore[] }) {
   );
 }
 
+// Predicted chance of completing a quest tomorrow (server, hourly).
+function StreakOutlook() {
+  const userId = useAppSelector((state) => state.auth.userId);
+  const prediction = useStreakPrediction(userId);
+  const p = prediction.data;
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        Streak outlook
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        Chance you complete at least one quest tomorrow. Updated every hour.
+      </Txt>
+      {prediction.isError ? (
+        <EmptyState
+          title="Could not load your outlook"
+          body="Check your connection and open Insights again."
+        />
+      ) : p ? (
+        <View accessible accessibilityRole="summary" accessibilityLabel={predictionA11yLabel(p)}>
+          <StreakGauge probability={p.probability} />
+          <View style={styles.outlookNotes}>
+            {explainPrediction(p).map((line) => (
+              <Txt key={line} variant="caption" color={colors.inkSoft} align="center">
+                {line}
+              </Txt>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <Skeleton height={220} />
+      )}
+    </Card>
+  );
+}
+
+// The last 365 days of XP. Independent of the week/month switch above.
+function YearOfActivity() {
+  const userId = useAppSelector((state) => state.auth.userId);
+  const timezone = useAppSelector((state) => state.user.profile?.timezone ?? null);
+  const today = todayInTimezone(timezone);
+  const year = useYearXp(userId, today);
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        Your year
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        XP earned each day for the last 365 days. Tap a day for details.
+      </Txt>
+      {year.isError ? (
+        <EmptyState
+          title="Could not load your year"
+          body="Check your connection and open Insights again."
+        />
+      ) : year.data ? (
+        <YearHeatmap days={year.data} today={today} />
+      ) : (
+        <Skeleton height={150} />
+      )}
+    </Card>
+  );
+}
+
 function Momentum({ streak, best, level }: { streak: number; best: number; level: number }) {
   return (
     <Accordion
@@ -245,7 +317,11 @@ export function InsightsScreen() {
           <Headline s={summary} period={period} />
           <Takeaways items={items} />
 
+          <StreakOutlook />
+
           <Pillars days={current} />
+
+          <YearOfActivity />
 
           <Accordion
             title="Your score, day by day"
@@ -337,6 +413,10 @@ const styles = StyleSheet.create({
   },
   cardSubtitle: {
     marginBottom: spacing.md,
+  },
+  outlookNotes: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
   },
   headlineRow: {
     flexDirection: 'row',

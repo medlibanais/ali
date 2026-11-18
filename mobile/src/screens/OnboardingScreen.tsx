@@ -704,22 +704,6 @@ const styles = themed(() =>
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
   },
-  selfieRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  selfiePreview: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
-    marginRight: spacing.lg,
-  },
-  selfieActions: {
-    flex: 1,
-  },
-  selfieNote: {
-    marginTop: spacing.sm,
-  },
   pressed: {
     opacity: 0.96,
   },
