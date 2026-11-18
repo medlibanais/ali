@@ -409,6 +409,11 @@ verify_jwt = false
 [functions.generate-insights]
 verify_jwt = false
 
+# Called by the database webhook (x-webhook-secret) or by the job's owner,
+# both checked inside the function.
+[functions.generate-avatar-config]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

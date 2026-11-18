@@ -8,11 +8,9 @@
 // floating without a hitch. All callbacks passed down are stable.
 
 import React, {
-  forwardRef,
   memo,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -24,7 +22,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { sanitizeAvatarConfig } from '../avatar/types';
 import { VALID_OPTION_IDS } from '../avatar/options';
 import Backdrop from '../components/Backdrop';
-import ConfettiLite from '../components/ConfettiLite';
 import EmptyState from '../components/EmptyState';
 import { FadeInUp, PressableScale } from '../components/Motion';
 import PillarOrbit from '../components/PillarOrbit';
@@ -36,10 +33,10 @@ import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import { BellGlyph, ChevronGlyph, PillarGlyph } from '../components/icons';
 import type { Quest } from '../api/types';
+import XpBar from '../features/celebrations/XpBar';
 import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
-import { levelProgress } from '../lib/levels';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -144,6 +141,8 @@ const TodayHeader = memo(function TodayHeader({
           {unread > 0 ? <View style={styles.bellDot} /> : null}
         </PressableScale>
       </View>
+      {/* XP particles fly into this bar when a quest is completed. */}
+      <XpBar />
     </FadeInUp>
   );
 });
@@ -350,14 +349,6 @@ const ProgressStrip = memo(function ProgressStrip({
           <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
             {`${totalXp.toLocaleString()} XP`}
           </Txt>
-          <View style={styles.xpTrack}>
-            <View
-              style={[
-                styles.xpFill,
-                { width: `${Math.round(levelProgress(totalXp) * 100)}%` },
-              ]}
-            />
-          </View>
         </View>
         <View style={styles.stripDivider} />
         <PressableScale
@@ -406,27 +397,6 @@ const QuestsError = memo(function QuestsError() {
   );
 });
 
-export interface ConfettiLayerHandle {
-  fire: (color: string) => void;
-}
-
-/** Confetti keeps its own state, so a burst does not re-render the screen. */
-const ConfettiLayer = memo(
-  forwardRef<ConfettiLayerHandle>(function ConfettiLayer(_props, ref) {
-    const [burst, setBurst] = useState<{ key: number; color: string } | null>(null);
-    useImperativeHandle(ref, () => ({
-      fire: (color: string) => setBurst({ key: Date.now(), color }),
-    }), []);
-    const onDone = useCallback(() => setBurst(null), []);
-    if (!burst) return null;
-    return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <ConfettiLite key={burst.key} visible accentColor={burst.color} onDone={onDone} />
-      </View>
-    );
-  }),
-);
-
 // ------------------------------------------------------------ screen
 
 export function TodayScreen({ navigation, route }: Props) {
@@ -436,7 +406,6 @@ export function TodayScreen({ navigation, route }: Props) {
   const initialLoading = useAppSelector(selectInitialLoading);
   const refreshing = useAppSelector((state) => state.quests.refreshing);
   const [expandedPillar, setExpandedPillar] = useState<PillarId | null>(null);
-  const confettiRef = useRef<ConfettiLayerHandle>(null);
 
   const load = useCallback(
     (silent: boolean) => {
@@ -533,7 +502,8 @@ export function TodayScreen({ navigation, route }: Props) {
       if (completeQuest.fulfilled.match(result)) {
         const xp = result.payload.xp_awarded;
         const questId = result.payload.quest_id;
-        confettiRef.current?.fire(colors.pillar[quest.pillar]);
+        // XP particles, level-up and Perfect Day are queued by the
+        // celebration middleware (store/celebrationMiddleware.ts).
         // Level-ups and badges ride on the undo toast (their notification
         // center entries skip the banner so they don't replace it).
         const extras = [
@@ -623,7 +593,6 @@ export function TodayScreen({ navigation, route }: Props) {
           </Txt>
         </>
       )}
-      <ConfettiLayer ref={confettiRef} />
     </Screen>
   );
 }
@@ -699,18 +668,6 @@ const styles = themed(() =>
     width: 1,
     marginVertical: spacing.xs,
     backgroundColor: colors.line,
-  },
-  xpTrack: {
-    height: 6,
-    borderRadius: 3,
-    marginTop: spacing.sm,
-    backgroundColor: colors.paperAlt,
-    overflow: 'hidden',
-  },
-  xpFill: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.gold,
   },
   questHeader: {
     marginTop: spacing.xl + 4,

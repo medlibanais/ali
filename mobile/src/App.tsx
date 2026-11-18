@@ -16,6 +16,7 @@ import { store } from './store';
 import RootNavigator from './navigation/RootNavigator';
 import SplashScreen from './screens/SplashScreen';
 import ToastProvider from './components/Toast';
+import CelebrationHost from './features/celebrations/CelebrationHost';
 import type { RootParamList } from './navigation/types';
 import { useTheme } from './theme/useTheme';
 import { useAppDispatch, useAppSelector } from './store/hooks';
@@ -96,6 +97,7 @@ function ThemedRoot() {
         <RootNavigator />
         <Avatar3DHost />
       </ThemeTransition>
+      <CelebrationHost />
     </NavigationContainer>
   );
 }
