@@ -1,4 +1,4 @@
--- PrayerLock 0026: realtime friends leaderboard + cheers.
+-- PrayerLock 0035: realtime friends leaderboard + cheers.
 --
 --   (1) friends_weekly_xp: a view of you + your accepted friends with this
 --       week's XP. security_invoker = true, so every row it returns has
