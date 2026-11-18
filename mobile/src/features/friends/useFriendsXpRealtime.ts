@@ -1,7 +1,7 @@
 // Live weekly XP for the friends leaderboard.
 //
 // Each user has a private Realtime broadcast topic "xp:<user_id>". A
-// trigger on quest_completions (migration 0026) sends { user_id, xp_delta }
+// trigger on quest_completions (migration 0036) sends { user_id, xp_delta }
 // to it whenever they complete or undo a quest. Realtime checks the
 // realtime.messages RLS policy at join time, so you can only join your own
 // topic and those of accepted friends who share stats; any other join is
