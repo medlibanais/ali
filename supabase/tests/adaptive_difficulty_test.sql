@@ -1,4 +1,4 @@
--- Adaptive difficulty from 0015: calculate_user_difficulty rules, edge
+-- Adaptive difficulty from 0020: calculate_user_difficulty rules, edge
 -- cases and who may call it.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;
