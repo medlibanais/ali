@@ -16,6 +16,7 @@ import {
   readOfflineQueue,
   removeQueued,
 } from '../offlineQueue';
+import { kvStore } from '../kvStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -51,6 +52,7 @@ function quest(id: string, pillar: Quest['pillar'], extra: Partial<Quest> = {}):
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  kvStore.delete(QUEUE_KEY);
 });
 
 describe('completion queue', () => {
@@ -106,9 +108,9 @@ describe('completion queue', () => {
     expect(q.map((i) => `${i.kind}:${i.questId}`)).toEqual(['complete:a', 'undo:b', 'complete:b']);
   });
 
-  it('lives in AsyncStorage under offline_queue, so it survives a restart', async () => {
+  it('lives in MMKV under offline_queue, so it survives a restart', async () => {
     await enqueueCompletion({ ...base, questId: 'a', at: 'x' });
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
+    const raw = kvStore.getString(QUEUE_KEY) ?? null;
     expect(QUEUE_KEY).toMatch(/offline_queue/);
     expect(JSON.parse(raw ?? '[]')).toHaveLength(1);
   });

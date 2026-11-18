@@ -42,9 +42,12 @@ export interface SyncMachineContext {
   failedQuest: FailedQuest | null;
   errorKind: SyncErrorKind | null;
   errorMessage: string | null;
+  /** A flush is running (the queue may hit 0 before its result lands). */
+  flushing: boolean;
 }
 
 export type SyncMachineEvent =
+  | { type: 'FLUSH_STARTED' }
   | { type: 'COMPLETE_TAPPED'; questId: string }
   | { type: 'SERVER_CONFIRMED'; questId: string }
   | { type: 'SERVER_FAILED'; questId: string; title: string; message: string }
@@ -64,6 +67,7 @@ export const initialSyncContext: SyncMachineContext = {
   failedQuest: null,
   errorKind: null,
   errorMessage: null,
+  flushing: false,
 };
 
 export const syncMachine = setup({
@@ -75,8 +79,8 @@ export const syncMachine = setup({
     hasPending: ({ context }) => context.pending > 0,
     eventHasPending: ({ event }) =>
       (event.type === 'PENDING_CHANGED' || event.type === 'QUEUED') && event.pending > 0,
-    eventQueueEmpty: ({ event }) =>
-      (event.type === 'PENDING_CHANGED' && event.pending === 0) ||
+    eventQueueEmpty: ({ context, event }) =>
+      (event.type === 'PENDING_CHANGED' && event.pending === 0 && !context.flushing) ||
       (event.type === 'FLUSH_SUCCEEDED' && event.remaining === 0),
     isInFlightQuest: ({ context, event }) =>
       (event.type === 'SERVER_CONFIRMED' || event.type === 'SERVER_FAILED') &&
@@ -119,6 +123,8 @@ export const syncMachine = setup({
       failedQuest: null,
     }),
     clearError: assign({ errorKind: null, errorMessage: null, failedQuest: null }),
+    flushStarted: assign({ flushing: true }),
+    flushEnded: assign({ flushing: false }),
   },
   delays: {
     syncedDisplay: SYNCED_DISPLAY_MS,
@@ -130,10 +136,16 @@ export const syncMachine = setup({
   on: {
     // The queue count is always kept current, whatever the state.
     PENDING_CHANGED: { actions: 'setPending' },
+    FLUSH_STARTED: { actions: 'flushStarted' },
+    FLUSH_SUCCEEDED: { actions: ['flushEnded', 'setPending'] },
+    FLUSH_CONFLICT: { actions: 'flushEnded' },
+    FLUSH_FAILED: { actions: 'flushEnded' },
   },
   states: {
     Idle: {
       on: {
+        FLUSH_CONFLICT: { target: 'Error', actions: ['flushEnded', 'setPending', 'recordConflict'] },
+        FLUSH_FAILED: { target: 'Error', actions: ['flushEnded', 'setPending', 'recordFailure'] },
         COMPLETE_TAPPED: { target: 'OptimisticPending', actions: 'startInFlight' },
         QUEUED: { target: 'Syncing', actions: 'setPending' },
         PENDING_CHANGED: [
@@ -163,11 +175,11 @@ export const syncMachine = setup({
           { actions: 'setPending' },
         ],
         FLUSH_SUCCEEDED: [
-          { guard: 'eventQueueEmpty', target: 'Synced', actions: 'setPending' },
-          { actions: 'setPending' },
+          { guard: 'eventQueueEmpty', target: 'Synced', actions: ['flushEnded', 'setPending'] },
+          { actions: ['flushEnded', 'setPending'] },
         ],
-        FLUSH_CONFLICT: { target: 'Error', actions: ['setPending', 'recordConflict'] },
-        FLUSH_FAILED: { target: 'Error', actions: ['setPending', 'recordFailure'] },
+        FLUSH_CONFLICT: { target: 'Error', actions: ['flushEnded', 'setPending', 'recordConflict'] },
+        FLUSH_FAILED: { target: 'Error', actions: ['flushEnded', 'setPending', 'recordFailure'] },
       },
     },
     Synced: {
@@ -195,8 +207,8 @@ export const syncMachine = setup({
         COMPLETE_TAPPED: { target: 'OptimisticPending', actions: 'startInFlight' },
         QUEUED: { target: 'Syncing', actions: ['setPending', 'clearError'] },
         FLUSH_SUCCEEDED: [
-          { guard: 'eventQueueEmpty', target: 'Synced', actions: ['setPending', 'clearError'] },
-          { target: 'Syncing', actions: ['setPending', 'clearError'] },
+          { guard: 'eventQueueEmpty', target: 'Synced', actions: ['flushEnded', 'setPending', 'clearError'] },
+          { target: 'Syncing', actions: ['flushEnded', 'setPending', 'clearError'] },
         ],
       },
     },

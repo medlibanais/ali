@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { syncOfflineCompletions } from '../../store/offlineSync';
 import { refreshPendingCompletions } from '../../store/pendingCompletions';
 import { connectivityChanged } from '../../store/slices/syncSlice';
+import { registerBackgroundSync } from './backgroundSync';
 
 const OFFLINE_PROBE_MS = 15000;
 const MAX_BACKOFF_MS = 5 * 60 * 1000;
@@ -21,7 +22,7 @@ const MAX_BACKOFF_MS = 5 * 60 * 1000;
 /** Delay before retrying after `failures` server errors in a row. */
 export function retryDelayMs(failures: number): number {
   if (failures <= 0) return 0;
-  return Math.min(MAX_BACKOFF_MS, 15000 * 2 ** (failures - 1));
+  return Math.min(MAX_BACKOFF_MS, 2000 * 2 ** (failures - 1));
 }
 
 export function useOfflineSync(): void {
@@ -46,9 +47,11 @@ export function useOfflineSync(): void {
     };
   }, [dispatch]);
 
-  // Count what this account has waiting (also after switching accounts).
+  // Count what this account has waiting (also after switching accounts),
+  // and make sure the Android background flush is scheduled.
   useEffect(() => {
     dispatch(refreshPendingCompletions());
+    if (userId) registerBackgroundSync().catch(() => undefined);
   }, [dispatch, userId]);
 
   // Coming back to the app is a good moment to check the connection.

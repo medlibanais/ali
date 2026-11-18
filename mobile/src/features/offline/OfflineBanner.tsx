@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Txt from '../../components/Txt';
 import { probeConnectivity } from '../../lib/connectivity';
@@ -66,7 +66,26 @@ export function OfflineBanner() {
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const sync = useAppSelector((s) => s.sync);
-  const content = bannerContent(sync);
+  const live = bannerContent(sync);
+  const liveKey = live ? JSON.stringify(live) : '';
+
+  // Slides down when something needs saying, back up when it is over. The
+  // last message stays on screen while it slides away.
+  const [content, setContent] = useState<BannerContent | null>(live);
+  const slide = useRef(new Animated.Value(live ? 1 : 0)).current;
+  useEffect(() => {
+    if (live) setContent(live);
+    const animation = Animated.timing(slide, {
+      toValue: live ? 1 : 0,
+      duration: 260,
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.start(({ finished }) => {
+      if (finished && !live) setContent(null);
+    });
+    return () => animation.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveKey]);
 
   // Conflicts also get a toast, once per message.
   const { errorKind, errorMessage } = sync.machine;
@@ -86,7 +105,19 @@ export function OfflineBanner() {
   const action = content.action;
 
   return (
-    <View style={[styles.wrap, { top: insets.top + spacing.xs }]} pointerEvents="box-none">
+    <Animated.View
+      style={[
+        styles.wrap,
+        {
+          top: insets.top + spacing.xs,
+          opacity: slide,
+          transform: [
+            { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-120, 0] }) },
+          ],
+        },
+      ]}
+      pointerEvents="box-none"
+    >
       <View
         style={styles.banner}
         accessible={action === null}
@@ -94,7 +125,17 @@ export function OfflineBanner() {
         accessibilityLiveRegion="polite"
         accessibilityLabel={label}
       >
-        <View style={[styles.dot, { backgroundColor: dot }]} />
+        {content.tone === 'syncing' ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.accent}
+            style={styles.spinner}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        ) : (
+          <View style={[styles.dot, { backgroundColor: dot }]} />
+        )}
         <View style={styles.text}>
           <Txt variant="bodySemi" color={colors.ink}>
             {content.title}
@@ -123,7 +164,7 @@ export function OfflineBanner() {
           </Pressable>
         ) : null}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -149,6 +190,9 @@ const styles = themed(() =>
       maxWidth: 520,
       width: '100%',
       minHeight: 44,
+    },
+    spinner: {
+      marginRight: spacing.md,
     },
     dot: {
       width: 10,

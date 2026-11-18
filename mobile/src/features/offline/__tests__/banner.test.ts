@@ -1,39 +1,62 @@
 import { bannerContent } from '../OfflineBanner';
 import { retryDelayMs } from '../useOfflineSync';
+import type { SyncMachineView } from '../../../store/syncMachine';
 
-jest.mock('../../../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../../../lib/supabase', () => ({ supabase: { auth: {} } }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+jest.mock('expo-background-fetch', () => ({}));
+jest.mock('expo-task-manager', () => ({ defineTask: () => undefined }));
 
-const base = { online: true, pending: 0, syncing: false, justSynced: 0, rejected: [] };
+const idle: SyncMachineView = {
+  state: 'Idle',
+  pending: 0,
+  errorKind: null,
+  errorMessage: null,
+  failedQuest: null,
+};
+const base = { online: true, pending: 0, syncing: false, machine: idle };
 
-describe('offline banner', () => {
-  it('is hidden when online with nothing to say', () => {
+describe('global sync indicator', () => {
+  it('is hidden when idle and online', () => {
     expect(bannerContent(base)).toBeNull();
   });
-  it('says Offline and how many quests wait', () => {
+  it('says you are offline and how many actions wait', () => {
     const c = bannerContent({ ...base, online: false, pending: 2 });
     expect(c?.title).toBe('You are offline. Quests will sync when you reconnect');
-    expect(c?.detail).toMatch(/2 waiting/);
-    expect(c?.action).toBe('retry');
+    expect(c?.detail).toBe('2 actions waiting on this device.');
   });
-  it('shows syncing, then synced', () => {
-    expect(bannerContent({ ...base, pending: 1, syncing: true })?.title).toBe('Syncing 1 quest…');
-    expect(bannerContent({ ...base, justSynced: 3 })?.title).toMatch(/3 quests synced/);
+  it('shows "Syncing 3 actions..." with a spinner tone', () => {
+    const c = bannerContent({ ...base, pending: 3, machine: { ...idle, state: 'Syncing', pending: 3 } });
+    expect(c?.title).toBe('Syncing 3 actions...');
+    expect(c?.tone).toBe('syncing');
   });
-  it('explains refused completions', () => {
-    const c = bannerContent({
+  it('confirms when everything synced', () => {
+    expect(bannerContent({ ...base, machine: { ...idle, state: 'Synced' } })?.title).toBe('All synced');
+  });
+  it('offers Retry on a failure and OK on a conflict', () => {
+    const failed = bannerContent({
       ...base,
-      rejected: [{ title: 'Walk', reason: 'the daily limit of 15 quests was already reached' }],
+      machine: { ...idle, state: 'Error', errorKind: 'failed', errorMessage: 'boom' },
     });
-    expect(c?.tone).toBe('warning');
-    expect(c?.detail).toMatch(/"Walk": the daily limit/);
+    expect(failed?.action).toBe('retry');
+    const conflict = bannerContent({
+      ...base,
+      machine: {
+        ...idle,
+        state: 'Error',
+        errorKind: 'conflict',
+        errorMessage: 'This quest was already completed on another device, your XP was not doubled.',
+      },
+    });
+    expect(conflict?.action).toBe('dismiss');
+    expect(conflict?.detail).toMatch(/XP was not doubled/);
   });
-  it('backs off on server errors', () => {
+  it('backs off exponentially on server errors', () => {
     expect(retryDelayMs(0)).toBe(0);
-    expect(retryDelayMs(1)).toBe(15000);
-    expect(retryDelayMs(3)).toBe(60000);
+    expect(retryDelayMs(1)).toBe(2000);
+    expect(retryDelayMs(3)).toBe(8000);
     expect(retryDelayMs(20)).toBe(300000);
   });
 });

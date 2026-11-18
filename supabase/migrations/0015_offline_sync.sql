@@ -23,7 +23,13 @@
 --     gets: +5 XP for a quest claimed before 6 PM, and keep yesterday's
 --     streak alive with a quest that was really assigned yesterday. Every
 --     completion that arrives late is marked (synced_at) for auditing.
---  4. complete_quest() is unchanged and stays the online path.
+--  4. sync_quest_undo(): an undo tapped offline inside the 10 s window is
+--     honoured when it arrives later, judged by when it was tapped. An
+--     undo only takes XP away, so trusting its time cannot farm anything;
+--     it is still bounded (not before the completion, not in the future,
+--     not older than the grace window).
+--  5. complete_quest() and undo_quest_completion() are unchanged and stay
+--     the online path.
 
 ----------------------------------------------------------------------
 -- Columns
@@ -161,12 +167,13 @@ begin
     raise exception 'quest_skipped';
   end if;
 
-  -- Already completed (e.g. the online call reached the server but its
-  -- answer was lost and the app queued it): nothing more to award.
+  -- Already completed by another call: another device, or the online
+  -- call whose answer was lost before the app queued it. Server wins;
+  -- nothing more is awarded. 'conflict' lets the app tell the user.
   if exists (select 1 from quest_completions
              where quest_id = p_quest_id and undone_at is null) then
     return public.quest_state(p_quest_id)
-      || jsonb_build_object('duplicate', true);
+      || jsonb_build_object('duplicate', true, 'conflict', true);
   end if;
 
   -- (3) Bound the device's claimed time.
@@ -360,3 +367,117 @@ revoke execute on function public.sync_quest_completion(uuid, uuid, timestamptz)
   from public, anon;
 grant execute on function public.sync_quest_completion(uuid, uuid, timestamptz)
   to authenticated;
+
+----------------------------------------------------------------------
+-- sync_quest_undo(quest, when the undo was tapped)
+----------------------------------------------------------------------
+create or replace function public.sync_quest_undo(
+  p_quest_id uuid,
+  p_undone_at timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_now timestamptz := now();
+  v_comp quest_completions%rowtype;
+  v_at timestamptz;
+  v_tz text;
+  v_today date;
+  v_comp_day date;
+  v_next uuid;
+  v_new_total int;
+  v_streak int;
+begin
+  if v_user is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_undone_at is null then
+    raise exception 'invalid_sync_payload';
+  end if;
+
+  perform 1 from gamification where user_id = v_user for update;
+
+  select * into v_comp from quest_completions
+    where quest_id = p_quest_id and undone_at is null;
+  if not found then
+    -- Nothing live to undo: undone already (replay, or another device).
+    if exists (select 1 from quests where id = p_quest_id and user_id = v_user) then
+      return jsonb_build_object('quest_id', p_quest_id, 'duplicate', true, 'conflict', true);
+    end if;
+    raise exception 'quest_not_found';
+  end if;
+  if v_comp.user_id <> v_user then
+    raise exception 'not_your_quest';
+  end if;
+
+  v_at := least(p_undone_at, v_now);
+  if v_at < v_now - public.offline_sync_grace() then
+    raise exception 'offline_undo_too_old';
+  end if;
+  v_at := greatest(v_at, v_comp.completed_at);
+  -- Same window the online undo allows (UI shows 10 s).
+  if v_at > v_comp.completed_at + interval '15 seconds' then
+    raise exception 'undo_window_expired';
+  end if;
+
+  update quest_completions set undone_at = v_now where id = v_comp.id;
+
+  select public.safe_tz(timezone) into v_tz from profiles where id = v_user;
+  v_today := (v_now at time zone v_tz)::date;
+  v_comp_day := (v_comp.completed_at at time zone v_tz)::date;
+
+  update gamification g set
+    total_xp = greatest(0, g.total_xp - v_comp.xp_awarded),
+    xp_today = case
+      when v_comp_day = v_today and g.xp_today_date = v_today
+        then greatest(0, g.xp_today - v_comp.xp_awarded)
+      else g.xp_today end,
+    level = public.level_for_xp(greatest(0, g.total_xp - v_comp.xp_awarded))
+  where g.user_id = v_user
+  returning total_xp, current_streak into v_new_total, v_streak;
+
+  -- Streak rollback, as in undo_quest_completion.
+  if v_comp.prev_current_streak is not null then
+    select c.id into v_next
+    from quest_completions c
+    join quests q on q.id = c.quest_id
+    where c.user_id = v_user and c.undone_at is null
+      and q.assigned_date = v_comp_day
+    order by c.completed_at
+    limit 1;
+
+    if v_next is null then
+      update gamification set
+        current_streak = v_comp.prev_current_streak,
+        best_streak = v_comp.prev_best_streak,
+        last_active_date = v_comp.prev_last_active_date
+      where user_id = v_user
+      returning current_streak into v_streak;
+    else
+      update quest_completions set
+        prev_current_streak = v_comp.prev_current_streak,
+        prev_best_streak = v_comp.prev_best_streak,
+        prev_last_active_date = v_comp.prev_last_active_date
+      where id = v_next;
+    end if;
+  end if;
+
+  perform public.recompute_daily_score(v_user,
+    (select assigned_date from quests where id = p_quest_id));
+
+  return jsonb_build_object(
+    'quest_id', p_quest_id,
+    'xp_refunded', v_comp.xp_awarded,
+    'total_xp', v_new_total,
+    'current_streak', v_streak,
+    'duplicate', false
+  );
+end;
+$$;
+
+revoke execute on function public.sync_quest_undo(uuid, timestamptz) from public, anon;
+grant execute on function public.sync_quest_undo(uuid, timestamptz) to authenticated;

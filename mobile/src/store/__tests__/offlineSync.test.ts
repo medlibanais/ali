@@ -8,10 +8,14 @@ import authReducer from '../slices/authSlice';
 import gamificationReducer from '../slices/gamificationSlice';
 import questsReducer, { completeQuest, fetchDailyQuests, undoQuest } from '../slices/questsSlice';
 import syncReducer from '../slices/syncSlice';
-import { syncOfflineCompletions } from '../offlineSync';
-import { readOfflineQueue } from '../../lib/offlineQueue';
+import { COMPLETED_ELSEWHERE, setFlushPaceForTests, syncOfflineCompletions } from '../offlineSync';
+import { syncMachineMiddleware } from '../syncMachineMiddleware';
+import { QUEUE_KEY, readOfflineQueue } from '../../lib/offlineQueue';
+import { kvStore } from '../../lib/kvStore';
 import { isOnline, reportOffline, reportOnline, resetConnectivityForTests } from '../../lib/connectivity';
 
+jest.mock('expo-background-fetch', () => ({}));
+jest.mock('expo-task-manager', () => ({ defineTask: () => undefined }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
@@ -61,6 +65,7 @@ function makeStore() {
       quests: questsReducer,
       sync: syncReducer,
     },
+    middleware: (getDefault) => getDefault().concat(syncMachineMiddleware),
     preloadedState: {
       auth: {
         status: 'signedIn' as never, userId: 'u1', email: null, busy: false,
@@ -72,8 +77,12 @@ function makeStore() {
 
 const offlineRpc = () => Promise.reject(new TypeError('Network request failed'));
 
+setFlushPaceForTests(0);
+
 beforeEach(async () => {
   await AsyncStorage.clear();
+  kvStore.delete(QUEUE_KEY);
+  kvStore.delete('prayerlock.dailyQuests.v1');
   mockCalls.length = 0;
   resetConnectivityForTests();
   mockServerGam = { level: 1, total_xp: 0, xp_today: 0, xp_today_date: null, current_streak: 0, best_streak: 0 };
@@ -180,7 +189,7 @@ it('undo of an offline completion just leaves the queue', async () => {
 
 it('keeps queued quests ticked when the day reloads offline', async () => {
   const store = makeStore();
-  await AsyncStorage.setItem(
+  kvStore.set(
     'prayerlock.dailyQuests.v1',
     JSON.stringify({
       date: (() => {
@@ -200,4 +209,124 @@ it('keeps queued quests ticked when the day reloads offline', async () => {
   expect(qs.find((q) => q.quest_id === 'a')?.completed).toBe(true);
   expect(qs.find((q) => q.quest_id === 'b')?.completed).toBe(false);
   expect(store.getState().quests.pillarScores.health).toBe(50);
+});
+
+it('drives the XState machine: OptimisticPending, Syncing, then Synced', async () => {
+  const store = makeStore();
+  reportOffline();
+  await store.dispatch(completeQuest(quest('a')));
+  await store.dispatch(completeQuest(quest('b')));
+  expect(store.getState().sync.machine).toMatchObject({ state: 'Syncing', pending: 2 });
+
+  reportOnline();
+  mockRpcImpl = () => Promise.resolve({ data: {}, error: null });
+  await store.dispatch(syncOfflineCompletions());
+  expect(store.getState().sync.machine.state).toBe('Synced');
+});
+
+it('server wins on a conflict: notice, no doubled XP, quest stays as the server has it', async () => {
+  const store = makeStore();
+  reportOffline();
+  await store.dispatch(completeQuest(quest('a', 50)));
+  reportOnline();
+  mockServerGam.total_xp = 55; // the other device's completion
+  mockRpcImpl = (name) =>
+    Promise.resolve(
+      name === 'sync_quest_completion'
+        ? { data: { duplicate: true, conflict: true }, error: null }
+        : { data: null, error: null },
+    );
+  const res = await store.dispatch(syncOfflineCompletions());
+  if (!syncOfflineCompletions.fulfilled.match(res)) throw new Error('sync failed');
+  expect(res.payload.conflicts).toHaveLength(1);
+  const s = store.getState();
+  expect(s.sync.machine).toMatchObject({ state: 'Error', errorKind: 'conflict' });
+  expect(s.sync.machine.errorMessage).toBe(COMPLETED_ELSEWHERE);
+  expect(s.gamification.totalXp).toBe(55); // not 55 + our 55
+});
+
+it('a lost online answer is not reported as a conflict', async () => {
+  const store = makeStore();
+  mockRpcImpl = offlineRpc; // the online call "fails" (it did reach the server)
+  await store.dispatch(completeQuest(quest('a')));
+  reportOnline();
+  mockRpcImpl = (name) =>
+    Promise.resolve(
+      name === 'sync_quest_completion'
+        ? { data: { duplicate: true, conflict: true }, error: null }
+        : { data: null, error: null },
+    );
+  const res = await store.dispatch(syncOfflineCompletions());
+  if (!syncOfflineCompletions.fulfilled.match(res)) throw new Error('sync failed');
+  expect(res.payload.conflicts).toHaveLength(0);
+  expect(res.payload.duplicates).toBe(1);
+});
+
+it('keeps exactly the failed items when 3 of 5 sync', async () => {
+  const store = makeStore();
+  reportOffline();
+  for (const id of ['a', 'b', 'c', 'd', 'e']) await store.dispatch(completeQuest(quest(id)));
+  reportOnline();
+  mockRpcImpl = (name, params) => {
+    if (name !== 'sync_quest_completion') return Promise.resolve({ data: null, error: null });
+    return params.p_quest_id === 'd'
+      ? Promise.resolve({ data: null, error: { message: 'internal server error' } })
+      : Promise.resolve({ data: {}, error: null });
+  };
+  const res = await store.dispatch(syncOfflineCompletions());
+  if (!syncOfflineCompletions.fulfilled.match(res)) throw new Error('sync failed');
+  expect(res.payload.synced).toBe(3);
+  expect(res.payload.remaining).toBe(2);
+  const left = await readOfflineQueue('u1');
+  expect(left.map((i) => i.questId)).toEqual(['d', 'e']);
+  expect(left[0].attempts).toBe(1);
+  expect(store.getState().sync.machine).toMatchObject({ state: 'Error', errorKind: 'failed', pending: 2 });
+});
+
+it('queues an undo made offline and replays complete then undo in order', async () => {
+  const store = makeStore();
+  // Completed online first (the server has it).
+  mockRpcImpl = (name) =>
+    Promise.resolve(
+      name === 'complete_quest'
+        ? { data: { quest_id: 'a', xp_awarded: 15, total_xp: 15, level: 1, level_up: false, daily_score: 0, current_streak: 1, best_streak: 1, new_badges: [] }, error: null }
+        : { data: null, error: null },
+    );
+  await store.dispatch(completeQuest(quest('a')));
+  reportOffline();
+  await store.dispatch(completeQuest(quest('b')));
+  mockCalls.length = 0;
+  await store.dispatch(undoQuest('a'));
+  expect(mockCalls).toHaveLength(0);
+  const q = await readOfflineQueue('u1');
+  expect(q.map((i) => `${i.kind}:${i.questId}`)).toEqual(['complete:b', 'undo:a']);
+
+  reportOnline();
+  mockRpcImpl = () => Promise.resolve({ data: {}, error: null });
+  await store.dispatch(syncOfflineCompletions());
+  expect(
+    mockCalls.filter((c) => c.name.startsWith('sync_')).map((c) => `${c.name}:${c.params.p_quest_id}`),
+  ).toEqual(['sync_quest_completion:b', 'sync_quest_undo:a']);
+});
+
+it('tags the post-sync XP refresh so reward animations do not replay', async () => {
+  const seen: unknown[] = [];
+  const store = configureStore({
+    reducer: { auth: authReducer, gamification: gamificationReducer, quests: questsReducer, sync: syncReducer },
+    middleware: (getDefault) =>
+      getDefault().concat(() => (next) => (action) => {
+        const a = action as { type: string; meta?: { arg?: unknown } };
+        if (a.type === 'gamification/fetch/fulfilled') seen.push(a.meta?.arg);
+        return next(action);
+      }),
+    preloadedState: {
+      auth: { status: 'signedIn' as never, userId: 'u1', email: null, busy: false, error: null, pendingInviteCode: null },
+    },
+  });
+  reportOffline();
+  await store.dispatch(completeQuest(quest('a')));
+  reportOnline();
+  mockRpcImpl = () => Promise.resolve({ data: {}, error: null });
+  await store.dispatch(syncOfflineCompletions());
+  expect(seen).toContainEqual({ reason: 'sync' });
 });

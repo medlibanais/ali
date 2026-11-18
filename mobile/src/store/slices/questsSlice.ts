@@ -248,8 +248,9 @@ export const completeQuest = createAsyncThunk<
   dispatch(questCompletedLocally(quest.quest_id));
   const userId = getState().auth.userId;
 
-  const saveOffline = async (): Promise<CompleteQuestResult> => {
+  const saveOffline = async (afterOnlineAttempt = false): Promise<CompleteQuestResult> => {
     const item = await enqueueCompletion({
+      afterOnlineAttempt,
       questId: quest.quest_id,
       userId,
       at: now.toISOString(),
@@ -299,7 +300,7 @@ export const completeQuest = createAsyncThunk<
       // If the request did reach the server, the replay is a no-op there
       // (the quest is already completed), so nothing is counted twice.
       reportOffline();
-      return saveOffline();
+      return saveOffline(true);
     }
     dispatch(questRolledBack(quest.quest_id));
     return rejectWithValue({

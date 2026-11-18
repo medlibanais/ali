@@ -43,6 +43,7 @@ export function eventForAction(action: UnknownAction): SyncMachineEvent | null {
       message: action.payload?.message ?? 'Could not complete this quest.',
     };
   }
+  if (action.type === syncOfflineCompletions.pending.type) return { type: 'FLUSH_STARTED' };
   if (pendingChanged.match(action)) {
     return { type: 'PENDING_CHANGED', pending: action.payload };
   }
@@ -61,8 +62,8 @@ export function eventForAction(action: UnknownAction): SyncMachineEvent | null {
     if (r.stoppedBy === 'error') {
       return { type: 'FLUSH_FAILED', message: 'Sync failed. Your quests are still saved.', remaining: r.remaining };
     }
-    if (r.stoppedBy === 'done') return { type: 'FLUSH_SUCCEEDED', remaining: r.remaining };
-    return null; // offline: stay in Syncing, waiting for the network
+    // 'done', or 'offline' (remaining > 0 keeps it in Syncing, waiting).
+    return { type: 'FLUSH_SUCCEEDED', remaining: r.remaining };
   }
   if (syncRetryRequested.match(action)) return { type: 'RETRY' };
   if (syncNoticeDismissed.match(action)) return { type: 'DISMISS' };

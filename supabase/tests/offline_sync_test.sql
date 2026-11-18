@@ -2,7 +2,7 @@
 -- streak repair, and the bounds on the client's claimed time.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;
-select plan(31);
+select plan(36);
 
 -- Pick a fixed-offset zone where it is now between 02:00 and 20:59, so
 -- "yesterday 21:00" and "today 01:00" are both in the past and inside
@@ -101,6 +101,33 @@ select is(
   (public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 1'),
      '11111111-1111-4111-8111-000000000001', now())->>'duplicate')::boolean,
   true, 'a replay after an undo does not complete the quest again');
+
+select public.complete_quest(pg_temp.q(auth.uid(), 'Today 8'));  -- another device, online
+select is(
+  (public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 8'),
+     '11111111-1111-4111-8111-000000000098', now() - interval '1 minute')->>'conflict')::boolean,
+  true, 'a completion done elsewhere is flagged as a conflict');
+
+---------------------------------------------------------------- offline undo
+select pg_temp.as_admin();
+create temp table xp_mid as select (pg_temp.gam('00000000-0000-0000-0000-0000000000b1')).total_xp as xp;
+grant all on xp_mid to authenticated;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
+select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 6'),
+  '11111111-1111-4111-8111-000000000061', now() - interval '20 seconds');
+select is(
+  (public.sync_quest_undo(pg_temp.q(auth.uid(), 'Today 6'), now() - interval '14 seconds')->>'duplicate')::boolean,
+  false, 'an undo tapped within the window is honoured when it arrives later');
+select is((pg_temp.gam(auth.uid())).total_xp, (select xp from xp_mid),
+  'and takes the XP back');
+select is(
+  (public.sync_quest_undo(pg_temp.q(auth.uid(), 'Today 6'), now() - interval '14 seconds')->>'duplicate')::boolean,
+  true, 'replaying the undo changes nothing');
+select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 7'),
+  '11111111-1111-4111-8111-000000000071', now() - interval '60 seconds');
+select throws_ok(
+  $$select public.sync_quest_undo(pg_temp.q(auth.uid(), 'Today 7'), now())$$,
+  'undo_window_expired', 'an undo tapped after the window is refused');
 
 ---------------------------------------------------------------- time bounds
 select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 2'),

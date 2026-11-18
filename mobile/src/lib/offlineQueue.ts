@@ -37,6 +37,11 @@ export interface QueuedCompletion extends QueuedBase {
   xpEstimate: number;
   /** Device-local day (YYYY-MM-DD) the completion happened on. */
   localDate: string;
+  /**
+   * Queued because the online call failed mid-way: the server may already
+   * have it from that call, which is then not a conflict with another device.
+   */
+  afterOnlineAttempt?: boolean;
 }
 
 export interface QueuedUndo extends QueuedBase {

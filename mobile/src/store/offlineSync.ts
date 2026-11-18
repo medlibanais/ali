@@ -47,6 +47,11 @@ const SYNC_TIMEOUT_MS = 15000;
  * calls per 5 seconds; 600 ms keeps a long flush under that.
  */
 export const FLUSH_PACE_MS = 600;
+let flushPaceMs = FLUSH_PACE_MS;
+/** Tests run the flush without the pause. */
+export function setFlushPaceForTests(ms: number): void {
+  flushPaceMs = ms;
+}
 
 export const COMPLETED_ELSEWHERE =
   'This quest was already completed on another device, your XP was not doubled.';
@@ -136,10 +141,13 @@ export async function syncOne(item: QueuedAction): Promise<Outcome> {
       const old = await callRpc('complete_quest', { p_quest_id: item.questId });
       return classifyFailure(old.error, old.thrown) ?? { kind: 'ok', duplicate: false };
     }
-    return (
-      classifyFailure(res.error, res.thrown) ??
-      outcomeOf(res.data, COMPLETED_ELSEWHERE)
-    );
+    const outcome =
+      classifyFailure(res.error, res.thrown) ?? outcomeOf(res.data, COMPLETED_ELSEWHERE);
+    // Our own earlier online call got through: same device, no conflict.
+    if (outcome.kind === 'conflict' && item.afterOnlineAttempt) {
+      return { kind: 'ok', duplicate: true };
+    }
+    return outcome;
   }
 
   const res = await callRpc('sync_quest_undo', {
@@ -178,7 +186,7 @@ export async function flushOfflineQueue(userId: string, hooks: FlushHooks = {}):
     remaining: 0,
     stoppedBy: 'done',
   };
-  const pace = hooks.paceMs ?? FLUSH_PACE_MS;
+  const pace = hooks.paceMs ?? flushPaceMs;
   const queue = await readOfflineQueue(userId);
   let index = 0;
   for (; index < queue.length; index += 1) {
@@ -203,8 +211,12 @@ export async function flushOfflineQueue(userId: string, hooks: FlushHooks = {}):
       else result.synced += 1;
       continue;
     }
-    // Server wins: undo the local optimistic change.
-    hooks.onServerState?.(item.questId, item.kind === 'undo');
+    // Server wins: put the quest back to what the server has.
+    //   completion: conflict -> done elsewhere (completed); refused -> not completed
+    //   undo:       conflict -> undone elsewhere (not completed); refused -> completed
+    const serverCompleted =
+      item.kind === 'complete' ? outcome.kind === 'conflict' : outcome.kind === 'rejected';
+    hooks.onServerState?.(item.questId, serverCompleted);
     const entry = { questId: item.questId, title: item.title, reason: outcome.reason };
     if (outcome.kind === 'conflict') result.conflicts.push(entry);
     else result.rejected.push(entry);
