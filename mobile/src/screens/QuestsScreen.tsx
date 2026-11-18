@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -57,10 +58,29 @@ function QuestsSkeleton() {
   );
 }
 
+type Row =
+  | { type: 'open'; quest: Quest }
+  | { type: 'empty' }
+  | { type: 'doneHeader'; count: number }
+  | { type: 'done'; quest: Quest };
+
+const rowKey = (row: Row): string =>
+  row.type === 'open' || row.type === 'done' ? row.quest.quest_id : row.type;
+// Row kinds are recycled separately, so a quest row never reuses the
+// "Completed" header's views.
+const rowType = (row: Row): Row['type'] => row.type;
+
+/** Average QuestRow height (64 px card + 12 px gap) for FlashList's first layout. */
+const ESTIMATED_ROW = 76;
+
 export function QuestsScreen({ navigation }: Props) {
   useTheme();
   const dispatch = useAppDispatch();
-  const { quests, loading, date } = useAppSelector((state) => state.quests);
+  // Each pick is its own subscription: undoing a quest elsewhere does not
+  // re-render this screen through unrelated state.
+  const quests = useAppSelector((state) => state.quests.quests);
+  const loading = useAppSelector((state) => state.quests.loading);
+  const date = useAppSelector((state) => state.quests.date);
   const [filter, setFilter] = useState<Filter>('all');
   const [completedOpen, setCompletedOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -74,92 +94,61 @@ export function QuestsScreen({ navigation }: Props) {
   }, [dispatch, date]);
 
   const initialLoading = loading && date === null;
-  const dayQuests = quests.filter((q) => !q.skipped);
-  const doneCount = dayQuests.filter((q) => q.completed).length;
-  const xpLeft = dayQuests
-    .filter((q) => !q.completed)
-    .reduce((sum, q) => sum + q.xp_reward, 0);
 
-  const visible = useMemo(() => {
+  const summary = useMemo(() => {
+    const dayQuests = quests.filter((q) => !q.skipped);
+    const done = dayQuests.filter((q) => q.completed);
+    const xpLeft = dayQuests
+      .filter((q) => !q.completed)
+      .reduce((sum, q) => sum + q.xp_reward, 0);
+    const shares = PILLARS.map((pillar) => ({
+      pillar,
+      share: dayQuests.length
+        ? done.filter((q) => q.pillar === pillar).length / dayQuests.length
+        : 0,
+    }));
+    return { total: dayQuests.length, doneCount: done.length, xpLeft, shares };
+  }, [quests]);
+
+  const rows = useMemo((): Row[] => {
     const active = quests.filter((q) => !q.skipped && !q.completed);
-    const filtered =
-      filter === 'all' ? active : active.filter((q) => q.pillar === filter);
-    return filtered.sort(
+    const visible = (filter === 'all' ? active : active.filter((q) => q.pillar === filter)).sort(
       (a, b) =>
         PILLARS.indexOf(a.pillar) - PILLARS.indexOf(b.pillar) ||
         (a.priority ?? 1) - (b.priority ?? 1),
     );
-  }, [quests, filter]);
+    const done = quests.filter(
+      (q) => q.completed && (filter === 'all' || q.pillar === filter),
+    );
+    const out: Row[] = visible.length
+      ? visible.map((quest) => ({ type: 'open', quest }))
+      : [{ type: 'empty' }];
+    if (done.length > 0) {
+      out.push({ type: 'doneHeader', count: done.length });
+      if (completedOpen) for (const quest of done) out.push({ type: 'done', quest });
+    }
+    return out;
+  }, [quests, filter, completedOpen]);
 
-  const completed = useMemo(() => {
-    const done = quests.filter((q) => q.completed);
-    return filter === 'all'
-      ? done
-      : done.filter((q) => q.pillar === filter);
-  }, [quests, filter]);
+  // Stable, so memoized QuestRows skip when only another quest changed.
+  const openQuest = useCallback(
+    (quest: Quest) => navigation.navigate('QuestDetail', { quest }),
+    [navigation],
+  );
+  const toggleCompleted = useCallback(() => setCompletedOpen((open) => !open), []);
+  const showPillarLabel = filter === 'all';
 
-  const openQuest = (quest: Quest) => {
-    navigation.navigate('QuestDetail', { quest });
-  };
-
-  return (
-    <Screen scroll>
-      <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
-        {`${doneCount} of ${dayQuests.length} done · ${xpLeft} XP left today`}
-      </Txt>
-      <Txt variant="title" style={styles.title}>
-        Today&apos;s quests
-      </Txt>
-      <View style={styles.progressTrack}>
-        {PILLARS.map((pillar) => {
-          const share = dayQuests.length
-            ? dayQuests.filter((q) => q.pillar === pillar && q.completed).length /
-              dayQuests.length
-            : 0;
-          return share > 0 ? (
-            <View
-              key={pillar}
-              style={{ flex: share, backgroundColor: pillarPastels(pillar).base }}
-            />
-          ) : null;
-        })}
-        <View style={{ flex: Math.max(0.0001, 1 - doneCount / Math.max(1, dayQuests.length)) }} />
-      </View>
-
-      <QuestSearchBar
-        value={searchText}
-        onChangeText={setSearchText}
-        searching={search.searching}
-      />
-
-      {searchActive ? (
-        <QuestSearchResults search={search} />
-      ) : initialLoading ? (
-        <QuestsSkeleton />
-      ) : (
-        <>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScroll}
-            contentContainerStyle={styles.filterContent}
-          >
-            {FILTER_OPTIONS.map((option) => (
-              <Chip
-                key={option.value}
-                label={option.label}
-                selected={filter === option.value}
-                onPress={() => setFilter(option.value)}
-                dotColor={
-                  option.value === 'all'
-                    ? undefined
-                    : pillarPastels(option.value).base
-                }
-              />
-            ))}
-          </ScrollView>
-
-          {visible.length === 0 ? (
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<Row>) => {
+      switch (item.type) {
+        case 'open':
+          return (
+            <QuestRow quest={item.quest} onPress={openQuest} showPillarLabel={showPillarLabel} />
+          );
+        case 'done':
+          return <QuestRow quest={item.quest} />;
+        case 'empty':
+          return (
             <EmptyState
               title={
                 filter === 'all'
@@ -168,45 +157,111 @@ export function QuestsScreen({ navigation }: Props) {
               }
               body="Everything in this view is either done or skipped. Tomorrow brings a new set."
             />
-          ) : (
-            visible.map((quest) => (
-              <QuestRow
-                key={quest.quest_id}
-                quest={quest}
-                onPress={openQuest}
-                showPillarLabel={filter === 'all'}
-              />
-            ))
-          )}
-
-          {completed.length > 0 ? (
+          );
+        case 'doneHeader':
+          return (
             <View style={styles.completedSection}>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={`Completed quests, ${item.count}`}
                 accessibilityState={{ expanded: completedOpen }}
-                onPress={() => setCompletedOpen((open) => !open)}
-                style={({ pressed }) => [
-                  styles.completedHeader,
-                  pressed && styles.pressed,
-                ]}
+                onPress={toggleCompleted}
+                style={({ pressed }) => [styles.completedHeader, pressed && styles.pressed]}
               >
                 <Txt variant="bodySemi" color={colors.inkSoft}>
-                  {`Completed · ${completed.length}`}
+                  {`Completed · ${item.count}`}
                 </Txt>
-                <View
-                  style={completedOpen ? styles.chevronUp : styles.chevronDown}
-                >
+                <View style={completedOpen ? styles.chevronUp : styles.chevronDown}>
                   <ChevronGlyph />
                 </View>
               </Pressable>
-              {completedOpen
-                ? completed.map((quest) => (
-                    <QuestRow key={quest.quest_id} quest={quest} />
-                  ))
-                : null}
             </View>
-          ) : null}
-        </>
+          );
+      }
+    },
+    [openQuest, showPillarLabel, filter, completedOpen, toggleCompleted],
+  );
+
+  // Fixed above the list, so the search field keeps focus while the body
+  // below switches between the list, the skeleton and search results.
+  const top = (
+    <View style={styles.padded}>
+      <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
+        {`${summary.doneCount} of ${summary.total} done · ${summary.xpLeft} XP left today`}
+      </Txt>
+      <Txt variant="title" style={styles.title}>
+        Today&apos;s quests
+      </Txt>
+      <View style={styles.progressTrack}>
+        {summary.shares.map(({ pillar, share }) =>
+          share > 0 ? (
+            <View
+              key={pillar}
+              style={{ flex: share, backgroundColor: pillarPastels(pillar).base }}
+            />
+          ) : null,
+        )}
+        <View
+          style={{ flex: Math.max(0.0001, 1 - summary.doneCount / Math.max(1, summary.total)) }}
+        />
+      </View>
+      <QuestSearchBar
+        value={searchText}
+        onChangeText={setSearchText}
+        searching={search.searching}
+      />
+    </View>
+  );
+
+  const chips = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterScroll}
+      contentContainerStyle={styles.filterContent}
+    >
+      {FILTER_OPTIONS.map((option) => (
+        <Chip
+          key={option.value}
+          label={option.label}
+          selected={filter === option.value}
+          onPress={() => setFilter(option.value)}
+          dotColor={option.value === 'all' ? undefined : pillarPastels(option.value).base}
+        />
+      ))}
+    </ScrollView>
+  );
+
+  return (
+    <Screen padded={false}>
+      {top}
+      {searchActive ? (
+        <ScrollView
+          contentContainerStyle={styles.padded}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <QuestSearchResults search={search} />
+        </ScrollView>
+      ) : initialLoading ? (
+        <View style={styles.padded}>
+          <QuestsSkeleton />
+        </View>
+      ) : (
+        // FlashList recycles row views instead of mounting one per quest,
+        // and only draws the rows on screen.
+        <FlashList
+          data={rows}
+          renderItem={renderItem}
+          keyExtractor={rowKey}
+          getItemType={rowType}
+          estimatedItemSize={ESTIMATED_ROW}
+          extraData={completedOpen}
+          ListHeaderComponent={chips}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
       )}
     </Screen>
   );
@@ -234,6 +289,14 @@ const styles = themed(() => StyleSheet.create({
     flexGrow: 0,
     marginBottom: spacing.md,
     marginHorizontal: -24,
+  },
+  padded: {
+    paddingHorizontal: 24,
+  },
+  // FlashList only takes padding here; the tab bar floats over the end.
+  listContent: {
+    paddingHorizontal: 24,
+    paddingBottom: spacing.lg,
   },
   filterContent: {
     paddingHorizontal: 24,

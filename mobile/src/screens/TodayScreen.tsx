@@ -15,7 +15,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -36,6 +42,7 @@ import type { Quest } from '../api/types';
 import XpBar from '../features/celebrations/XpBar';
 import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
+import { markFirstScreenPainted } from '../lib/bootSplash';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
@@ -464,6 +471,9 @@ export function TodayScreen({ navigation, route }: Props) {
     navigation.setParams({ pillar: undefined });
   }, [pillarParam, navigation]);
 
+  // The native splash stays up until this screen's first frame is laid out.
+  const onFirstLayout = useCallback(() => markFirstScreenPainted('today'), []);
+
   const onRefresh = useCallback(() => {
     load(true);
   }, [load]);
@@ -560,6 +570,7 @@ export function TodayScreen({ navigation, route }: Props) {
         />
       }
     >
+      <View onLayout={onFirstLayout} style={styles.paintMarker} pointerEvents="none" />
       {initialLoading ? (
         <TodaySkeleton />
       ) : (
@@ -599,6 +610,9 @@ export function TodayScreen({ navigation, route }: Props) {
 
 const styles = themed(() =>
   StyleSheet.create({
+  paintMarker: {
+    height: 0,
+  },
   header: {
     marginTop: spacing.lg,
   },

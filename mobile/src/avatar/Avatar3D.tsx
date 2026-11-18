@@ -9,13 +9,22 @@
 // bottom, paced by the life score, see alive.ts) and blinks: each look is
 // also rendered once with the eyes shut, and that image is shown for the
 // ~0.2 s of a blink. Both are View transforms/opacity, cheap on Android.
+//
+// Startup and memory: the Today and Profile pictures are also saved to
+// disk (renderCache.ts), so a normal launch shows the avatar straight from
+// the cache and never starts the WebView. The WebView (three.js plus the
+// 46 MB model, the heaviest thing in the app) is only mounted when a look
+// is missing, after the first screen has settled, and it is unmounted
+// again after a quiet spell so its memory goes back to the system.
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Image, Platform, StyleSheet, View } from 'react-native';
+import { runAfterInteractionsOrTimeout } from '../lib/afterInteractions';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useAliveMotion } from './alive';
 import { Asset } from 'expo-asset';
 import { bgStyle } from './palettes';
+import { loadCachedRender, saveCachedRender, setCacheVersion } from './renderCache';
 import { irisFor, partsFor, skinFor, targetsFor } from './shape';
 import type { AvatarConfig, Mood } from './types';
 
@@ -24,6 +33,8 @@ const VIEWER = require('../../assets/avatar3d/viewer.html');
 // The human every avatar is shaped from (built by tools/human/build.py).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const MODEL: number = require('../../assets/avatar3d/models/human.bin');
+// A new viewer or model changes these hashes, so old disk pictures miss.
+setCacheVersion(`${Asset.fromModule(VIEWER).hash ?? ''}:${Asset.fromModule(MODEL).hash ?? ''}`);
 
 /** 'head-thumb' and 'body-thumb' are the small pictures on the editor's choices. */
 export type Mode = 'head' | 'full-body' | 'head-thumb' | 'body-thumb' | 'head-hd' | 'body-hd';
@@ -49,6 +60,8 @@ export interface RenderRequest {
    * jumps the queue.
    */
   channel?: string;
+  /** Save the picture to disk and look there first (everyday looks only). */
+  persist?: boolean;
 }
 
 // ---------------------------------------------------------------- store
@@ -68,6 +81,8 @@ function remember(key: string, data: string) {
 }
 const listeners = new Set<() => void>();
 let pump: (() => void) | null = null;
+/** Keys being looked up on disk, so a look is not queued twice meanwhile. */
+const lookingUp = new Set<string>();
 
 function emit() {
   listeners.forEach((l) => l());
@@ -78,7 +93,25 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-export function requestRender(req: RenderRequest) {
+// ------------------------------------------------- host lifecycle state
+
+/** True while the hidden renderer should be mounted. */
+let hostWanted = false;
+/** Avatar3D views with a live preview (the editor) keep the host warm. */
+let liveUsers = 0;
+const hostListeners = new Set<() => void>();
+function setHostWanted(v: boolean) {
+  if (hostWanted === v) return;
+  hostWanted = v;
+  hostListeners.forEach((l) => l());
+}
+function subscribeHost(l: () => void) {
+  hostListeners.add(l);
+  return () => hostListeners.delete(l);
+}
+const getHostWanted = () => hostWanted;
+
+function enqueue(req: RenderRequest) {
   if (images.has(req.key)) return;
   if (req.channel) {
     for (let i = queue.length - 1; i >= 0; i--) if (queue[i].channel === req.channel) queue.splice(i, 1);
@@ -89,8 +122,40 @@ export function requestRender(req: RenderRequest) {
     if (queue.some((q) => q.key === req.key)) return;
     queue.push(req);
   }
+  setHostWanted(true);
   pump?.();
 }
+
+export function requestRender(req: RenderRequest) {
+  if (images.has(req.key) || lookingUp.has(req.key)) return;
+  if (!req.persist) {
+    enqueue(req);
+    return;
+  }
+  lookingUp.add(req.key);
+  loadCachedRender(req.key).then((uri) => {
+    lookingUp.delete(req.key);
+    if (uri) {
+      remember(req.key, uri);
+      emit();
+    } else {
+      enqueue(req);
+    }
+  });
+}
+
+/** Test hook: the renderer's mounted state and in-memory pictures. */
+export const __avatar3dInternals = {
+  isHostWanted: getHostWanted,
+  imageCount: () => images.size,
+  reset() {
+    images.clear();
+    queue.length = 0;
+    lookingUp.clear();
+    liveUsers = 0;
+    setHostWanted(false);
+  },
+};
 
 /** Where the camera stands: the usual 3/4 view unless the editor turns it. */
 export interface Camera {
@@ -161,7 +226,24 @@ async function assetUri(module: number): Promise<string> {
  * Mount once, near the app root. Hidden; it only renders avatars into
  * images for Avatar3D.
  */
+/** How long the renderer may sit idle before it is unmounted. */
+const HOST_IDLE_MS = 20_000;
+
 export function Avatar3DHost() {
+  const wanted = useSyncExternalStore(subscribeHost, getHostWanted, getHostWanted);
+  // Start the renderer only once the first screen has finished drawing,
+  // so the WebView's start-up does not compete with it.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!wanted) return;
+    const task = runAfterInteractionsOrTimeout(() => setSettled(true));
+    return () => task.cancel();
+  }, [wanted]);
+  if (!wanted || !settled) return null;
+  return <RendererHost />;
+}
+
+function RendererHost() {
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [modelUri, setModelUri] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('head');
@@ -183,10 +265,28 @@ export function Avatar3DHost() {
     };
   }, []);
 
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      pump = null;
+    },
+    [],
+  );
+
   const next = () => {
     if (!ready.current || busy.current || !modelUri) return;
     const req = queue.shift();
-    if (!req) return;
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = null;
+    if (!req) {
+      // Nothing to draw: let the WebView go after a quiet spell, unless
+      // the editor is open and will want it again any second.
+      idleTimer.current = setTimeout(() => {
+        if (queue.length === 0 && !busy.current && liveUsers === 0) setHostWanted(false);
+      }, HOST_IDLE_MS);
+      return;
+    }
     busy.current = req;
     setMode(req.mode);
     // Give the view a frame to take the mode's size before rendering.
@@ -205,6 +305,7 @@ export function Avatar3DHost() {
       ready.current = true;
       next();
     } else if (msg.type === 'snapshot' && busy.current && msg.data) {
+      if (busy.current.persist) void saveCachedRender(busy.current.key, msg.data);
       remember(busy.current.key, msg.data);
       busy.current = null;
       emit();
@@ -329,10 +430,19 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
   if (ready) lastShown.current = { uri: ready, mode };
   const uri =
     ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined);
+  // The everyday looks (Today, Profile) are kept on disk across launches.
+  const persist = !live && (mode === 'head' || mode === 'full-body');
   useEffect(() => {
-    requestRender({ key, mode, command: commandFor(config, mood, mode, bare, camera), channel: live });
+    if (!live) return;
+    liveUsers += 1;
+    return () => {
+      liveUsers -= 1;
+    };
+  }, [live]);
+  useEffect(() => {
+    requestRender({ key, mode, command: commandFor(config, mood, mode, bare, camera), channel: live, persist });
     // Queued after the open-eyes image, so the avatar shows up first.
-    if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, camera, true) });
+    if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, camera, true), persist });
     // config fields are all in the key
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, animated]);
