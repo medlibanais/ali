@@ -8,6 +8,9 @@ import {
   View,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AppStackParamList } from '../navigation/types';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
@@ -70,6 +73,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const myProfile = useAppSelector((state) => state.user.profile);
   const [section, setSection] = useState<Section>('friends');
   const [query, setQuery] = useState('');
@@ -258,6 +262,12 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         {section === 'friends' ? (
           <>
             <Button title="Invite friends" onPress={shareInvite} style={styles.inviteButton} />
+            <Button
+              title="Party quests"
+              variant="secondary"
+              onPress={() => navigation.navigate('PartyQuests')}
+              style={styles.inviteButton}
+            />
             {circle.isLoading ? (
               <View>
                 <Skeleton height={72} style={styles.skeletonBlock} />
