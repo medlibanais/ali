@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -34,12 +36,12 @@ type Props = CompositeScreenProps<
 type Filter = 'all' | Pillar;
 
 const FILTER_OPTIONS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'health', label: 'Health' },
-  { value: 'family', label: 'Family' },
-  { value: 'work', label: 'Work' },
-  { value: 'fun', label: 'Fun' },
-  { value: 'spirituality', label: 'Spirituality' },
+  { value: 'all', get label() { return i18n.t('quests.all'); } },
+  { value: 'health', get label() { return i18n.t('quests.health'); } },
+  { value: 'family', get label() { return i18n.t('quests.family'); } },
+  { value: 'work', get label() { return i18n.t('quests.work'); } },
+  { value: 'fun', get label() { return i18n.t('quests.fun'); } },
+  { value: 'spirituality', get label() { return i18n.t('quests.spirituality'); } },
 ];
 
 function QuestsSkeleton() {
@@ -56,6 +58,7 @@ function QuestsSkeleton() {
 }
 
 export function QuestsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { quests, loading, date } = useAppSelector((state) => state.quests);
@@ -100,10 +103,10 @@ export function QuestsScreen({ navigation }: Props) {
   return (
     <Screen scroll>
       <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
-        {`${doneCount} of ${dayQuests.length} done · ${xpLeft} XP left today`}
+        {t('quests.ofDoneXpLeft', { doneCount, length: dayQuests.length, xpLeft })}
       </Txt>
       <Txt variant="title" style={styles.title}>
-        Today&apos;s quests
+        {t('quests.todaySQuests')}
       </Txt>
       <View style={styles.progressTrack}>
         {PILLARS.map((pillar) => {
@@ -150,10 +153,10 @@ export function QuestsScreen({ navigation }: Props) {
             <EmptyState
               title={
                 filter === 'all'
-                  ? 'Nothing left to do today'
-                  : `No ${PILLAR_LABELS[filter as Pillar].toLowerCase()} quests left today`
+                  ? t('quests.nothingLeftToDo')
+                  : t('quests.noQuestsLeftToday', { v1: PILLAR_LABELS[filter as Pillar].toLowerCase() })
               }
-              body="Everything in this view is either done or skipped. Tomorrow brings a new set."
+              body={t('quests.everythingInThisView')}
             />
           ) : (
             visible.map((quest) => (
@@ -178,7 +181,7 @@ export function QuestsScreen({ navigation }: Props) {
                 ]}
               >
                 <Txt variant="bodySemi" color={colors.inkSoft}>
-                  {`Completed · ${completed.length}`}
+                  {t('quests.completed', { length: completed.length })}
                 </Txt>
                 <View
                   style={completedOpen ? styles.chevronUp : styles.chevronDown}

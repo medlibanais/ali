@@ -46,4 +46,22 @@ export function monthShort(month: number): string {
   });
 }
 
+/** "Bust size" -> "bust_size": the key a data label is stored under. */
+export function slugKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+/**
+ * Display text for a data value that is stored in English (onboarding
+ * options, avatar editor labels). Unknown values fall back to themselves,
+ * so new options never render blank.
+ */
+export function labelFor(group: 'options' | 'avatarText', value: string): string {
+  const key = `${group}.${slugKey(value)}`;
+  return i18n.exists(key) ? String(i18n.t(key as never)) : value;
+}
+
 export default i18n;

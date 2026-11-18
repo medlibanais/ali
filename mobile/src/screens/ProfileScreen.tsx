@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   LayoutAnimation,
@@ -173,6 +174,7 @@ function ProfileSkeleton() {
 }
 
 export function ProfileScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -256,7 +258,7 @@ export function ProfileScreen({ navigation }: Props) {
         await Share.share({ message: payload });
       } catch {
         toast.showToast({
-          message: 'Your export is ready. Sharing is not available on this device.',
+          message: t('profile.yourExportIsReady'),
         });
       }
     } catch (error) {
@@ -264,7 +266,7 @@ export function ProfileScreen({ navigation }: Props) {
         message:
           error instanceof Error
             ? error.message
-            : 'Export is not available yet. Try again later.',
+            : t('profile.exportIsNotAvailable'),
       });
     } finally {
       setExporting(false);
@@ -273,21 +275,21 @@ export function ProfileScreen({ navigation }: Props) {
 
   const deleteAccount = () => {
     Alert.alert(
-      'Delete account',
-      'This permanently removes your profile, quests, streaks, and conversations. There is no undo.',
+      t('profile.deleteAccount'),
+      t('profile.thisPermanentlyRemovesYour'),
       [
-        { text: 'Keep my account', style: 'cancel' },
+        { text: t('profile.keepMyAccount'), style: 'cancel' },
         {
-          text: 'Continue',
+          text: t('profile.continue'),
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Are you certain',
-              'Everything tied to this account will be erased. Confirm deletion.',
+              t('profile.areYouCertain'),
+              t('profile.everythingTiedToThis'),
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('profile.cancel'), style: 'cancel' },
                 {
-                  text: 'Delete permanently',
+                  text: t('profile.deletePermanently'),
                   style: 'destructive',
                   onPress: async () => {
                     try {
@@ -296,7 +298,7 @@ export function ProfileScreen({ navigation }: Props) {
                       );
                       if (error) throw error;
                       toast.showToast({
-                        message: 'Your account has been deleted.',
+                        message: t('profile.yourAccountHasBeen'),
                       });
                       dispatch(logout());
                     } catch (error) {
@@ -304,7 +306,7 @@ export function ProfileScreen({ navigation }: Props) {
                         message:
                           error instanceof Error
                             ? error.message
-                            : 'Could not delete the account. Try again later.',
+                            : t('profile.couldNotDeleteThe'),
                       });
                     }
                   },
@@ -318,10 +320,10 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   const confirmLogout = () => {
-    Alert.alert('Sign out', 'You can sign back in anytime.', [
-      { text: 'Stay', style: 'cancel' },
+    Alert.alert(t('profile.signOut'), t('profile.youCanSignBack'), [
+      { text: t('profile.stay'), style: 'cancel' },
       {
-        text: 'Sign out',
+        text: t('profile.signOut'),
         style: 'destructive',
         onPress: () => dispatch(logout()),
       },
@@ -350,17 +352,17 @@ export function ProfileScreen({ navigation }: Props) {
         <>
           <FadeInUp style={styles.heading}>
             <Txt variant="caption" color={colors.inkSoft}>
-              A little more you, every day
+              {t('profile.aLittleMoreYou')}
             </Txt>
             <Txt variant="title" style={styles.headingTitle}>
-              Your profile
+              {t('profile.yourProfile')}
             </Txt>
           </FadeInUp>
 
           <FadeInUp delay={60} style={styles.identity}>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Edit your avatar"
+              accessibilityLabel={t('profile.editYourAvatar')}
               onPress={() => navigation.navigate('AvatarCreator')}
               pressedScale={0.95}
               style={styles.avatarRim}
@@ -369,7 +371,7 @@ export function ProfileScreen({ navigation }: Props) {
             </PressableScale>
             <View style={styles.identityText}>
               <Txt variant="title" numberOfLines={1}>
-                {profile?.first_name ?? 'You'}
+                {profile?.first_name ?? t('profile.you')}
               </Txt>
               {profile?.username ? (
                 <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
@@ -379,32 +381,32 @@ export function ProfileScreen({ navigation }: Props) {
               <View style={styles.inline}>
                 <SparklesGlyph />
                 <Txt variant="label" color={colors.accent} style={styles.inlineText} numberOfLines={1}>
-                  {`Level ${gamification.level} · ${title}`}
+                  {t('profile.level', { level: gamification.level, title })}
                 </Txt>
               </View>
               <View style={styles.identityActions}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit profile"
+                  accessibilityLabel={t('profile.editProfile')}
                   onPress={() => navigation.navigate('AvatarCreator')}
                   hitSlop={8}
                   style={({ pressed }) => [styles.actionPill, pressed && styles.pressed]}
                 >
                   <PencilGlyph size={14} />
                   <Txt variant="bodySemi" color={colors.accent} style={styles.actionText}>
-                    Edit
+                    {t('profile.edit')}
                   </Txt>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Share profile"
+                  accessibilityLabel={t('profile.shareProfile')}
                   onPress={() => setSharing(true)}
                   hitSlop={8}
                   style={({ pressed }) => [styles.actionPill, pressed && styles.pressed]}
                 >
                   <ShareGlyph size={15} />
                   <Txt variant="bodySemi" color={colors.accent} style={styles.actionText}>
-                    Share
+                    {t('profile.share')}
                   </Txt>
                 </Pressable>
               </View>
@@ -424,24 +426,24 @@ export function ProfileScreen({ navigation }: Props) {
             <View style={styles.growthHeader}>
               <Txt variant="heading">{`${totalXp.toLocaleString()} XP`}</Txt>
               <Txt variant="label" color={colors.inkSoft}>
-                {`Level ${gamification.level + 1} ahead`}
+                {t('profile.levelAhead', { v1: gamification.level + 1 })}
               </Txt>
             </View>
             <View style={styles.xpTrack}>
               <View style={[styles.xpFill, { width: `${Math.round(progress * 100)}%` }]} />
             </View>
             <Txt variant="caption" color={colors.inkSoft}>
-              {`${toNext.toLocaleString()} XP to your next chapter`}
+              {t('profile.xpToYourNext', { v1: toNext.toLocaleString() })}
             </Txt>
             <View style={styles.streakPill}>
               <FlameGlyph />
               <View style={styles.streakText}>
                 <Txt variant="bodySemi" color={colors.accent}>
-                  {streak > 0 ? `${streak}-day streak` : 'Start a streak today'}
+                  {streak > 0 ? t('profile.dayStreak', { streak }) : t('profile.startAStreakToday')}
                 </Txt>
                 <Txt variant="caption" color={colors.inkSoft}>
                   {streak > 0
-                    ? 'Small steps. Real momentum.'
+                    ? t('profile.smallStepsRealMomentum')
                     : bestStreakLabel(gamification.bestStreak)}
                 </Txt>
               </View>
@@ -450,9 +452,9 @@ export function ProfileScreen({ navigation }: Props) {
 
           <FadeInUp delay={180}>
             <View style={styles.sectionHeader}>
-              <Txt variant="heading">Your pillars</Txt>
+              <Txt variant="heading">{t('profile.yourPillars')}</Txt>
               <Txt variant="caption" color={colors.inkSoft}>
-                Today&apos;s balance
+                {t('profile.todaySBalance')}
               </Txt>
             </View>
             <View style={styles.pillarRow}>
@@ -484,17 +486,17 @@ export function ProfileScreen({ navigation }: Props) {
               headers and rows show; details fold away until opened. */}
           <FadeInUp delay={240}>
             <Txt variant="heading" style={styles.sectionTitle}>
-              Make GROW yours
+              {t('profile.makeGrowYours')}
             </Txt>
 
             <Txt variant="label" style={styles.groupLabel}>
-              You
+              {t('profile.you')}
             </Txt>
             <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<FaceGlyph size={20} color={colors.ink} />}
-                label="Avatar & photo"
-                detail="How you show up in GROW"
+                label={t('profile.avatarPhoto')}
+                detail={t('profile.howYouShowUp')}
                 open={openSection === 'avatar'}
                 onPress={() => toggle('avatar')}
               />
@@ -502,23 +504,23 @@ export function ProfileScreen({ navigation }: Props) {
                 <View style={styles.subList}>
                   <SubRow
                     icon={PencilGlyph}
-                    label="Edit avatar"
+                    label={t('profile.editAvatar')}
                     onPress={() => navigation.navigate('AvatarCreator')}
                   />
                   <SubRow
                     icon={SparklesGlyph}
-                    label="AI avatar from a photo"
+                    label={t('profile.aiAvatarFromA')}
                     onPress={() => navigation.navigate('AiAvatar')}
                   />
                   <SubRow
                     icon={CameraGlyph}
-                    label="Profile picture"
+                    label={t('profile.profilePicture')}
                     value={
                       profile?.avatar_mode === 'ai'
-                        ? 'AI avatar'
+                        ? t('profile.aiAvatar')
                         : profile?.avatar_mode === 'photo'
-                          ? 'Photo'
-                          : 'Avatar'
+                          ? t('profile.photo')
+                          : t('profile.avatar')
                     }
                     onPress={() => navigation.navigate('EditPhoto')}
                   />
@@ -527,8 +529,8 @@ export function ProfileScreen({ navigation }: Props) {
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<BackdropGlyph size={20} color={colors.ink} />}
-                label="Appearance"
-                detail={`${theme.name} theme`}
+                label={t('profile.appearance')}
+                detail={t('profile.theme', { name: theme.name })}
                 open={openSection === 'theme'}
                 onPress={() => toggle('theme')}
               />
@@ -542,7 +544,7 @@ export function ProfileScreen({ navigation }: Props) {
                           key={option.id}
                           accessibilityRole="button"
                           accessibilityState={{ selected }}
-                          accessibilityLabel={`${option.name} theme`}
+                          accessibilityLabel={t('profile.theme', { name: option.name })}
                           onPress={() => dispatch(setTheme(option.id))}
                           style={({ pressed }) => [styles.themeOption, pressed && styles.pressed]}
                         >
@@ -574,32 +576,32 @@ export function ProfileScreen({ navigation }: Props) {
             </Card>
 
             <Txt variant="label" style={styles.groupLabel}>
-              Growth
+              {t('profile.growth')}
             </Txt>
             <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<SettingsGlyph />}
-                label="Goals & pillars"
-                detail="Choose what matters to you"
+                label={t('profile.goalsPillars')}
+                detail={t('profile.chooseWhatMattersTo')}
                 open={openSection === 'goals'}
                 onPress={() => toggle('goals')}
               />
               {openSection === 'goals' ? (
                 <View style={styles.subList}>
-                  <SubRow label="Workouts" value={`${goals?.workouts_per_week ?? '-'} per week`} />
-                  <SubRow label="Sleep" value={`${goals?.sleep_target_hours ?? '-'} hours`} />
-                  <SubRow label="Water" value={`${goals?.water_liters_per_day ?? '-'} liters`} />
-                  <SubRow label="Calling parents" value={`${goals?.call_parents_frequency ?? '-'}`} />
+                  <SubRow label={t('profile.workouts')} value={t('profile.perWeek', { v1: goals?.workouts_per_week ?? '-' })} />
+                  <SubRow label={t('profile.sleep')} value={t('profile.hours', { v1: goals?.sleep_target_hours ?? '-' })} />
+                  <SubRow label={t('profile.water')} value={t('profile.liters', { v1: goals?.water_liters_per_day ?? '-' })} />
+                  <SubRow label={t('profile.callingParents')} value={`${goals?.call_parents_frequency ?? '-'}`} />
                   <SubRow
-                    label="Deep work"
-                    value={`${goals?.deep_work_hours_per_week ?? '-'} hours per week`}
+                    label={t('profile.deepWork')}
+                    value={t('profile.hoursPerWeek', { v1: goals?.deep_work_hours_per_week ?? '-' })}
                   />
-                  <SubRow label="Fun time" value={`${goals?.weekly_fun_hours ?? '-'} hours per week`} />
+                  <SubRow label={t('profile.funTime')} value={t('profile.hoursPerWeek', { v1: goals?.weekly_fun_hours ?? '-' })} />
                   <SubRow
-                    label="Practice"
+                    label={t('profile.practice')}
                     value={
                       goals?.prayer_frequency === '5_daily'
-                        ? '5 daily prayers'
+                        ? t('profile.n5DailyPrayers')
                         : `${goals?.prayer_frequency ?? '-'}`
                     }
                   />
@@ -608,81 +610,81 @@ export function ProfileScreen({ navigation }: Props) {
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<StarGlyph size={20} color={colors.ink} />}
-                label="Achievements"
-                detail="Badges you have earned"
+                label={t('profile.achievements')}
+                detail={t('profile.badgesYouHaveEarned')}
                 onPress={() => navigation.navigate('Achievements')}
               />
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<UserGlyph />}
-                label="Friends"
-                detail="Invite, compare, cheer on"
+                label={t('profile.friends')}
+                detail={t('profile.inviteCompareCheerOn')}
                 onPress={() => navigation.navigate('Friends')}
               />
             </Card>
 
             <Txt variant="label" style={styles.groupLabel}>
-              Preferences
+              {t('profile.preferences')}
             </Txt>
             <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<BellGlyph size={20} color={colors.ink} />}
-                label="Reminders"
-                detail="Daily check-ins and nudges"
+                label={t('profile.reminders')}
+                detail={t('profile.dailyCheckInsAnd')}
                 onPress={() => navigation.navigate('NotificationSettings')}
               />
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<ClockGlyph size={20} color={colors.ink} />}
-                label="Timezone"
+                label={t('profile.timezone')}
                 detail={profile?.timezone ?? 'UTC'}
                 onPress={() => navigation.navigate('TimezonePicker')}
               />
             </Card>
 
             <Txt variant="label" style={styles.groupLabel}>
-              Account & help
+              {t('profile.accountHelp')}
             </Txt>
             <Card padded={false} style={styles.settings}>
               <SettingsRow
                 icon={<HelpGlyph />}
-                label="Help & support"
-                detail="We're here for you"
+                label={t('profile.helpSupport')}
+                detail={t('profile.weReHereFor')}
                 open={openSection === 'help'}
                 onPress={() => toggle('help')}
               />
               {openSection === 'help' ? (
                 <View style={styles.subList}>
                   <SubRow
-                    label="Ask your coach"
+                    label={t('profile.askYourCoach')}
                     onPress={() => navigation.navigate('MainTabs', { screen: 'Coach' })}
                   />
-                  <SubRow label="Terms of Service" onPress={() => navigation.navigate('TermsOfService')} />
+                  <SubRow label={t('profile.termsOfService')} onPress={() => navigation.navigate('TermsOfService')} />
                 </View>
               ) : null}
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<ShieldCheckGlyph />}
-                label="Privacy & data"
-                detail="Your data, your choices"
+                label={t('profile.privacyData')}
+                detail={t('profile.yourDataYourChoices')}
                 open={openSection === 'privacy'}
                 onPress={() => toggle('privacy')}
               />
               {openSection === 'privacy' ? (
                 <View style={styles.subList}>
-                  <SubRow label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
+                  <SubRow label={t('profile.privacyPolicy')} onPress={() => navigation.navigate('PrivacyPolicy')} />
                   <SubRow
-                    label={exporting ? 'Preparing export' : 'Export my data'}
+                    label={exporting ? t('profile.preparingExport') : t('profile.exportMyData')}
                     onPress={exporting ? undefined : exportData}
                   />
-                  <SubRow label="Delete account" danger onPress={deleteAccount} />
+                  <SubRow label={t('profile.deleteAccount')} danger onPress={deleteAccount} />
                 </View>
               ) : null}
               <Hairline style={styles.divider} />
               <SettingsRow
                 icon={<LockGlyph size={20} color={colors.ink} />}
-                label="Sign out"
-                detail="You can sign back in anytime"
+                label={t('profile.signOut')}
+                detail={t('profile.youCanSignBack2')}
                 onPress={confirmLogout}
               />
             </Card>
@@ -690,7 +692,7 @@ export function ProfileScreen({ navigation }: Props) {
 
           <View style={styles.footer}>
             <Txt variant="caption" color={colors.inkSoft}>
-              GROW · At your own pace
+              {t('profile.growAtYourOwn')}
             </Txt>
           </View>
         </>

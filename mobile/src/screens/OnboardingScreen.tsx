@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { labelFor } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -125,14 +127,14 @@ const ROLE_OPTIONS = [
 ];
 
 const STEP_TITLES = [
-  'Welcome',
-  'Health',
-  'Family',
-  'Work',
-  'Fun',
-  'Spirituality',
-  'Identity',
-];
+  'onboarding.welcome',
+  'onboarding.health',
+  'onboarding.family',
+  'onboarding.work',
+  'onboarding.fun',
+  'onboarding.spirituality',
+  'onboarding.identity',
+] as const;
 
 const SLEEP_TICKS: number[] = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 
@@ -171,7 +173,7 @@ function OptionSelect({
                   variant="body"
                   color={selected ? colors.accent : colors.ink}
                 >
-                  {option}
+                  {labelFor('options', option)}
                 </Txt>
                 <View
                   style={[
@@ -189,6 +191,7 @@ function OptionSelect({
 }
 
 export function OnboardingScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const [step, setStep] = useState(0);
@@ -259,12 +262,12 @@ export function OnboardingScreen({ navigation }: Props) {
   const goNext = async () => {
     if (step === 6) {
       if (draft.firstName.trim().length === 0) {
-        setNameError('Tell us your first name.');
+        setNameError(t('onboarding.tellUsYourFirst'));
         return;
       }
       if (!USERNAME_RE.test(draft.username.trim().toLowerCase())) {
         setUsernameError(
-          '3-20 chars: lowercase letters, numbers, underscore.',
+          t('onboarding.n320CharsLowercase'),
         );
         return;
       }
@@ -285,7 +288,7 @@ export function OnboardingScreen({ navigation }: Props) {
       navigation.navigate('AiAvatar', { fromOnboarding: true });
     } else {
       const message =
-        result.payload ?? 'Could not save your answers. Try again.';
+        result.payload ?? t('onboarding.couldNotSaveYour');
       if (message.toLowerCase().includes('username')) {
         setUsernameError(message);
       }
@@ -307,22 +310,19 @@ export function OnboardingScreen({ navigation }: Props) {
 
       <View style={styles.content}>
         <Txt variant="label" color={colors.inkFaint} style={styles.stepLabel}>
-          {`Step ${step + 1} of ${totalSteps}`}
+          {t('onboarding.stepOf', { step: step + 1, totalSteps })}
         </Txt>
         <Txt variant="title" style={styles.stepTitle}>
-          {STEP_TITLES[step]}
+          {t(STEP_TITLES[step])}
         </Txt>
 
         {step === 0 ? (
           <View>
             <Txt variant="body" color={colors.inkSoft} style={styles.paragraph}>
-              GROW builds a picture of who you are becoming, then gives
-              you daily quests across five pillars: health, family, work, fun,
-              and spirituality.
+              {t('onboarding.growBuildsAPicture')}
             </Txt>
             <Txt variant="body" color={colors.inkSoft} style={styles.paragraph}>
-              The next few answers take about ninety seconds. They shape your
-              future self portrait and your first week of quests.
+              {t('onboarding.theNextFewAnswers')}
             </Txt>
           </View>
         ) : null}
@@ -330,7 +330,7 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 1 ? (
           <View>
             <Txt variant="label" style={styles.questionLabel}>
-              Workouts per week
+              {t('onboarding.workoutsPerWeek')}
             </Txt>
             <Stepper
               value={draft.workoutsPerWeek}
@@ -339,7 +339,7 @@ export function OnboardingScreen({ navigation }: Props) {
               max={7}
             />
             <Txt variant="label" style={styles.questionLabel}>
-              Sleep target, hours per night
+              {t('onboarding.sleepTargetHoursPer')}
             </Txt>
             <View style={styles.sliderRow}>
               {SLEEP_TICKS.map((tick) => {
@@ -367,7 +367,7 @@ export function OnboardingScreen({ navigation }: Props) {
               })}
             </View>
             <Txt variant="label" style={styles.questionLabel}>
-              Water per day, liters
+              {t('onboarding.waterPerDayLiters')}
             </Txt>
             <Stepper
               value={draft.waterLitersPerDay}
@@ -382,19 +382,19 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 2 ? (
           <View>
             <Txt variant="label" style={styles.questionLabel}>
-              How often will you call your parents
+              {t('onboarding.howOftenWillYou')}
             </Txt>
             <SegmentedControl<CallFrequency>
               options={[
-                { value: 'weekly', label: 'Weekly' },
-                { value: 'bi-weekly', label: 'Bi-weekly' },
-                { value: 'monthly', label: 'Monthly' },
+                { value: 'weekly', label: t('onboarding.weekly') },
+                { value: 'bi-weekly', label: t('onboarding.biWeekly') },
+                { value: 'monthly', label: t('onboarding.monthly') },
               ]}
               value={draft.callFrequency}
               onChange={(v) => update('callFrequency', v)}
             />
             <Txt variant="label" style={styles.questionLabel}>
-              Quality hours with loved ones per week
+              {t('onboarding.qualityHoursWithLoved')}
             </Txt>
             <Stepper
               value={draft.qualityHours}
@@ -403,10 +403,10 @@ export function OnboardingScreen({ navigation }: Props) {
               max={20}
             />
             <Field
-              label="Family goals"
+              label={t('onboarding.familyGoals')}
               value={draft.familyGoals}
               onChangeText={(t) => update('familyGoals', t)}
-              placeholder="For example, be present at dinner every night"
+              placeholder={t('onboarding.forExampleBePresent')}
               multiline
               containerStyle={styles.questionField}
             />
@@ -416,7 +416,7 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 3 ? (
           <View>
             <Txt variant="label" style={styles.questionLabel}>
-              Deep work hours per week
+              {t('onboarding.deepWorkHoursPer')}
             </Txt>
             <Stepper
               value={draft.deepWorkHours}
@@ -426,23 +426,23 @@ export function OnboardingScreen({ navigation }: Props) {
               step={5}
             />
             <Field
-              label="Career goal"
+              label={t('onboarding.careerGoal')}
               value={draft.careerGoal}
               onChangeText={(t) => update('careerGoal', t)}
-              placeholder="For example, Senior Software Engineer"
+              placeholder={t('onboarding.forExampleSeniorSoftware')}
               containerStyle={styles.questionField}
             />
             <OptionSelect
-              label="Current role"
+              label={t('onboarding.currentRole')}
               options={ROLE_OPTIONS}
               value={draft.currentRole}
               onChange={(v) => update('currentRole', v)}
             />
             <Field
-              label="Skill to develop"
+              label={t('onboarding.skillToDevelop')}
               value={draft.skill}
               onChangeText={(t) => update('skill', t)}
-              placeholder="For example, Machine Learning"
+              placeholder={t('onboarding.forExampleMachineLearning')}
               containerStyle={styles.questionField}
             />
           </View>
@@ -451,20 +451,20 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 4 ? (
           <View>
             <Txt variant="label" style={styles.questionLabel}>
-              Hobbies, pick all that apply
+              {t('onboarding.hobbiesPickAllThat')}
             </Txt>
             <View style={styles.chipWrap}>
               {HOBBY_OPTIONS.map((hobby) => (
                 <Chip
                   key={hobby}
-                  label={hobby}
+                  label={labelFor('options', hobby)}
                   selected={draft.hobbies.includes(hobby)}
                   onPress={() => toggleInList('hobbies', hobby)}
                 />
               ))}
             </View>
             <Txt variant="label" style={styles.questionLabel}>
-              Weekly fun time, hours
+              {t('onboarding.weeklyFunTimeHours')}
             </Txt>
             <Stepper
               value={draft.weeklyFunHours}
@@ -478,7 +478,7 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 5 ? (
           <View>
             <OptionSelect
-              label="Religion or belief"
+              label={t('onboarding.religionOrBelief')}
               options={RELIGION_OPTIONS}
               value={draft.religion}
               onChange={(v) => update('religion', v)}
@@ -486,29 +486,29 @@ export function OnboardingScreen({ navigation }: Props) {
             {draft.religion === 'Muslim' ? (
               <View style={styles.questionField}>
                 <Txt variant="label" style={styles.questionLabel}>
-                  Prayer frequency
+                  {t('onboarding.prayerFrequency')}
                 </Txt>
                 <View style={styles.lockedRow}>
-                  <Txt variant="body">5 daily prayers</Txt>
+                  <Txt variant="body">{t('onboarding.n5DailyPrayers')}</Txt>
                   <Txt variant="caption" color={colors.inkFaint}>
-                    Set from your tradition
+                    {t('onboarding.setFromYourTradition')}
                   </Txt>
                 </View>
               </View>
             ) : (
               <Field
-                label="Prayer or practice frequency"
+                label={t('onboarding.prayerOrPracticeFrequency')}
                 value={draft.prayerFrequency}
                 onChangeText={(t) => update('prayerFrequency', t)}
-                placeholder="For example, once daily, twice weekly"
+                placeholder={t('onboarding.forExampleOnceDaily')}
                 containerStyle={styles.questionField}
               />
             )}
             <Field
-              label="Spiritual practice"
+              label={t('onboarding.spiritualPractice')}
               value={draft.spiritualPractice}
               onChangeText={(t) => update('spiritualPractice', t)}
-              placeholder="For example, Quran reading, meditation"
+              placeholder={t('onboarding.forExampleQuranReading')}
               containerStyle={styles.questionField}
             />
           </View>
@@ -517,48 +517,47 @@ export function OnboardingScreen({ navigation }: Props) {
         {step === 6 ? (
           <View>
             <Field
-              label="First name"
+              label={t('onboarding.firstName')}
               value={draft.firstName}
               onChangeText={(t) => {
                 update('firstName', t);
                 if (nameError) setNameError(null);
               }}
               error={nameError}
-              placeholder="Your first name"
+              placeholder={t('onboarding.yourFirstName')}
               autoCapitalize="words"
             />
             <Field
-              label="Username"
+              label={t('onboarding.username')}
               value={draft.username}
               onChangeText={(t) => {
                 update('username', t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
                 if (usernameError) setUsernameError(null);
               }}
               error={usernameError}
-              placeholder="e.g. mohamed_dev"
+              placeholder={t('onboarding.eGMohamedDev')}
               autoCapitalize="none"
               autoCorrect={false}
               containerStyle={styles.questionField}
             />
             <Txt variant="caption" color={colors.inkFaint} style={styles.usernameNote}>
-              Friends find you with this. 3-20 chars: letters, numbers,
-              underscore.
+              {t('onboarding.friendsFindYouWith')}
             </Txt>
             <Field
-              label="Dream body"
+              label={t('onboarding.dreamBody')}
               value={draft.dreamBody}
               onChangeText={(t) => update('dreamBody', t)}
-              placeholder="For example, lean and energetic"
+              placeholder={t('onboarding.forExampleLeanAnd')}
               containerStyle={styles.questionField}
             />
             <Txt variant="label" style={styles.questionLabel}>
-              Dream personality, pick all that apply
+              {t('onboarding.dreamPersonalityPickAll')}
             </Txt>
             <View style={styles.chipWrap}>
               {PERSONALITY_OPTIONS.map((trait) => (
                 <Chip
                   key={trait}
-                  label={trait}
+                  label={labelFor('options', trait)}
                   selected={draft.dreamPersonality.includes(trait)}
                   onPress={() => toggleInList('dreamPersonality', trait)}
                 />
@@ -576,14 +575,14 @@ export function OnboardingScreen({ navigation }: Props) {
         <View style={styles.footer}>
           {step > 0 ? (
             <Button
-              title="Back"
+              title={t('onboarding.back')}
               variant="ghost"
               onPress={goBack}
               style={styles.backButton}
             />
           ) : null}
           <Button
-            title={step === totalSteps - 1 ? 'Start my journey' : 'Continue'}
+            title={step === totalSteps - 1 ? t('onboarding.startMyJourney') : t('onboarding.continue')}
             onPress={goNext}
             disabled={!canContinue}
             loading={submitting}

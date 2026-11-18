@@ -3,6 +3,8 @@
 // bars. Everything reads real data (daily_scores, gamification, ai_insights).
 
 import React, { useMemo, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
 import Accordion from '../components/Accordion';
@@ -35,11 +37,11 @@ import { useTheme } from '../theme/useTheme';
 
 type Period = 'week' | 'month';
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
-  { value: 'week', label: 'This week' },
-  { value: 'month', label: 'This month' },
+  { value: 'week', get label() { return i18n.t('insights.thisWeek'); } },
+  { value: 'month', get label() { return i18n.t('insights.thisMonth'); } },
 ];
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS = (): string[] => [i18n.t('insights.sunday'), i18n.t('insights.monday'), i18n.t('insights.tuesday'), i18n.t('insights.wednesday'), i18n.t('insights.thursday'), i18n.t('insights.friday'), i18n.t('insights.saturday')];
 
 function shortLabel(iso: string, period: Period): string {
   const d = new Date(`${iso}T12:00:00`);
@@ -50,15 +52,15 @@ function shortLabel(iso: string, period: Period): string {
 
 function verdict(s: PeriodSummary, period: Period): string {
   if (s.activeDays === 0) {
-    return `No quests finished ${period === 'week' ? 'this week' : 'this month'} yet. One small quest today gets things moving.`;
+    return i18n.t('insights.noQuestsFinishedYet', { v1: period === 'week' ? 'this week' : 'this month' });
   }
   if (s.prevAvgScore === null) {
-    return 'Your first stretch on the books. Keep showing up and the comparisons appear here.';
+    return i18n.t('insights.yourFirstStretchOn');
   }
   const diff = s.avgScore - s.prevAvgScore;
-  if (diff >= 5) return `Better than last ${period}. Whatever you changed, it is working.`;
-  if (diff <= -5) return `A bit lower than last ${period}. Pick your easiest quest today and build from there.`;
-  return `Steady compared with last ${period}. Consistency is how habits stick.`;
+  if (diff >= 5) return i18n.t('insights.betterThanLastWhatever', { period });
+  if (diff <= -5) return i18n.t('insights.aBitLowerThan', { period });
+  return i18n.t('insights.steadyComparedWithLast', { period });
 }
 
 function takeaways(s: PeriodSummary, period: Period): string[] {
@@ -75,18 +77,19 @@ function takeaways(s: PeriodSummary, period: Period): string[] {
     );
   }
   if (period === 'month' && s.bestWeekday !== null) {
-    out.push(`${WEEKDAYS[s.bestWeekday]} is usually your best day.`);
+    out.push(`${WEEKDAYS()[s.bestWeekday]} is usually your best day.`);
   }
   return out;
 }
 
 function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
+  const { t } = useTranslation();
   const diff = s.prevAvgScore === null ? null : s.avgScore - s.prevAvgScore;
   const up = diff !== null && diff >= 0;
   return (
     <Card style={styles.card}>
       <Txt variant="label" color={colors.inkSoft}>
-        {period === 'week' ? 'Average score this week' : 'Average score this month'}
+        {period === 'week' ? t('insights.averageScoreThisWeek') : t('insights.averageScoreThisMonth')}
       </Txt>
       <View style={styles.headlineRow}>
         <Txt variant="display" style={styles.bigNumber}>
@@ -100,7 +103,7 @@ function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
             ]}
           >
             <Txt variant="bodySemi" color={up ? colors.accent : colors.danger}>
-              {`${up ? '▲' : '▼'} ${Math.abs(diff)} vs last ${period}`}
+              {t('insights.vsLast', { v1: up ? '▲' : '▼', v2: Math.abs(diff), period })}
             </Txt>
           </View>
         ) : null}
@@ -113,11 +116,12 @@ function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
 }
 
 function Takeaways({ items }: { items: string[] }) {
+  const { t } = useTranslation();
   if (items.length === 0) return null;
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        What stands out
+        {t('insights.whatStandsOut')}
       </Txt>
       {items.map((t, i) => (
         <View key={i} style={styles.bulletRow}>
@@ -132,14 +136,15 @@ function Takeaways({ items }: { items: string[] }) {
 }
 
 function Pillars({ days }: { days: DayScore[] }) {
+  const { t } = useTranslation();
   const avgs = pillarAverages(days.filter((d) => d.assigned > 0)).sort((a, b) => b.value - a.value);
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Your pillars
+        {t('insights.yourPillars')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        Average score per pillar, highest first
+        {t('insights.averageScorePerPillar')}
       </Txt>
       {avgs.map((p) => (
         <PillarBar key={p.pillar} pillar={p.pillar} value={p.value} />
@@ -150,6 +155,7 @@ function Pillars({ days }: { days: DayScore[] }) {
 
 // The last 365 days of XP. Independent of the week/month switch above.
 function YearOfActivity() {
+  const { t } = useTranslation();
   const userId = useAppSelector((state) => state.auth.userId);
   const timezone = useAppSelector((state) => state.user.profile?.timezone ?? null);
   const today = todayInTimezone(timezone);
@@ -157,15 +163,15 @@ function YearOfActivity() {
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Your year
+        {t('insights.yourYear')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        XP earned each day for the last 365 days. Tap a day for details.
+        {t('insights.xpEarnedEachDay')}
       </Txt>
       {year.isError ? (
         <EmptyState
-          title="Could not load your year"
-          body="Check your connection and open Insights again."
+          title={t('insights.couldNotLoadYour')}
+          body={t('insights.checkYourConnectionAnd')}
         />
       ) : year.data ? (
         <YearHeatmap days={year.data} today={today} />
@@ -177,16 +183,17 @@ function YearOfActivity() {
 }
 
 function Momentum({ streak, best, level }: { streak: number; best: number; level: number }) {
+  const { t } = useTranslation();
   return (
     <Accordion
-      title="Momentum"
-      summary={`${streak}-day streak · best ${best} · level ${level}`}
+      title={t('insights.momentum')}
+      summary={t('insights.dayStreakBestLevel', { streak, best, level })}
       style={styles.card}
     >
       <View style={styles.statsRow}>
-        <Stat value={`${streak}`} label="day streak" color={colors.gold} />
+        <Stat value={`${streak}`} label={t('insights.dayStreak')} color={colors.gold} />
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
-        <Stat value={`${best}`} label="best streak" />
+        <Stat value={`${best}`} label={t('insights.bestStreak')} />
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
         <Stat value={`${level}`} label={titleForLevel(level)} />
       </View>
@@ -208,6 +215,7 @@ function Stat({ value, label, color }: { value: string; label: string; color?: s
 }
 
 export function InsightsScreen() {
+  const { t } = useTranslation();
   useTheme();
   const [period, setPeriod] = useState<Period>('week');
   const [shareOpen, setShareOpen] = useState(false);
@@ -246,10 +254,10 @@ export function InsightsScreen() {
   return (
     <Screen scroll>
       <View style={styles.titleRow}>
-        <Txt variant="title">Insights</Txt>
+        <Txt variant="title">{t('insights.insights')}</Txt>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Share your progress as a story"
+          accessibilityLabel={t('insights.shareYourProgressAs')}
           onPress={() => setShareOpen(true)}
           style={({ pressed }) => [
             styles.sharePill,
@@ -257,7 +265,7 @@ export function InsightsScreen() {
           ]}
         >
           <Txt variant="bodySemi" color={colors.accent}>
-            Share
+            {t('insights.share')}
           </Txt>
         </Pressable>
       </View>
@@ -280,17 +288,17 @@ export function InsightsScreen() {
           <YearOfActivity />
 
           <Accordion
-            title="Your score, day by day"
-            summary="Daily scores against your average"
+            title={t('insights.yourScoreDayBy')}
+            summary={t('insights.dailyScoresAgainstYour')}
             style={styles.card}
           >
             <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-              Tap a point to see the exact score. The dashed line is your average.
+              {t('insights.tapAPointTo')}
             </Txt>
             <LineChart
               data={current.map((d) => ({ label: shortLabel(d.date, period), value: d.overall }))}
               height={170}
-              emptyLabel="No scores yet"
+              emptyLabel={t('insights.noScoresYet')}
             />
           </Accordion>
 
@@ -302,7 +310,7 @@ export function InsightsScreen() {
 
           <Card style={styles.card}>
             <Txt variant="heading" style={styles.cardTitle}>
-              From your coach
+              {t('insights.fromYourCoach')}
             </Txt>
             {coach.length > 0 ? (
               coach.map((insight, i) => (
@@ -319,15 +327,15 @@ export function InsightsScreen() {
               ))
             ) : (
               <EmptyState
-                title="Notes arrive on Sunday"
-                body="Your coach reads the week's data and writes a few plain observations here."
+                title={t('insights.notesArriveOnSunday')}
+                body={t('insights.yourCoachReadsThe')}
               />
             )}
           </Card>
 
           <Button
-            title="Share my progress as a story"
-            winTitle="Show it off"
+            title={t('insights.shareMyProgressAs')}
+            winTitle={t('insights.showItOff')}
             icon={ShareGlyph}
             onPress={() => setShareOpen(true)}
           />

@@ -17,6 +17,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import i18n, { appLocale } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -38,7 +40,7 @@ import { BellGlyph, ChevronGlyph, PillarGlyph } from '../components/icons';
 import type { Quest } from '../api/types';
 import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
-import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
+import { bestStreakLabel, streakLabel } from '../lib/format';
 import { levelProgress } from '../lib/levels';
 import { registerDeviceForPush } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
@@ -86,12 +88,12 @@ type Props = CompositeScreenProps<
 function greeting(firstName: string | null | undefined): string {
   const hour = new Date().getHours();
   const part =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    hour < 12 ? i18n.t('today.goodMorning') : hour < 18 ? i18n.t('today.goodAfternoon') : i18n.t('today.goodEvening');
   return firstName ? `${part}, ${firstName}.` : `${part}.`;
 }
 
 function dateLine(): string {
-  return new Date().toLocaleDateString(undefined, {
+  return new Date().toLocaleDateString(appLocale(), {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -118,6 +120,7 @@ const TodayHeader = memo(function TodayHeader({
 }: {
   onBellPress: () => void;
 }) {
+  const { t } = useTranslation();
   useTheme();
   const firstName = useAppSelector((state) => state.user.profile?.first_name);
   const unread = useUnreadCount();
@@ -135,7 +138,7 @@ const TodayHeader = memo(function TodayHeader({
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={
-            unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
+            unread > 0 ? t('today.notificationsUnread', { unread }) : t('today.notifications')
           }
           onPress={onBellPress}
           pressedScale={0.9}
@@ -236,6 +239,7 @@ export const QuestSection = memo(function QuestSection({
   onOpen: (quest: Quest) => void;
   onComplete: (quest: Quest) => void;
 }) {
+  const { t } = useTranslation();
   useTheme();
   // Re-renders only when the listed ids, their order or the counts change.
   const list = useAppSelector<TodayList>(
@@ -244,7 +248,7 @@ export const QuestSection = memo(function QuestSection({
   );
   const hiddenCount = list.inScopeCount - list.ids.length;
   const scopeLabel =
-    expandedPillar === null ? 'Up next' : `${PILLAR_LABELS[expandedPillar]} today`;
+    expandedPillar === null ? t('today.upNext') : t('today.today', { pillar: PILLAR_LABELS[expandedPillar] });
 
   return (
     <>
@@ -260,12 +264,12 @@ export const QuestSection = memo(function QuestSection({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={expandedPillar !== null ? 'Show all pillars' : 'See all quests'}
+          accessibilityLabel={expandedPillar !== null ? t('today.showAllPillars') : t('today.seeAllQuests')}
           onPress={expandedPillar !== null ? onClearPillar : onSeeAll}
           hitSlop={10}
         >
           <Txt variant="bodySemi" color={colors.accent}>
-            {expandedPillar !== null ? 'Show all' : 'See all'}
+            {expandedPillar !== null ? t('today.showAll') : t('today.seeAll')}
           </Txt>
         </Pressable>
       </View>
@@ -274,13 +278,13 @@ export const QuestSection = memo(function QuestSection({
         <EmptyState
           title={
             expandedPillar === null
-              ? 'No quests yet today'
-              : `No ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests today`
+              ? t('today.noQuestsYetToday')
+              : t('today.noQuestsToday', { pillar: PILLAR_LABELS[expandedPillar].toLowerCase() })
           }
           body={
             expandedPillar === null
-              ? 'Pull down to refresh, or ask your coach for a quest.'
-              : 'This pillar has no quests scheduled today. Another pillar might.'
+              ? t('today.pullDownToRefresh')
+              : t('today.thisPillarHasNo')
           }
         />
       ) : (
@@ -288,8 +292,8 @@ export const QuestSection = memo(function QuestSection({
           {list.openCount === 0 ? (
             <Txt variant="body" color={colors.inkSoft} align="center" style={styles.allDone}>
               {expandedPillar === null
-                ? 'Everything is done for today. Your future self thanks you.'
-                : `All ${PILLAR_LABELS[expandedPillar].toLowerCase()} quests are done.`}
+                ? t('today.everythingIsDoneFor')
+                : t('today.allQuestsAreDone', { pillar: PILLAR_LABELS[expandedPillar].toLowerCase() })}
             </Txt>
           ) : null}
           {list.ids.map((id, index) => (
@@ -308,12 +312,12 @@ export const QuestSection = memo(function QuestSection({
       {hiddenCount > 0 ? (
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`See ${hiddenCount} more quests`}
+          accessibilityLabel={t('today.seeMoreQuests', { count: hiddenCount })}
           onPress={onSeeAll}
           style={styles.allQuests}
         >
           <Txt variant="bodySemi" color={colors.accent}>
-            {`${hiddenCount} more ${hiddenCount === 1 ? 'quest' : 'quests'}`}
+            {t('today.more', { count: hiddenCount })}
           </Txt>
           <ChevronGlyph color={colors.accent} />
         </PressableScale>
@@ -327,6 +331,7 @@ const ProgressStrip = memo(function ProgressStrip({
 }: {
   onFreeze: () => void;
 }) {
+  const { t } = useTranslation();
   useTheme();
   const totalXp = useAppSelector((state) => state.gamification.totalXp);
   const level = useAppSelector((state) => state.gamification.level);
@@ -341,7 +346,7 @@ const ProgressStrip = memo(function ProgressStrip({
     <>
       {/* Progress comes after today's to-dos: act first, then reflect. */}
       <Txt variant="label" style={styles.progressLabel}>
-        Your progress
+        {t('today.yourProgress')}
       </Txt>
       <FadeInUp delay={320} style={styles.strip}>
         <View style={[styles.stripCell, styles.stripFirst]}>
@@ -349,7 +354,7 @@ const ProgressStrip = memo(function ProgressStrip({
             {currentTitle ?? titleForLevel(level)}
           </Txt>
           <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
-            {`${totalXp.toLocaleString()} XP`}
+            {t('common.xp', { count: totalXp, formatted: totalXp.toLocaleString(appLocale()) })}
           </Txt>
           <View style={styles.xpTrack}>
             <View
@@ -365,7 +370,7 @@ const ProgressStrip = memo(function ProgressStrip({
           accessibilityRole="button"
           accessibilityLabel={
             currentStreak > 0
-              ? `${streakLabel(currentStreak)}. Tap to use a streak freeze`
+              ? t('today.tapToUseA', { streak: streakLabel(currentStreak) })
               : streakLabel(currentStreak)
           }
           disabled={currentStreak === 0}
@@ -373,7 +378,7 @@ const ProgressStrip = memo(function ProgressStrip({
           style={styles.stripCell}
         >
           <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-            Streak
+            {t('today.streak')}
           </Txt>
           <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
             {currentStreak > 0 ? streakLabel(currentStreak) : bestStreakLabel(bestStreak)}
@@ -382,13 +387,13 @@ const ProgressStrip = memo(function ProgressStrip({
         <View style={styles.stripDivider} />
         <View style={styles.stripCell}>
           <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-            Life score
+            {t('today.lifeScore')}
           </Txt>
           <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
             {`${Math.round(score)}`}
           </Txt>
           <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
-            {`${doneCount} of ${activeCount} done`}
+            {t('today.ofDone', { doneCount, activeCount })}
           </Txt>
         </View>
       </FadeInUp>
@@ -431,6 +436,7 @@ const ConfettiLayer = memo(
 // ------------------------------------------------------------ screen
 
 export function TodayScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
@@ -455,7 +461,7 @@ export function TodayScreen({ navigation }: Props) {
       const synced = (result.payload as { synced: number } | undefined)?.synced ?? 0;
       if (synced > 0) {
         showToast({
-          message: `Back online — synced ${synced} offline ${synced === 1 ? 'completion' : 'completions'}.`,
+          message: t('today.backOnlineSyncedOffline', { count: synced }),
         });
       }
     });
@@ -474,7 +480,7 @@ export function TodayScreen({ navigation }: Props) {
         if (cancelled) return;
         if (result.redeemed) {
           showToast({
-            message: 'Invite accepted — you are now connected.',
+            message: t('today.inviteAcceptedYouAre'),
           });
         }
         dispatch(setPendingInviteCode(null));
@@ -499,24 +505,24 @@ export function TodayScreen({ navigation }: Props) {
 
   const confirmFreeze = useCallback(() => {
     Alert.alert(
-      'Freeze your streak?',
-      'Today counts as protected even without a completion. One freeze per week.',
+      t('today.freezeYourStreak'),
+      t('today.todayCountsAsProtected'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Freeze',
+          text: t('today.freeze'),
           onPress: async () => {
             const { error } = await supabase.rpc('use_streak_freeze');
             if (error) {
               const msg = error.message.includes('freeze_already_used')
-                ? 'You already used this week\'s freeze.'
+                ? t('today.youAlreadyUsedThis')
                 : error.message.includes('already_active_today')
-                  ? 'You are already active today — no freeze needed.'
-                  : 'Could not freeze the streak right now.';
+                  ? t('today.youAreAlreadyActive')
+                  : t('today.couldNotFreezeThe');
               showToast({ message: msg });
             } else {
               showToast({
-                message: 'Streak frozen for today. Back at it tomorrow.',
+                message: t('today.streakFrozenForToday'),
               });
             }
           },
@@ -535,14 +541,14 @@ export function TodayScreen({ navigation }: Props) {
         // Level-ups and badges ride on the undo toast (their notification
         // center entries skip the banner so they don't replace it).
         const extras = [
-          result.payload.level_up ? `Level ${result.payload.level}!` : null,
+          result.payload.level_up ? t('today.level', { level: result.payload.level }) : null,
           result.payload.new_badges?.length
-            ? `${pluralize(result.payload.new_badges.length, 'new badge')}.`
+            ? t('today.newBadges_one', { count: result.payload.new_badges.length })
             : null,
         ].filter(Boolean);
         showToast({
-          message: [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
-          actionLabel: 'Undo',
+          message: [t('today.xpIsDone', { xp, title: quest.title }), ...extras].join(' '),
+          actionLabel: t('today.undo'),
           countdownSeconds: 10,
           durationMs: 10000,
           onAction: () => {
@@ -554,7 +560,7 @@ export function TodayScreen({ navigation }: Props) {
         }
       } else {
         showToast({
-          message: result.payload?.message ?? 'Could not complete this quest.',
+          message: result.payload?.message ?? t('today.couldNotCompleteThis'),
         });
       }
     },
@@ -617,7 +623,7 @@ export function TodayScreen({ navigation }: Props) {
             align="center"
             style={styles.footerNote}
           >
-            Pull down to refresh your day.
+            {t('today.pullDownToRefresh2')}
           </Txt>
         </>
       )}

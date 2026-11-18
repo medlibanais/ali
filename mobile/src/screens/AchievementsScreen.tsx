@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import BadgeMedallion from '../components/BadgeMedallion';
 import Card from '../components/Card';
@@ -26,11 +28,21 @@ interface TitleProgress {
 }
 
 const RARITY_LABELS: Record<Rarity, string> = {
-  common: 'Common',
-  uncommon: 'Uncommon',
-  rare: 'Rare',
-  epic: 'Epic',
-  legendary: 'Legendary',
+  get common() {
+    return i18n.t('achievements.common');
+  },
+  get uncommon() {
+    return i18n.t('achievements.uncommon');
+  },
+  get rare() {
+    return i18n.t('achievements.rare');
+  },
+  get epic() {
+    return i18n.t('achievements.epic');
+  },
+  get legendary() {
+    return i18n.t('achievements.legendary');
+  },
 };
 
 function formatUnlockDate(iso: string): string {
@@ -56,6 +68,7 @@ function AchievementsSkeleton() {
 }
 
 export function AchievementsScreen() {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const [badges, setBadges] = useState<Achievement[] | null>(null);
@@ -77,7 +90,7 @@ export function AchievementsScreen() {
       .catch((e: unknown) => {
         if (!mounted) return;
         setBadges([]);
-        setError(typeof e === 'string' ? e : 'Could not load achievements.');
+        setError(typeof e === 'string' ? e : t('achievements.couldNotLoadAchievements'));
       });
     return () => {
       mounted = false;
@@ -94,10 +107,10 @@ export function AchievementsScreen() {
   return (
     <Screen scroll>
       <Txt variant="title" style={styles.title}>
-        Achievements
+        {t('achievements.achievements')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.subtitle}>
-        {error ?? `${unlockedCount} of ${list.length} unlocked`}
+        {error ?? t('achievements.ofUnlocked', { unlockedCount, length: list.length })}
       </Txt>
 
       {badges === null ? (
@@ -107,43 +120,43 @@ export function AchievementsScreen() {
           {titles.length > 0 ? (
             <>
               <Txt variant="label" style={styles.sectionLabel}>
-                Titles
+                {t('achievements.titles')}
               </Txt>
               <Card style={styles.titlesCard}>
-                <Txt variant="heading">{currentTitle?.name ?? 'Novice'}</Txt>
+                <Txt variant="heading">{currentTitle?.name ?? t('achievements.novice')}</Txt>
                 <Txt variant="caption" color={colors.inkFaint} style={styles.rowDetail}>
                   {nextTitle
-                    ? `Next: ${nextTitle.name} at level ${nextTitle.target} (${pluralize(
+                    ? t('achievements.nextAtLevelTo', { name: nextTitle.name, target: nextTitle.target, v3: pluralize(
                         Math.max(0, nextTitle.target - nextTitle.progress),
                         'level',
-                      )} to go)`
-                    : 'Every level title unlocked.'}
+                      ) })
+                    : t('achievements.everyLevelTitleUnlocked')}
                 </Txt>
-                {pillarTitles.map((t) => (
-                  <View key={t.title_id} style={styles.titleRow}>
+                {pillarTitles.map((title) => (
+                  <View key={title.title_id} style={styles.titleRow}>
                     <View style={styles.rowHeader}>
                       <Txt
                         variant="bodySemi"
-                        color={t.unlocked_at ? colors.gold : colors.inkSoft}
+                        color={title.unlocked_at ? colors.gold : colors.inkSoft}
                       >
-                        {t.name}
+                        {title.name}
                       </Txt>
                       <Txt variant="caption" color={colors.inkFaint}>
-                        {t.unlocked_at
-                          ? `Unlocked ${formatUnlockDate(t.unlocked_at)}`
-                          : progressLabel(t)}
+                        {title.unlocked_at
+                          ? t('achievements.unlocked', { v1: formatUnlockDate(title.unlocked_at) })
+                          : progressLabel(title)}
                       </Txt>
                     </View>
                     <View style={styles.track}>
                       <View
                         style={[
                           styles.fill,
-                          { width: `${Math.round((100 * t.progress) / t.target)}%` },
+                          { width: `${Math.round((100 * title.progress) / title.target)}%` },
                         ]}
                       />
                     </View>
                     <Txt variant="caption" color={colors.inkFaint}>
-                      {t.description}
+                      {title.description}
                     </Txt>
                   </View>
                 ))}
@@ -152,7 +165,7 @@ export function AchievementsScreen() {
           ) : null}
 
           <Txt variant="label" style={styles.sectionLabel}>
-            Badges
+            {t('achievements.badges')}
           </Txt>
           <Card padded={false}>
             {list.map((badge, index) => {
@@ -185,7 +198,7 @@ export function AchievementsScreen() {
                         style={styles.rowDetail}
                       >
                         {badge.unlocked_at
-                          ? `Unlocked ${formatUnlockDate(badge.unlocked_at)}`
+                          ? t('achievements.unlocked', { v1: formatUnlockDate(badge.unlocked_at) })
                           : `${badge.description}${badge.xp_reward ? ` +${badge.xp_reward} XP` : ''}`}
                       </Txt>
                     </View>

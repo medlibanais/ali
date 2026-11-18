@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { FlatList } from 'react-native';
 import Hairline from '../components/Hairline';
@@ -46,6 +47,7 @@ function deviceTimezone(): string {
 }
 
 export function TimezonePickerScreen() {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -77,14 +79,14 @@ export function TimezonePickerScreen() {
         .eq('id', user.id);
       if (error) throw error;
       await dispatch(fetchProfile());
-      toast.showToast({ message: `Timezone set to ${zone}.` });
+      toast.showToast({ message: t('timezonePicker.timezoneSetTo', { zone }) });
     } catch (e) {
       const msg =
         e && typeof e === 'object' && 'message' in e ? String(e.message) : '';
       toast.showToast({
         message: msg.includes('timezone_change_too_soon')
-          ? 'You can change your timezone once every 7 days.'
-          : msg || 'Could not save the timezone.',
+          ? t('timezonePicker.youCanChangeYour')
+          : msg || t('timezonePicker.couldNotSaveThe'),
       });
     } finally {
       setSaving(false);
@@ -98,14 +100,14 @@ export function TimezonePickerScreen() {
           style={styles.search}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search timezones"
+          placeholder={t('timezonePicker.searchTimezones')}
           placeholderTextColor={colors.inkFaint}
           autoCapitalize="none"
           autoCorrect={false}
-          accessibilityLabel="Search timezones"
+          accessibilityLabel={t('timezonePicker.searchTimezones')}
         />
         <Txt variant="caption" color={colors.inkFaint} style={styles.detected}>
-          {`Detected on this device: ${detected}`}
+          {t('timezonePicker.detectedOnThisDevice', { detected })}
         </Txt>
       </View>
       <FlatList
@@ -131,7 +133,7 @@ export function TimezonePickerScreen() {
                 </Txt>
                 {selected ? (
                   <Txt variant="bodySemi" color={colors.accent}>
-                    Current
+                    {t('timezonePicker.current')}
                   </Txt>
                 ) : null}
               </Pressable>
@@ -142,7 +144,7 @@ export function TimezonePickerScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Txt variant="body" color={colors.inkSoft} align="center">
-              No timezone matches that search.
+              {t('timezonePicker.noTimezoneMatchesThat')}
             </Txt>
           </View>
         }
