@@ -27,7 +27,8 @@
     "xp_other": "{{formatted}} XP",
     "days_many": "{{count}} jours",
     "bestDays_many": "record {{count}} jours",
-    "xp_many": "{{formatted}} XP"
+    "xp_many": "{{formatted}} XP",
+    "loading2": "{{title}}, chargement"
   },
   "pillars": {
     "health": "Santé",
@@ -121,7 +122,8 @@
     "use": "Utiliser comme photo de profil",
     "drawFailed": "L'image n'a pas pu être dessinée.",
     "signInAgain": "Reconnecte-toi pour faire cela.",
-    "remaining_many": "Encore {{count}} aujourd'hui."
+    "remaining_many": "Encore {{count}} aujourd'hui.",
+    "makingA11y": "Création de ta photo"
   },
   "pillarBubble": {
     "a11y": "{{pillar}}, {{score}} pour cent",
@@ -183,7 +185,8 @@
     "wasSkipped": "Cette quête a été passée.",
     "loadFailed": "Impossible de charger les quêtes du jour.",
     "completeFailed": "Impossible de terminer cette quête.",
-    "skipFailed": "Impossible de passer cette quête."
+    "skipFailed": "Impossible de passer cette quête.",
+    "rateLimited": "Doucement, puis réessaie."
   },
   "errors": {
     "notSignedIn": "Non connecté.",
@@ -226,7 +229,9 @@
     "tooLong": "Ce message est trop long. Reste sous {{max}} caractères.",
     "generic": "Ton futur toi a perdu le fil une seconde. Touche Réessayer.",
     "ratingFailed": "Impossible d'enregistrer cette note.",
-    "sendFailed": "Impossible d'envoyer ce message."
+    "sendFailed": "Impossible d'envoyer ce message.",
+    "couldNotRefreshThe": "Impossible d'actualiser le compteur du jour.",
+    "theConnectionDroppedBefore": "La connexion a coupé avant la réponse. Touche Réessayer pour redemander."
   },
   "friendErrors": {
     "ownAccount": "C'est ton propre compte.",
@@ -483,7 +488,8 @@
     "newBadges_many": "{{count}} nouveaux badges.",
     "more_many": "{{count}} quêtes de plus",
     "seeMoreQuests_many": "Voir {{count}} quêtes de plus",
-    "backOnlineSyncedOffline_many": "De retour en ligne : {{count}} quêtes hors ligne synchronisées."
+    "backOnlineSyncedOffline_many": "De retour en ligne : {{count}} quêtes hors ligne synchronisées.",
+    "openYourProfile": "Ouvrir ton profil"
   },
   "quests": {
     "all": "Toutes",
@@ -497,7 +503,8 @@
     "nothingLeftToDo": "Plus rien à faire aujourd'hui",
     "noQuestsLeftToday": "Plus de quêtes {{pillar}} aujourd'hui",
     "everythingInThisView": "Tout ici est terminé ou passé. Demain apporte une nouvelle série.",
-    "completed": "Terminées · {{length}}"
+    "completed": "Terminées · {{length}}",
+    "completedA11y": "Quêtes terminées, {{count}}"
   },
   "questDetail": {
     "easy": "Facile",
@@ -556,7 +563,15 @@
     "sendMessage": "Envoyer le message",
     "leftToday_one": "{{count}} message restant aujourd'hui",
     "leftToday_other": "{{count}} messages restants aujourd'hui",
-    "leftToday_many": "{{count}} messages restants aujourd'hui"
+    "leftToday_many": "{{count}} messages restants aujourd'hui",
+    "reconnecting": "Reconnexion…",
+    "stopGenerating": "Arrêter la génération",
+    "aFewHours": "quelques heures",
+    "limitReachedA11y": "Limite quotidienne atteinte. Ton coach revient dans {{time}}",
+    "usedAll": "Tu as utilisé tes {{limit}} messages du jour. Ton coach revient à minuit.",
+    "youHaveLeft_one": "Il te reste {{count}} message aujourd'hui.",
+    "youHaveLeft_many": "Il te reste {{count}} messages aujourd'hui.",
+    "youHaveLeft_other": "Il te reste {{count}} messages aujourd'hui."
   },
   "insights": {
     "thisWeek": "Cette semaine",
@@ -607,7 +622,10 @@
     "steadyComparedWithLast_week": "Stable par rapport à la semaine dernière. La régularité ancre les habitudes.",
     "steadyComparedWithLast_month": "Stable par rapport au mois dernier. La régularité ancre les habitudes.",
     "vsLast_week": "{{arrow}} {{diff}} par rapport à la semaine dernière",
-    "vsLast_month": "{{arrow}} {{diff}} par rapport au mois dernier"
+    "vsLast_month": "{{arrow}} {{diff}} par rapport au mois dernier",
+    "streakOutlook": "Prévision de série",
+    "chanceYouCompleteAt": "Probabilité que tu termines au moins une quête demain. Mise à jour toutes les heures.",
+    "couldNotLoadYour2": "Impossible de charger ta prévision"
   },
   "profile": {
     "yourExportIsReady": "Ton export est prêt. Le partage n'est pas disponible sur cet appareil.",
@@ -900,7 +918,9 @@
     "startFromMyCurrent": "Partir de mon avatar actuel",
     "startFromTheLook": "Partir du look {{label}}",
     "pickACustomColor": "{{title}} : choisir une couleur personnalisée",
-    "unlocksAtLevelSuffix": ", se débloque au niveau {{level}}"
+    "unlocksAtLevelSuffix": ", se débloque au niveau {{level}}",
+    "makeItLookLike": "Me ressembler : créer l'avatar à partir d'un selfie",
+    "tapSaveToKeep": "{{note}} Touche Enregistrer pour le garder."
   },
   "options": {
     "muslim": "Musulman",
@@ -1535,5 +1555,125 @@
     "wink": "Clin d'œil",
     "yellow": "Jaune",
     "younger": "Plus jeune"
+  },
+  "themes": {
+    "neon": "Néon",
+    "parchment": "Parchemin",
+    "forest": "Forêt",
+    "ocean": "Océan",
+    "sunset": "Coucher de soleil",
+    "rose": "Rose",
+    "lavender": "Lavande",
+    "midnight": "Minuit",
+    "ember": "Braise"
+  },
+  "selfie": {
+    "weCouldNotSee": "Aucun visage n'a été détecté sur cette photo, voici donc un départ aléatoire. Essaie un selfie net, de face.",
+    "photoReadingIsNot": "La lecture de photo n'est pas encore activée, voici donc un départ aléatoire.",
+    "theAiIsBusy": "L'IA est occupée, voici donc un départ aléatoire. Réessaie dans une minute.",
+    "weCouldNotRead": "Impossible de lire la photo cette fois, voici un départ aléatoire à modifier.",
+    "theAvatarCannotShow": "L'avatar ne peut pas encore afficher {{what}}.",
+    "weMatchedYourSkin": "Nous avons repris ton teint, tes cheveux, la couleur de tes yeux et tes lunettes. Affine le visage dans les onglets ci-dessous.{{beard}}",
+    "takeASelfie": "Prendre un selfie",
+    "chooseAPhoto": "Choisir une photo",
+    "somethingWentWrongTry": "Un problème est survenu. Réessaie.",
+    "makeItLookLike": "Me ressembler",
+    "close": "Fermer",
+    "cancel": "Annuler",
+    "takeAClearFront": "Prends un selfie net, de face, avec une bonne lumière. L'IA choisit ton teint, ta coiffure, ta couleur de cheveux, la couleur de tes yeux et tes lunettes. Ta photo reste privée, est utilisée une fois, puis supprimée.",
+    "workingOnYourAvatar": "Création de ton avatar",
+    "uploadingYourPhoto": "Envoi de ta photo…",
+    "readingYourPhoto": "Lecture de ta photo…",
+    "thisUsuallyTakes5": "Cela prend en général 5 à 15 secondes.",
+    "faceTheCameraNo": "Face à l'objectif, sans chapeau, cheveux visibles.",
+    "openSettingsToAllow": "Ouvrir les réglages pour autoriser l'appareil photo et les photos",
+    "openSettings": "Ouvrir les réglages",
+    "couldNotReadThat": "Impossible de lire cette photo.",
+    "thatPhotoIsStill": "Cette photo dépasse encore 500 Ko. Essaie-en une autre.",
+    "couldNotOpenThe": "Impossible d'ouvrir l'appareil photo ou les photos.",
+    "youAreSignedOut": "Tu es déconnecté. Connecte-toi et réessaie.",
+    "couldNotUploadThe": "Impossible d'envoyer la photo : {{message}}",
+    "youHaveMade10": "Tu as créé 10 avatars à partir d'une photo aujourd'hui. Réessaie demain.",
+    "yourLastPhotoIs": "Ta dernière photo est encore en cours de lecture. Patiente un instant.",
+    "thisFeatureIsNot": "Cette fonction n'est pas encore configurée sur le serveur (mise à jour de la base de données manquante).",
+    "couldNotStartReading": "Impossible de lancer la lecture de ta photo. Réessaie.",
+    "facial": {
+      "stubble": "une barbe de trois jours",
+      "moustache": "une moustache",
+      "beard": "une barbe",
+      "none": ""
+    }
+  },
+  "streakOutlook": {
+    "highRisk": "Risque élevé",
+    "moderate": "Modéré",
+    "onTrack": "En bonne voie",
+    "notEnoughData": "Pas assez de données",
+    "sundays": "Dimanches",
+    "mondays": "Lundis",
+    "tuesdays": "Mardis",
+    "wednesdays": "Mercredis",
+    "thursdays": "Jeudis",
+    "fridays": "Vendredis",
+    "saturdays": "Samedis",
+    "weNeedFullDays": "Il faut {{MIN_DATA_DAYS}} jours complets d'historique pour prévoir demain.",
+    "yourFirstPredictionArrives": "Ta première prévision arrive dans l'heure.",
+    "activeOfTheLast": "Actif {{active7}} des {{window7}} derniers jours.",
+    "streakOutlookNotEnough": "Prévision de série : pas encore assez de données.",
+    "streakOutlookPercentChance": "Prévision de série : {{probability}} pour cent de chances que tu termines une quête demain. {{band}}.",
+    "moreToGo_one": "Encore {{count}} jour.",
+    "moreToGo_many": "Encore {{count}} jours.",
+    "moreToGo_other": "Encore {{count}} jours.",
+    "weekdayLine": "{{day}} : {{active}} sur {{total}}.",
+    "thatWeekday": "Ce jour de la semaine",
+    "alreadyDoneToday": "Déjà fait quelque chose aujourd'hui.",
+    "tomorrow": "demain"
+  },
+  "celebrations": {
+    "levelUpLevel": "Niveau supérieur. Niveau {{toLevel}}, {{toTitle}}.",
+    "level": "Niveau {{toLevel}} : {{toTitle}}",
+    "levelNewTitle": "Niveau {{toLevel}} · nouveau titre",
+    "sharingIsNotAvailable": "Le partage n'est pas disponible sur ce téléphone.",
+    "shareToInstagram": "Partager sur Instagram",
+    "couldNotCreateThe": "Impossible de créer l'image. Réessaie.",
+    "levelUp": "Niveau supérieur",
+    "youWere": "Tu étais",
+    "youAreNow": "Tu es maintenant",
+    "growWhoAreYou": "GROW · Qui deviens-tu ?",
+    "keepGrowing": "Continue de grandir",
+    "perfectDayAllQuests": "Journée parfaite. Les {{questCount}} quêtes sont faites.",
+    "perfectDay": "Journée parfaite",
+    "everyQuestDone": "Toutes les quêtes faites",
+    "allQuestsAcrossYour": "Les {{questCount}} quêtes, dans tous tes piliers. C'est la personne que tu deviens.",
+    "beautiful": "Magnifique",
+    "level4": "Niveau {{level}}, {{title}}",
+    "maxLevel": "Niveau max",
+    "levelN": "Niveau {{level}}"
+  },
+  "questSearch": {
+    "searching": "Recherche",
+    "searchAllQuestsE": "Cherche parmi toutes les quêtes, ex. moment calme avec maman",
+    "searchTheQuestLibrary": "Chercher dans la bibliothèque de quêtes",
+    "findsQuestsByMeaning": "Trouve les quêtes par leur sens, pas seulement par les mots",
+    "clearSearch": "Effacer la recherche",
+    "min": " · {{timeEstimateMinutes}} min",
+    "questXpRelevancePercent": "{{title}}. Quête {{pillar}}, {{xpReward}} XP. Pertinence {{relevance}} pour cent. {{description}}",
+    "tryTheSearchAgain": "Relancer la recherche",
+    "tryAgain": "Réessayer",
+    "typeAtLeast3": "Tape au moins 3 lettres.",
+    "searchingTheQuestLibrary": "Recherche dans la bibliothèque de quêtes…",
+    "noQuestsFound": "Aucune quête trouvée.",
+    "topQuestsFor": "Les {{length}} meilleures quêtes pour {{query}}",
+    "questLibraryBestMatches": "BIBLIOTHÈQUE DE QUÊTES · MEILLEURS RÉSULTATS",
+    "youLookOfflineSearch": "Tu sembles hors ligne. La recherche a besoin d'une connexion.",
+    "questSearchIsNot": "La recherche de quêtes n'est pas encore activée.",
+    "searchIsWarmingUp": "La recherche se prépare. Réessaie dans un instant.",
+    "searchFailedTryAgain": "La recherche a échoué. Réessaie.",
+    "relevant": "Pertinente à {{v1}} %"
+  },
+  "skeletons": {
+    "loadingYourDay": "Chargement de ta journée",
+    "loadingYourInsights": "Chargement de tes statistiques",
+    "loadingYourConversation": "Chargement de ta conversation"
   }
 }

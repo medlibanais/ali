@@ -19,6 +19,7 @@ import BecomingCard from '../components/BecomingCard';
 import Hairline from '../components/Hairline';
 import { FadeInUp, PressableScale } from '../components/Motion';
 import PillarBubble from '../components/PillarBubble';
+import { HeroTarget } from '../components/Hero';
 import ProfileAvatar from '../components/ProfileAvatar';
 import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
@@ -364,15 +365,17 @@ export function ProfileScreen({ navigation }: Props) {
           </FadeInUp>
 
           <FadeInUp delay={60} style={styles.identity}>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={t('profile.editYourAvatar')}
-              onPress={() => navigation.navigate('AvatarCreator')}
-              pressedScale={0.95}
-              style={styles.avatarRim}
-            >
-              <ProfileAvatar profile={profile} size={108} mood="happy" />
-            </PressableScale>
+            <HeroTarget heroKey="avatar">
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.editYourAvatar')}
+                onPress={() => navigation.navigate('AvatarCreator')}
+                pressedScale={0.95}
+                style={styles.avatarRim}
+              >
+                <ProfileAvatar profile={profile} size={108} mood="happy" />
+              </PressableScale>
+            </HeroTarget>
             <View style={styles.identityText}>
               <Txt variant="title" numberOfLines={1}>
                 {profile?.first_name ?? t('profile.you')}
@@ -534,7 +537,7 @@ export function ProfileScreen({ navigation }: Props) {
               <SettingsRow
                 icon={<BackdropGlyph size={20} color={colors.ink} />}
                 label={t('profile.appearance')}
-                detail={t('profile.theme', { name: theme.name })}
+                detail={t('profile.theme', { name: t(`themes.${theme.id}`) })}
                 open={openSection === 'theme'}
                 onPress={() => toggle('theme')}
               />
@@ -548,7 +551,7 @@ export function ProfileScreen({ navigation }: Props) {
                           key={option.id}
                           accessibilityRole="button"
                           accessibilityState={{ selected }}
-                          accessibilityLabel={t('profile.theme', { name: option.name })}
+                          accessibilityLabel={t('profile.theme', { name: t(`themes.${option.id}`) })}
                           onPress={() => dispatch(setTheme(option.id))}
                           style={({ pressed }) => [styles.themeOption, pressed && styles.pressed]}
                         >
@@ -569,7 +572,7 @@ export function ProfileScreen({ navigation }: Props) {
                             color={selected ? colors.accent : colors.inkSoft}
                             style={styles.themeName}
                           >
-                            {option.name}
+                            {t(`themes.${option.id}`)}
                           </Txt>
                         </Pressable>
                       );
@@ -737,6 +740,10 @@ const styles = themed(() =>
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: spacing.xl,
+      // Above the cards below, so the avatar flying in from Today
+      // (HeroTarget) passes over them. No background, so no shadow.
+      zIndex: 2,
+      elevation: 12,
     },
     avatarRim: {
       width: 120,

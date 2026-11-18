@@ -269,7 +269,7 @@ ${pending.length ? questLines(pending, 3) : '- (none)'}
 export const OUTPUT_MAX_CHARS = 420;
 
 // Content we never ship, even if the model produced it.
-const HARD_BANNED_RE =
+export const HARD_BANNED_RE =
   /(you failed|you are weak|you'?re (lazy|pathetic|a failure)|shame on you|take \d+\s?(mg|ml|pills?)|i diagnose|you (probably )?have (adhd|depression|covid|flu|diabetes|cancer))/i;
 
 /** Clean, soften and length-cap a model reply. Null means "do not use". */

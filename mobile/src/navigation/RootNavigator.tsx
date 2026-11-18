@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { markFirstScreenPainted } from '../lib/bootSplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useLanguageSync } from '../i18n/useLanguageSync';
@@ -50,6 +52,13 @@ const titledOptions = themed(() => ({
   headerTintColor: colors.ink,
   headerShadowVisible: false,
   headerBackTitleVisible: false,
+}));
+
+// Pushed screens slide in from the right like game menus (the Android
+// default is a plain fade). Runs natively in react-native-screens.
+const appStackOptions = themed(() => ({
+  ...titledOptions,
+  animation: 'slide_from_right' as const,
 }));
 
 function AuthNavigator() {
@@ -116,7 +125,7 @@ function AppNavigator() {
   useLanguageSync();
   const { t } = useTranslation();
   return (
-    <AppStack.Navigator screenOptions={titledOptions}>
+    <AppStack.Navigator screenOptions={appStackOptions}>
       <AppStack.Screen
         name="MainTabs"
         component={MainTabs}
@@ -207,12 +216,29 @@ export function RootNavigator() {
     case 'restoring':
       return <SplashScreen />;
     case 'unauthenticated':
-      return <AuthNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <AuthNavigator />
+        </View>
+      );
     case 'needsOnboarding':
-      return <OnboardingNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onOnboardingPainted}>
+          <OnboardingNavigator />
+        </View>
+      );
     case 'ready':
       return <AppNavigator />;
   }
 }
 
 export default RootNavigator;
+
+// Signed-out and onboarding launches hide the native splash once their
+// first screen is laid out; signed-in launches wait for Today instead.
+const onAuthPainted = () => markFirstScreenPainted('auth');
+const onOnboardingPainted = () => markFirstScreenPainted('onboarding');
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

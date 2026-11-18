@@ -158,6 +158,27 @@ something is missing:
 | "The AI image service refused our key" | the fal key is wrong or out of credit |
 | "The AI could not be reached, so that reply came from your saved plan" | Groq was down or slow; the key is set |
 
+### "Make it look like me" (selfie to avatar)
+
+The editor's face button takes a selfie, uploads it to the private `selfies`
+bucket and queues a row in `avatar_generation_jobs` (migration 0030). The
+insert calls `generate-avatar-config` through a database webhook made in SQL.
+It reads the selfie with Groq's vision model (`GROQ_API_KEY`, the coach's
+key), then fal.ai (`FAL_KEY`) if Groq fails, and falls back to a random look.
+
+```bash
+npx supabase db push
+npx supabase functions deploy generate-avatar-config
+# webhook target and secret (once, in the SQL editor of the dashboard):
+#   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+#   select vault.create_secret('<long random string>', 'avatar_webhook_secret');
+npx supabase secrets set AVATAR_WEBHOOK_SECRET=<the same long random string>
+```
+
+Without the two Vault secrets the app still works: it calls the function
+itself for its own job after 6 seconds. Optional: `AVATAR_VISION_MODEL`
+(Groq model id), `AVATAR_FAL_VISION_ENDPOINT` / `AVATAR_FAL_VISION_MODEL`.
+
 ### What the coach remembers
 
 Each coach request carries today's quests, yesterday's quests per pillar
@@ -177,3 +198,7 @@ Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 RLS on every table (privacy matrix proven in `tests/e2e.ps1`), no secrets in
 the client bundle, server-side rate limiting (auth, coach 20/day, quest
 limits), no PII in logs. See `SECURITY.md` for the dependency audit posture.
+
+## CI/CD
+
+GitHub Actions runs typecheck, unit tests, the API E2E script and Detox on every push to `main`, and deploys the web app to Netlify when all of it passes. Setup and secrets: [docs/ci-cd.md](docs/ci-cd.md).

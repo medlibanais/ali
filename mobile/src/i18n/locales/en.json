@@ -24,7 +24,8 @@
     "bestDays_other": "best {{count}} days",
     "somethingWrong": "Something went wrong. Try again.",
     "xp_one": "{{formatted}} XP",
-    "xp_other": "{{formatted}} XP"
+    "xp_other": "{{formatted}} XP",
+    "loading2": "{{title}}, loading"
   },
   "pillars": {
     "health": "Health",
@@ -117,7 +118,8 @@
     "isProfile": "Your profile picture",
     "use": "Use as my profile picture",
     "drawFailed": "The picture could not be drawn.",
-    "signInAgain": "Sign in again to do that."
+    "signInAgain": "Sign in again to do that.",
+    "makingA11y": "Making your photo"
   },
   "pillarBubble": {
     "a11y": "{{pillar}}, {{score}} percent",
@@ -178,7 +180,8 @@
     "wasSkipped": "This quest was skipped.",
     "loadFailed": "Could not load today's quests.",
     "completeFailed": "Could not complete this quest.",
-    "skipFailed": "Could not skip this quest."
+    "skipFailed": "Could not skip this quest.",
+    "rateLimited": "Slow down a little, then try again."
   },
   "errors": {
     "notSignedIn": "Not signed in.",
@@ -221,7 +224,9 @@
     "tooLong": "That message is too long. Keep it under {{max}} characters.",
     "generic": "Your future self lost the thread for a second. Tap retry.",
     "ratingFailed": "Could not save that rating.",
-    "sendFailed": "Could not send that message."
+    "sendFailed": "Could not send that message.",
+    "couldNotRefreshThe": "Could not refresh the daily count.",
+    "theConnectionDroppedBefore": "The connection dropped before the reply arrived. Tap retry to ask again."
   },
   "friendErrors": {
     "ownAccount": "That is your own account.",
@@ -474,7 +479,8 @@
     "seeMoreQuests_one": "See {{count}} more quest",
     "seeMoreQuests_other": "See {{count}} more quests",
     "backOnlineSyncedOffline_one": "Back online — synced {{count}} offline completion.",
-    "backOnlineSyncedOffline_other": "Back online — synced {{count}} offline completions."
+    "backOnlineSyncedOffline_other": "Back online — synced {{count}} offline completions.",
+    "openYourProfile": "Open your profile"
   },
   "quests": {
     "all": "All",
@@ -488,7 +494,8 @@
     "nothingLeftToDo": "Nothing left to do today",
     "noQuestsLeftToday": "No {{pillar}} quests left today",
     "everythingInThisView": "Everything in this view is either done or skipped. Tomorrow brings a new set.",
-    "completed": "Completed · {{length}}"
+    "completed": "Completed · {{length}}",
+    "completedA11y": "Completed quests, {{count}}"
   },
   "questDetail": {
     "easy": "Easy",
@@ -546,7 +553,14 @@
     "speakYourMessage": "Speak your message",
     "sendMessage": "Send message",
     "leftToday_one": "{{count}} message left today",
-    "leftToday_other": "{{count}} messages left today"
+    "leftToday_other": "{{count}} messages left today",
+    "reconnecting": "Reconnecting…",
+    "stopGenerating": "Stop generating",
+    "aFewHours": "a few hours",
+    "limitReachedA11y": "Daily limit reached. Your coach is back in {{time}}",
+    "usedAll": "You've used all {{limit}} messages today. Your coach is back at midnight.",
+    "youHaveLeft_one": "You have {{count}} message left today.",
+    "youHaveLeft_other": "You have {{count}} messages left today."
   },
   "insights": {
     "thisWeek": "This week",
@@ -597,7 +611,10 @@
     "steadyComparedWithLast_week": "Steady compared with last week. Consistency is how habits stick.",
     "steadyComparedWithLast_month": "Steady compared with last month. Consistency is how habits stick.",
     "vsLast_week": "{{arrow}} {{diff}} vs last week",
-    "vsLast_month": "{{arrow}} {{diff}} vs last month"
+    "vsLast_month": "{{arrow}} {{diff}} vs last month",
+    "streakOutlook": "Streak outlook",
+    "chanceYouCompleteAt": "Chance you complete at least one quest tomorrow. Updated every hour.",
+    "couldNotLoadYour2": "Could not load your outlook"
   },
   "profile": {
     "yourExportIsReady": "Your export is ready. Sharing is not available on this device.",
@@ -951,7 +968,9 @@
     "startFromMyCurrent": "Start from my current avatar",
     "startFromTheLook": "Start from the look {{label}}",
     "pickACustomColor": "{{title}}: pick a custom color",
-    "unlocksAtLevelSuffix": ", unlocks at level {{level}}"
+    "unlocksAtLevelSuffix": ", unlocks at level {{level}}",
+    "makeItLookLike": "Make it look like me: build the avatar from a selfie",
+    "tapSaveToKeep": "{{note}} Tap Save to keep it."
   },
   "options": {
     "muslim": "Muslim",
@@ -1534,5 +1553,124 @@
       "ar": "Arabic"
     },
     "restartNote": "Close and reopen GROW to finish switching the layout direction. Text has already switched."
+  },
+  "themes": {
+    "neon": "Neon",
+    "parchment": "Parchment",
+    "forest": "Forest",
+    "ocean": "Ocean",
+    "sunset": "Sunset",
+    "rose": "Rose",
+    "lavender": "Lavender",
+    "midnight": "Midnight",
+    "ember": "Ember"
+  },
+  "selfie": {
+    "weCouldNotSee": "We could not see a face in that photo, so here is a random start. Try a clear, front-facing selfie.",
+    "photoReadingIsNot": "Photo reading is not switched on yet, so here is a random start.",
+    "theAiIsBusy": "The AI is busy right now, so here is a random start. Try again in a minute.",
+    "weCouldNotRead": "We could not read the photo this time, so here is a random start to edit.",
+    "theAvatarCannotShow": "The avatar cannot show {{what}} yet.",
+    "weMatchedYourSkin": "We matched your skin tone, hair, eye color and glasses. Fine-tune the face in the tabs below.{{beard}}",
+    "takeASelfie": "Take a selfie",
+    "chooseAPhoto": "Choose a photo",
+    "somethingWentWrongTry": "Something went wrong. Try again.",
+    "makeItLookLike": "Make it look like me",
+    "close": "Close",
+    "cancel": "Cancel",
+    "takeAClearFront": "Take a clear, front-facing selfie in good light. The AI picks your skin tone, hairstyle, hair color, eye color and glasses. Your photo is private, used once, then deleted.",
+    "workingOnYourAvatar": "Working on your avatar",
+    "uploadingYourPhoto": "Uploading your photo…",
+    "readingYourPhoto": "Reading your photo…",
+    "thisUsuallyTakes5": "This usually takes 5 to 15 seconds.",
+    "faceTheCameraNo": "Face the camera, no hat, hair visible.",
+    "openSettingsToAllow": "Open settings to allow camera and photos",
+    "openSettings": "Open settings",
+    "couldNotReadThat": "Could not read that photo.",
+    "thatPhotoIsStill": "That photo is still over 500 KB. Try another one.",
+    "couldNotOpenThe": "Could not open the camera or photos.",
+    "youAreSignedOut": "You are signed out. Sign in and try again.",
+    "couldNotUploadThe": "Could not upload the photo: {{message}}",
+    "youHaveMade10": "You have made 10 avatars from a photo today. Try again tomorrow.",
+    "yourLastPhotoIs": "Your last photo is still being read. Give it a moment.",
+    "thisFeatureIsNot": "This feature is not set up on the server yet (database update missing).",
+    "couldNotStartReading": "Could not start reading your photo. Try again.",
+    "facial": {
+      "stubble": "stubble",
+      "moustache": "a moustache",
+      "beard": "a beard",
+      "none": ""
+    }
+  },
+  "streakOutlook": {
+    "highRisk": "High Risk",
+    "moderate": "Moderate",
+    "onTrack": "On Track",
+    "notEnoughData": "Not enough data",
+    "sundays": "Sundays",
+    "mondays": "Mondays",
+    "tuesdays": "Tuesdays",
+    "wednesdays": "Wednesdays",
+    "thursdays": "Thursdays",
+    "fridays": "Fridays",
+    "saturdays": "Saturdays",
+    "weNeedFullDays": "We need {{MIN_DATA_DAYS}} full days of history to predict tomorrow.",
+    "yourFirstPredictionArrives": "Your first prediction arrives within the hour.",
+    "activeOfTheLast": "Active {{active7}} of the last {{window7}} days.",
+    "streakOutlookNotEnough": "Streak outlook: not enough data yet.",
+    "streakOutlookPercentChance": "Streak outlook: {{probability}} percent chance you complete a quest tomorrow. {{band}}.",
+    "moreToGo_one": "{{count}} more day to go.",
+    "moreToGo_other": "{{count}} more days to go.",
+    "weekdayLine": "{{day}}: {{active}} of {{total}}.",
+    "thatWeekday": "That weekday",
+    "alreadyDoneToday": "Already done something today.",
+    "tomorrow": "tomorrow"
+  },
+  "celebrations": {
+    "levelUpLevel": "Level up. Level {{toLevel}}, {{toTitle}}.",
+    "level": "Level {{toLevel}}: {{toTitle}}",
+    "levelNewTitle": "Level {{toLevel}} · new title",
+    "sharingIsNotAvailable": "Sharing is not available on this phone.",
+    "shareToInstagram": "Share to Instagram",
+    "couldNotCreateThe": "Could not create the image. Try again.",
+    "levelUp": "Level up",
+    "youWere": "You were",
+    "youAreNow": "You are now",
+    "growWhoAreYou": "GROW · Who are you becoming?",
+    "keepGrowing": "Keep growing",
+    "perfectDayAllQuests": "Perfect day. All {{questCount}} quests done.",
+    "perfectDay": "Perfect day",
+    "everyQuestDone": "Every quest done",
+    "allQuestsAcrossYour": "All {{questCount}} quests, across your pillars. This is who you are becoming.",
+    "beautiful": "Beautiful",
+    "level4": "Level {{level}}, {{title}}",
+    "maxLevel": "Max level",
+    "levelN": "Level {{level}}"
+  },
+  "questSearch": {
+    "searching": "Searching",
+    "searchAllQuestsE": "Search all quests, e.g. calm time with mom",
+    "searchTheQuestLibrary": "Search the quest library",
+    "findsQuestsByMeaning": "Finds quests by meaning, not just matching words",
+    "clearSearch": "Clear search",
+    "min": " · {{timeEstimateMinutes}} min",
+    "questXpRelevancePercent": "{{title}}. {{pillar}} quest, {{xpReward}} XP. Relevance {{relevance}} percent. {{description}}",
+    "tryTheSearchAgain": "Try the search again",
+    "tryAgain": "Try again",
+    "typeAtLeast3": "Type at least 3 letters.",
+    "searchingTheQuestLibrary": "Searching the quest library…",
+    "noQuestsFound": "No quests found.",
+    "topQuestsFor": "Top {{length}} quests for {{query}}",
+    "questLibraryBestMatches": "QUEST LIBRARY · BEST MATCHES",
+    "youLookOfflineSearch": "You look offline. Search needs a connection.",
+    "questSearchIsNot": "Quest search is not switched on yet.",
+    "searchIsWarmingUp": "Search is warming up. Try again in a moment.",
+    "searchFailedTryAgain": "Search failed. Try again.",
+    "relevant": "{{v1}}% relevant"
+  },
+  "skeletons": {
+    "loadingYourDay": "Loading your day",
+    "loadingYourInsights": "Loading your insights",
+    "loadingYourConversation": "Loading your conversation"
   }
 }

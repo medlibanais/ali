@@ -16,9 +16,11 @@ import PillarBar from '../components/PillarBar';
 import Screen from '../components/Screen';
 import SegmentedControl from '../components/SegmentedControl';
 import Skeleton from '../components/Skeleton';
+import { InsightsSkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
 import YearHeatmap from '../components/charts/YearHeatmap';
+import StreakGauge from '../components/charts/StreakGauge';
 import {
   pillarAverages,
   summarizePeriod,
@@ -28,6 +30,11 @@ import {
   type DayScore,
   type PeriodSummary,
 } from '../features/analytics/api';
+import {
+  explainPrediction,
+  predictionA11yLabel,
+  useStreakPrediction,
+} from '../features/analytics/streakPrediction';
 import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
@@ -157,6 +164,43 @@ function Pillars({ days }: { days: DayScore[] }) {
   );
 }
 
+// Predicted chance of completing a quest tomorrow (server, hourly).
+function StreakOutlook() {
+  const { t } = useTranslation();
+  const userId = useAppSelector((state) => state.auth.userId);
+  const prediction = useStreakPrediction(userId);
+  const p = prediction.data;
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        {t('insights.streakOutlook')}
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        {t('insights.chanceYouCompleteAt')}
+      </Txt>
+      {prediction.isError ? (
+        <EmptyState
+          title={t('insights.couldNotLoadYour2')}
+          body={t('insights.checkYourConnectionAnd')}
+        />
+      ) : p ? (
+        <View accessible accessibilityRole="summary" accessibilityLabel={predictionA11yLabel(p)}>
+          <StreakGauge probability={p.probability} />
+          <View style={styles.outlookNotes}>
+            {explainPrediction(p).map((line) => (
+              <Txt key={line} variant="caption" color={colors.inkSoft} align="center">
+                {line}
+              </Txt>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <Skeleton height={220} />
+      )}
+    </Card>
+  );
+}
+
 // The last 365 days of XP. Independent of the week/month switch above.
 function YearOfActivity() {
   const { t } = useTranslation();
@@ -278,14 +322,14 @@ export function InsightsScreen() {
 
       {loading ? (
         <View style={styles.section}>
-          <Skeleton height={140} style={styles.card} />
-          <Skeleton height={160} style={styles.card} />
-          <Skeleton height={180} style={styles.card} />
+          <InsightsSkeleton />
         </View>
       ) : (
         <View style={styles.section}>
           <Headline s={summary} period={period} />
           <Takeaways items={items} />
+
+          <StreakOutlook />
 
           <Pillars days={current} />
 
@@ -381,6 +425,10 @@ const styles = StyleSheet.create({
   },
   cardSubtitle: {
     marginBottom: spacing.md,
+  },
+  outlookNotes: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
   },
   headlineRow: {
     flexDirection: 'row',

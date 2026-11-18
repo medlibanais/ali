@@ -24,11 +24,11 @@ const CRISIS_RE =
 
 // Acute red flags only: these get a fixed "stop and get help" reply.
 const ACUTE_SYMPTOM_RE =
-  /(chest (pain|tight)|can'?t breathe|cannot breathe|trouble breathing|faint(ed|ing)?\b|black(ed)? ?out|passed out|broken (arm|leg|bone|wrist|ankle)|cough(ing)? (up )?blood|vomit(ing)? blood|numb(ness)? (in )?(my )?(face|arm)|severe (pain|bleeding)|bleeding (a lot|heavily))/;
+  /(chest (pain|tight|hurts?)|can'?t breathe|cannot breathe|trouble breathing|faint(ed|ing)?\b|black(ed)? ?out|passed out|broken (arm|leg|bone|wrist|ankle)|cough(ing)? (up )?blood|vomit(ing)? blood|numb(ness)? (in )?(my )?(face|arm)|severe (pain|bleeding)|bleeding (a lot|heavily))/;
 
 // Everyday wellbeing: handled by the model with a gentle-health rule.
 const WELLBEING_RE =
-  /(tired|exhausted|sick|ill\b|headache|migraine|fever|sore|cold\b|flu\b|stomach|cramp|injur|sprain|can'?t sleep|insomnia|stress|anxious|anxiety|overwhelm|burn(ed|t)? ?out|sad\b|down today|low energy|depress|lonely|hopeless)/;
+  /(tired|exhausted|dizz|light.?headed|vertigo|sick|ill\b|headache|migraine|fever|sore|cold\b|flu\b|stomach|cramp|injur|sprain|can'?t sleep|insomnia|stress|anxious|anxiety|overwhelm|burn(ed|t)? ?out|sad\b|down today|low energy|depress|lonely|hopeless)/;
 
 const OUT_OF_SCOPE_RE =
   /(dosage|dose of|how (much|many) (mg|ml|pills?)|prescri|antibiotic|ibuprofen|paracetamol|diagnos(e|is) me|lawyer|lawsuit|sue (him|her|them|my|the)|legal (advice|action)|contract review|stock market|which stocks?|buy (stocks?|shares|crypto|bitcoin)|invest(ing)? (my )?(money|savings) in|crypto(currency)? (tips|advice)|mortgage|tax return|file (my )?taxes|insurance claim)/;

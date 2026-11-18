@@ -18,7 +18,8 @@ export interface UserProfile {
   timezone: string;
   invite_code: string | null;
   stats_visibility: 'friends' | 'private';
-  theme_id: string;
+  /** Theme picked by the user, synced across devices. Null until they pick one. */
+  theme_preference: string | null;
   /** null until the user (or this device) picks one. */
   language: Language | null;
   dream_body: string | null;
@@ -101,7 +102,7 @@ export const fetchProfile = createAsyncThunk<
       timezone: p?.timezone ?? 'UTC',
       invite_code: p?.invite_code ?? null,
       stats_visibility: (p?.stats_visibility as 'friends' | 'private') ?? 'friends',
-      theme_id: p?.theme_id ?? 'parchment',
+      theme_preference: p?.theme_preference ?? null,
       language: isLanguage(p?.language) ? p.language : null,
       dream_body: g?.dream_body ?? null,
       dream_personality: g?.dream_personality ?? [],

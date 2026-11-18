@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AvatarConfig } from '../avatar/types';
 import { AiAvatarError } from '../lib/aiAvatar';
@@ -13,6 +13,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchProfile } from '../store/slices/userSlice';
 import { colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import LoadingDots from './LoadingDots';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -116,7 +117,7 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
             <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={t('photoreal.photoA11y')} />
           ) : busy ? (
             <View style={styles.center}>
-              <ActivityIndicator color={colors.accent} />
+              <LoadingDots color={colors.accent} accessibilityLabel={t('photoreal.makingA11y')} />
               <Txt variant="caption" color={colors.inkSoft}>{t('photoreal.making')}</Txt>
             </View>
           ) : (

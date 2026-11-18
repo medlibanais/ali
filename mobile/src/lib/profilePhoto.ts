@@ -46,7 +46,7 @@ export function openAppSettings(): void {
 }
 
 /** Decode base64 into a Uint8Array without the `atob` global. */
-function base64ToBytes(base64: string): Uint8Array {
+export function base64ToBytes(base64: string): Uint8Array {
   const chars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const lookup = new Map<string, number>();

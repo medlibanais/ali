@@ -62,12 +62,14 @@ import {
 } from '../avatar/types';
 import ColorPicker from '../components/ColorPicker';
 import PhotorealSheet from '../components/PhotorealSheet';
+import SelfieAvatarSheet from '../components/SelfieAvatarSheet';
 import {
   BackdropGlyph,
   CameraGlyph,
   CloseGlyph,
   CompareGlyph,
   DiceGlyph,
+  FaceGlyph,
   LockGlyph,
   RedoGlyph,
   ResetGlyph,
@@ -153,6 +155,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const [customFor, setCustomFor] = useState<AvatarChoiceKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [selfieOpen, setSelfieOpen] = useState(false);
   const undoStack = useRef<Draft[]>([]);
   const redoStack = useRef<Draft[]>([]);
   // Where a slider drag started, so the whole drag is one undo step.
@@ -407,8 +410,11 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               >
                 <CompareGlyph color={comparing ? colors.onAccent : colors.ink} />
               </RoundButton>
+              <RoundButton label={t('avatarCreator.makeItLookLike')} onPress={() => setSelfieOpen(true)} disabled={!config}>
+                <FaceGlyph />
+              </RoundButton>
             </View>
-            <View style={styles.row}>
+            <View style={[styles.row, styles.rowEnd]}>
               <RoundButton
                 label={t('avatarCreator.surpriseMeAWhole')}
                 onPress={() => config && commit(randomAvatarConfig(level))}
@@ -584,6 +590,17 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
         )}
       </View>
       <PhotorealSheet visible={photoOpen} config={config} onClose={() => setPhotoOpen(false)} />
+      <SelfieAvatarSheet
+        visible={selfieOpen}
+        config={config}
+        level={level}
+        onClose={() => setSelfieOpen(false)}
+        onApply={(next, note) => {
+          setSelfieOpen(false);
+          commit(next);
+          toast.showToast({ message: t('avatarCreator.tapSaveToKeep', { note }) });
+        }}
+      />
     </View>
   );
 }
@@ -962,6 +979,13 @@ const styles = themed(() =>
       bottom: radius.lg + spacing.sm,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      // Narrow phones: the right-hand group moves up a line instead of
+      // running off the screen.
+      flexWrap: 'wrap',
+      rowGap: spacing.sm,
+    },
+    rowEnd: {
+      marginStart: 'auto',
     },
     row: {
       flexDirection: 'row',

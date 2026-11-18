@@ -36,7 +36,8 @@
     "xp_zero": "{{formatted}} XP",
     "xp_two": "{{formatted}} XP",
     "xp_few": "{{formatted}} XP",
-    "xp_many": "{{formatted}} XP"
+    "xp_many": "{{formatted}} XP",
+    "loading2": "{{title}}، جارٍ التحميل"
   },
   "pillars": {
     "health": "الصحة",
@@ -133,7 +134,8 @@
     "remaining_zero": "بقي {{count}} اليوم.",
     "remaining_two": "بقي {{count}} اليوم.",
     "remaining_few": "بقي {{count}} اليوم.",
-    "remaining_many": "بقي {{count}} اليوم."
+    "remaining_many": "بقي {{count}} اليوم.",
+    "makingA11y": "جارٍ إنشاء صورتك"
   },
   "pillarBubble": {
     "a11y": "{{pillar}}، {{score}} بالمئة",
@@ -198,7 +200,8 @@
     "wasSkipped": "تم تخطي هذه المهمة.",
     "loadFailed": "تعذّر تحميل مهام اليوم.",
     "completeFailed": "تعذّر إنجاز هذه المهمة.",
-    "skipFailed": "تعذّر تخطي هذه المهمة."
+    "skipFailed": "تعذّر تخطي هذه المهمة.",
+    "rateLimited": "تمهّل قليلًا، ثم حاول مجددًا."
   },
   "errors": {
     "notSignedIn": "لم تسجّل الدخول.",
@@ -241,7 +244,9 @@
     "tooLong": "الرسالة طويلة جدًا. اجعلها أقل من {{max}} حرف.",
     "generic": "فقدت ذاتك المستقبلية الخيط للحظة. اضغط إعادة المحاولة.",
     "ratingFailed": "تعذّر حفظ التقييم.",
-    "sendFailed": "تعذّر إرسال الرسالة."
+    "sendFailed": "تعذّر إرسال الرسالة.",
+    "couldNotRefreshThe": "تعذّر تحديث عدد رسائل اليوم.",
+    "theConnectionDroppedBefore": "انقطع الاتصال قبل وصول الرد. اضغط على إعادة المحاولة لتسأل مجددًا."
   },
   "friendErrors": {
     "ownAccount": "هذا حسابك أنت.",
@@ -510,7 +515,8 @@
     "backOnlineSyncedOffline_zero": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
     "backOnlineSyncedOffline_two": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
     "backOnlineSyncedOffline_few": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
-    "backOnlineSyncedOffline_many": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال."
+    "backOnlineSyncedOffline_many": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
+    "openYourProfile": "افتح ملفك الشخصي"
   },
   "quests": {
     "all": "الكل",
@@ -524,7 +530,8 @@
     "nothingLeftToDo": "لا شيء متبقٍّ اليوم",
     "noQuestsLeftToday": "لا مهام {{pillar}} متبقية اليوم",
     "everythingInThisView": "كل ما هنا منجز أو متخطى. الغد يحمل مجموعة جديدة.",
-    "completed": "منجزة · {{length}}"
+    "completed": "منجزة · {{length}}",
+    "completedA11y": "المهام المكتملة، {{count}}"
   },
   "questDetail": {
     "easy": "سهلة",
@@ -586,7 +593,18 @@
     "leftToday_zero": "بقيت {{count}} رسائل اليوم",
     "leftToday_two": "بقيت {{count}} رسائل اليوم",
     "leftToday_few": "بقيت {{count}} رسائل اليوم",
-    "leftToday_many": "بقيت {{count}} رسائل اليوم"
+    "leftToday_many": "بقيت {{count}} رسائل اليوم",
+    "reconnecting": "جارٍ إعادة الاتصال…",
+    "stopGenerating": "إيقاف الكتابة",
+    "aFewHours": "بضع ساعات",
+    "limitReachedA11y": "بلغت الحد اليومي. يعود مدربك بعد {{time}}",
+    "usedAll": "استخدمت كل رسائلك اليوم ({{limit}}). يعود مدربك عند منتصف الليل.",
+    "youHaveLeft_zero": "لم تتبقَّ لك رسائل اليوم.",
+    "youHaveLeft_one": "تبقّت لك رسالة واحدة اليوم.",
+    "youHaveLeft_two": "تبقّت لك رسالتان اليوم.",
+    "youHaveLeft_few": "تبقّت لك {{count}} رسائل اليوم.",
+    "youHaveLeft_many": "تبقّت لك {{count}} رسالة اليوم.",
+    "youHaveLeft_other": "تبقّت لك {{count}} رسالة اليوم."
   },
   "insights": {
     "thisWeek": "هذا الأسبوع",
@@ -626,7 +644,7 @@
     "showItOff": "اعرضه",
     "showedUp": "حضرت {{active}} من {{total}} أيام وأنجزت {{rate}}% من مهامك.",
     "strongest": "{{pillar}} هي أقوى ركائزك ({{value}}/100).",
-    "weakest": "{{pillar}} تحتاج أكبر قدر من الاهتمام ({{value}}/100). مهمة واحدة غدًا تصنع الفرق.",
+    "weakest": "{{pillar}} تحتاج أكبر قدر من الاهتمام ({{value}}/100). مهمة {{lower}} واحدة غدًا تصنع الفرق.",
     "bestDay": "{{day}} هو عادة أفضل أيامك.",
     "noQuestsFinishedYet_week": "لم تُنجز أي مهمة هذا الأسبوع بعد. مهمة صغيرة اليوم تحرّك الأمور.",
     "noQuestsFinishedYet_month": "لم تُنجز أي مهمة هذا الشهر بعد. مهمة صغيرة اليوم تحرّك الأمور.",
@@ -637,7 +655,10 @@
     "steadyComparedWithLast_week": "ثابت مقارنة بالأسبوع الماضي. الاستمرارية هي ما يرسّخ العادات.",
     "steadyComparedWithLast_month": "ثابت مقارنة بالشهر الماضي. الاستمرارية هي ما يرسّخ العادات.",
     "vsLast_week": "{{arrow}} {{diff}} مقارنة بالأسبوع الماضي",
-    "vsLast_month": "{{arrow}} {{diff}} مقارنة بالشهر الماضي"
+    "vsLast_month": "{{arrow}} {{diff}} مقارنة بالشهر الماضي",
+    "streakOutlook": "توقّع السلسلة",
+    "chanceYouCompleteAt": "احتمال أن تُكمل مهمة واحدة على الأقل غدًا. يُحدَّث كل ساعة.",
+    "couldNotLoadYour2": "تعذّر تحميل التوقّع"
   },
   "profile": {
     "yourExportIsReady": "ملف التصدير جاهز. المشاركة غير متاحة على هذا الجهاز.",
@@ -939,7 +960,9 @@
     "startFromMyCurrent": "البدء من صورتي الرمزية الحالية",
     "startFromTheLook": "البدء من إطلالة {{label}}",
     "pickACustomColor": "{{title}}: اختر لونًا مخصصًا",
-    "unlocksAtLevelSuffix": "، تُفتح في المستوى {{level}}"
+    "unlocksAtLevelSuffix": "، تُفتح في المستوى {{level}}",
+    "makeItLookLike": "اجعله يشبهني: أنشئ الأفاتار من صورة سيلفي",
+    "tapSaveToKeep": "{{note}} اضغط على حفظ للاحتفاظ به."
   },
   "options": {
     "muslim": "مسلم",
@@ -1586,5 +1609,128 @@
     "yara": "يارا",
     "yellow": "أصفر",
     "younger": "أصغر سنًا"
+  },
+  "themes": {
+    "neon": "نيون",
+    "parchment": "رق",
+    "forest": "غابة",
+    "ocean": "محيط",
+    "sunset": "غروب",
+    "rose": "وردي",
+    "lavender": "خزامى",
+    "midnight": "منتصف الليل",
+    "ember": "جمر"
+  },
+  "selfie": {
+    "weCouldNotSee": "لم نجد وجهًا في هذه الصورة، فإليك بداية عشوائية. جرّب صورة سيلفي واضحة من الأمام.",
+    "photoReadingIsNot": "قراءة الصور غير مفعّلة بعد، فإليك بداية عشوائية.",
+    "theAiIsBusy": "الذكاء الاصطناعي مشغول الآن، فإليك بداية عشوائية. حاول مجددًا بعد دقيقة.",
+    "weCouldNotRead": "تعذّرت قراءة الصورة هذه المرة، فإليك بداية عشوائية لتعدّلها.",
+    "theAvatarCannotShow": "لا يستطيع الأفاتار إظهار {{what}} بعد.",
+    "weMatchedYourSkin": "طابقنا لون بشرتك وشعرك ولون عينيك ونظارتك. عدّل الوجه بدقة من التبويبات أدناه.{{beard}}",
+    "takeASelfie": "التقط صورة سيلفي",
+    "chooseAPhoto": "اختر صورة",
+    "somethingWentWrongTry": "حدث خطأ ما. حاول مجددًا.",
+    "makeItLookLike": "اجعله يشبهني",
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "takeAClearFront": "التقط صورة سيلفي واضحة من الأمام في إضاءة جيدة. يختار الذكاء الاصطناعي لون بشرتك وتسريحتك ولون شعرك ولون عينيك ونظارتك. صورتك خاصة، تُستخدم مرة واحدة ثم تُحذف.",
+    "workingOnYourAvatar": "جارٍ العمل على الأفاتار",
+    "uploadingYourPhoto": "جارٍ رفع صورتك…",
+    "readingYourPhoto": "جارٍ قراءة صورتك…",
+    "thisUsuallyTakes5": "يستغرق هذا عادةً من 5 إلى 15 ثانية.",
+    "faceTheCameraNo": "انظر إلى الكاميرا، بدون قبعة، والشعر ظاهر.",
+    "openSettingsToAllow": "افتح الإعدادات للسماح بالكاميرا والصور",
+    "openSettings": "افتح الإعدادات",
+    "couldNotReadThat": "تعذّرت قراءة هذه الصورة.",
+    "thatPhotoIsStill": "ما زال حجم هذه الصورة أكبر من 500 كيلوبايت. جرّب صورة أخرى.",
+    "couldNotOpenThe": "تعذّر فتح الكاميرا أو الصور.",
+    "youAreSignedOut": "لقد سجّلت الخروج. سجّل الدخول وحاول مجددًا.",
+    "couldNotUploadThe": "تعذّر رفع الصورة: {{message}}",
+    "youHaveMade10": "أنشأت 10 أفاتارات من صورة اليوم. حاول مجددًا غدًا.",
+    "yourLastPhotoIs": "ما زالت صورتك الأخيرة قيد القراءة. انتظر قليلًا.",
+    "thisFeatureIsNot": "هذه الميزة غير مُعدّة على الخادم بعد (تحديث قاعدة البيانات ناقص).",
+    "couldNotStartReading": "تعذّر بدء قراءة صورتك. حاول مجددًا.",
+    "facial": {
+      "stubble": "لحية خفيفة",
+      "moustache": "شاربًا",
+      "beard": "لحية",
+      "none": ""
+    }
+  },
+  "streakOutlook": {
+    "highRisk": "خطر مرتفع",
+    "moderate": "متوسط",
+    "onTrack": "على المسار الصحيح",
+    "notEnoughData": "بيانات غير كافية",
+    "sundays": "أيام الأحد",
+    "mondays": "أيام الاثنين",
+    "tuesdays": "أيام الثلاثاء",
+    "wednesdays": "أيام الأربعاء",
+    "thursdays": "أيام الخميس",
+    "fridays": "أيام الجمعة",
+    "saturdays": "أيام السبت",
+    "weNeedFullDays": "نحتاج إلى {{MIN_DATA_DAYS}} أيام كاملة من السجل لنتوقّع الغد.",
+    "yourFirstPredictionArrives": "يصل أول توقّع لك خلال ساعة.",
+    "activeOfTheLast": "نشِط {{active7}} من آخر {{window7}} أيام.",
+    "streakOutlookNotEnough": "توقّع السلسلة: لا توجد بيانات كافية بعد.",
+    "streakOutlookPercentChance": "توقّع السلسلة: احتمال {{probability}} بالمئة أن تُكمل مهمة غدًا. {{band}}.",
+    "moreToGo_zero": "لم يتبقَّ شيء.",
+    "moreToGo_one": "تبقّى يوم واحد.",
+    "moreToGo_two": "تبقّى يومان.",
+    "moreToGo_few": "تبقّت {{count}} أيام.",
+    "moreToGo_many": "تبقّى {{count}} يومًا.",
+    "moreToGo_other": "تبقّى {{count}} يوم.",
+    "weekdayLine": "{{day}}: {{active}} من {{total}}.",
+    "thatWeekday": "ذلك اليوم من الأسبوع",
+    "alreadyDoneToday": "أنجزت شيئًا اليوم بالفعل.",
+    "tomorrow": "غدًا"
+  },
+  "celebrations": {
+    "levelUpLevel": "ارتقيت مستوى. المستوى {{toLevel}}، {{toTitle}}.",
+    "level": "المستوى {{toLevel}}: {{toTitle}}",
+    "levelNewTitle": "المستوى {{toLevel}} · لقب جديد",
+    "sharingIsNotAvailable": "المشاركة غير متاحة على هذا الهاتف.",
+    "shareToInstagram": "شارك على إنستغرام",
+    "couldNotCreateThe": "تعذّر إنشاء الصورة. حاول مجددًا.",
+    "levelUp": "ارتقيت مستوى",
+    "youWere": "كنت",
+    "youAreNow": "أصبحت الآن",
+    "growWhoAreYou": "GROW · من تصبح؟",
+    "keepGrowing": "واصل النمو",
+    "perfectDayAllQuests": "يوم مثالي. أنجزت كل المهام ({{questCount}}).",
+    "perfectDay": "يوم مثالي",
+    "everyQuestDone": "أنجزت كل المهام",
+    "allQuestsAcrossYour": "كل المهام ({{questCount}}) في جميع ركائزك. هذا هو الشخص الذي تصبحه.",
+    "beautiful": "رائع",
+    "level4": "المستوى {{level}}، {{title}}",
+    "maxLevel": "أعلى مستوى",
+    "levelN": "المستوى {{level}}"
+  },
+  "questSearch": {
+    "searching": "جارٍ البحث",
+    "searchAllQuestsE": "ابحث في كل المهام، مثل: وقت هادئ مع أمي",
+    "searchTheQuestLibrary": "ابحث في مكتبة المهام",
+    "findsQuestsByMeaning": "يجد المهام حسب المعنى، لا مطابقة الكلمات فقط",
+    "clearSearch": "مسح البحث",
+    "min": " · {{timeEstimateMinutes}} دقيقة",
+    "questXpRelevancePercent": "{{title}}. مهمة {{pillar}}، {{xpReward}} نقطة خبرة. الملاءمة {{relevance}} بالمئة. {{description}}",
+    "tryTheSearchAgain": "أعد البحث",
+    "tryAgain": "حاول مجددًا",
+    "typeAtLeast3": "اكتب 3 أحرف على الأقل.",
+    "searchingTheQuestLibrary": "جارٍ البحث في مكتبة المهام…",
+    "noQuestsFound": "لم يتم العثور على مهام.",
+    "topQuestsFor": "أفضل {{length}} مهام لـ {{query}}",
+    "questLibraryBestMatches": "مكتبة المهام · أفضل النتائج",
+    "youLookOfflineSearch": "يبدو أنك غير متصل. البحث يحتاج إلى اتصال.",
+    "questSearchIsNot": "البحث في المهام غير مفعّل بعد.",
+    "searchIsWarmingUp": "البحث قيد التجهيز. حاول مجددًا بعد لحظة.",
+    "searchFailedTryAgain": "فشل البحث. حاول مجددًا.",
+    "relevant": "ملاءمة {{v1}}%"
+  },
+  "skeletons": {
+    "loadingYourDay": "جارٍ تحميل يومك",
+    "loadingYourInsights": "جارٍ تحميل إحصاءاتك",
+    "loadingYourConversation": "جارٍ تحميل محادثتك"
   }
 }
