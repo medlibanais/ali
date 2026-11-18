@@ -1,0 +1,96 @@
+# Deploys the GROW web app to Netlify.
+# Triggered only when the CI workflow finishes SUCCESSFULLY for a push to
+# main (a merged PR or a direct push). If any CI job fails, nothing deploys.
+name: Deploy web to Netlify
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-netlify-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Export web build and deploy
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      # Baked into the JS bundle at export time. The anon key is public by
+      # design (RLS protects every table); Groq/FAL keys never come here.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      # Deploy exactly the commit CI tested, not whatever main is now.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Check secrets are set
+        run: |
+          missing=0
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY NETLIFY_AUTH_TOKEN NETLIFY_SITE_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing secret::$name is not set in Settings > Secrets and variables > Actions"
+              missing=1
+            fi
+          done
+          case "$EXPO_PUBLIC_SUPABASE_URL" in
+            https://*) ;;
+            *) [ -n "$EXPO_PUBLIC_SUPABASE_URL" ] && echo "::error::EXPO_PUBLIC_SUPABASE_URL must be the https:// Supabase Cloud URL" && missing=1 ;;
+          esac
+          exit $missing
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Export web build (npx expo export -p web)
+        run: npx expo export -p web --output-dir dist
+
+      # Project rules: dist must hold _redirects (SPA routing) and .nojekyll,
+      # and netlify.toml with skip_processing so fonts are not corrupted.
+      - name: Add and verify Netlify files
+        run: |
+          [ -f dist/_redirects ] || printf '/*    /index.html   200\n' > dist/_redirects
+          [ -f dist/.nojekyll ] || : > dist/.nojekyll
+          cp netlify.toml dist/netlify.toml
+          grep -q '^/\*[[:space:]]\+/index.html[[:space:]]\+200' dist/_redirects
+          grep -q 'skip_processing = true' dist/netlify.toml
+          test -f dist/index.html
+          # The live Supabase URL must be in the bundle (not a placeholder).
+          grep -rqF "$EXPO_PUBLIC_SUPABASE_URL" dist/_expo
+          ls -la dist
+          du -sh dist
+
+      - name: Deploy to Netlify (production)
+        run: |
+          npx --yes netlify-cli@17.38.1 deploy \
+            --dir dist \
+            --prod \
+            --site "$NETLIFY_SITE_ID" \
+            --message "GitHub Actions: ${{ github.event.workflow_run.head_sha }}" \
+            --json > deploy.json
+          node -e "const d=require('./deploy.json'); console.log('Live at', d.url); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Deployed to Netlify\n' + d.url + '\n')"

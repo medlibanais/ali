@@ -17,6 +17,7 @@ import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
 import YearHeatmap from '../components/charts/YearHeatmap';
+import StreakGauge from '../components/charts/StreakGauge';
 import {
   pillarAverages,
   summarizePeriod,
@@ -26,6 +27,11 @@ import {
   type DayScore,
   type PeriodSummary,
 } from '../features/analytics/api';
+import {
+  explainPrediction,
+  predictionA11yLabel,
+  useStreakPrediction,
+} from '../features/analytics/streakPrediction';
 import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
@@ -144,6 +150,42 @@ function Pillars({ days }: { days: DayScore[] }) {
       {avgs.map((p) => (
         <PillarBar key={p.pillar} pillar={p.pillar} value={p.value} />
       ))}
+    </Card>
+  );
+}
+
+// Predicted chance of completing a quest tomorrow (server, hourly).
+function StreakOutlook() {
+  const userId = useAppSelector((state) => state.auth.userId);
+  const prediction = useStreakPrediction(userId);
+  const p = prediction.data;
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        Streak outlook
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        Chance you complete at least one quest tomorrow. Updated every hour.
+      </Txt>
+      {prediction.isError ? (
+        <EmptyState
+          title="Could not load your outlook"
+          body="Check your connection and open Insights again."
+        />
+      ) : p ? (
+        <View accessible accessibilityRole="summary" accessibilityLabel={predictionA11yLabel(p)}>
+          <StreakGauge probability={p.probability} />
+          <View style={styles.outlookNotes}>
+            {explainPrediction(p).map((line) => (
+              <Txt key={line} variant="caption" color={colors.inkSoft} align="center">
+                {line}
+              </Txt>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <Skeleton height={220} />
+      )}
     </Card>
   );
 }
@@ -275,6 +317,8 @@ export function InsightsScreen() {
           <Headline s={summary} period={period} />
           <Takeaways items={items} />
 
+          <StreakOutlook />
+
           <Pillars days={current} />
 
           <YearOfActivity />
@@ -369,6 +413,10 @@ const styles = StyleSheet.create({
   },
   cardSubtitle: {
     marginBottom: spacing.md,
+  },
+  outlookNotes: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
   },
   headlineRow: {
     flexDirection: 'row',

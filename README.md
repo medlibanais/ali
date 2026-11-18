@@ -177,3 +177,7 @@ Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 RLS on every table (privacy matrix proven in `tests/e2e.ps1`), no secrets in
 the client bundle, server-side rate limiting (auth, coach 20/day, quest
 limits), no PII in logs. See `SECURITY.md` for the dependency audit posture.
+
+## CI/CD
+
+GitHub Actions runs typecheck, unit tests, the API E2E script and Detox on every push to `main`, and deploys the web app to Netlify when all of it passes. Setup and secrets: [docs/ci-cd.md](docs/ci-cd.md).

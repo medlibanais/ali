@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { unregisterDeviceForPush } from '../../lib/notifications';
 
 export type AuthStatus =
   | 'restoring'
@@ -150,6 +151,8 @@ export const resendVerification = createAsyncThunk<
 });
 
 export const logout = createAsyncThunk<void, void>('auth/logout', async () => {
+  // Stop this phone getting the signed-out user's pushes.
+  await unregisterDeviceForPush();
   await supabase.auth.signOut();
 });
 
