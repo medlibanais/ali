@@ -7,14 +7,21 @@
 // token budget before it is sent (_shared/tokenBudget.ts). 20 messages/day, enforced here — never trust the
 // client counter, and count it across all of the user's conversations so
 // starting a new chat does not reset it.
+//
+// Request modes (POST JSON):
+//   { message, conversation_id?, stream: true }  -> text/event-stream
+//       events: meta, delta, replace, done, error (see streamReply below)
+//   { message, conversation_id? }                 -> one JSON reply (older apps)
+//   { status: true }                              -> today's count + reset time
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import {
   classifyIntent,
   isDeterministic,
   safetyResponse,
 } from '../_shared/intents.ts';
-import { callGroq, type ChatTurn, hasGroqKey } from '../_shared/llm.ts';
+import { callGroq, type ChatTurn, hasGroqKey, streamGroq } from '../_shared/llm.ts';
+import { ReplyShaper, sseFrame } from '../_shared/coachStream.ts';
 import {
   buildCompactSystemPrompt,
   buildSystemPrompt,
@@ -70,9 +77,13 @@ Deno.serve(async (req: Request) => {
 
     let message = '';
     let requestedConversation: string | null = null;
+    let wantsStream = false;
+    let wantsStatus = false;
     try {
       const body = await req.json();
       message = typeof body?.message === 'string' ? body.message.trim() : '';
+      wantsStream = body?.stream === true;
+      wantsStatus = body?.status === true;
       if (body?.conversation_id != null) {
         if (
           typeof body.conversation_id !== 'string' ||
@@ -85,24 +96,12 @@ Deno.serve(async (req: Request) => {
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
-    if (message.length === 0) return json({ error: 'empty_message' }, 400);
-    if (message.length > INPUT_MAX) {
-      return json({ error: 'message_too_long', max: INPUT_MAX }, 400);
-    }
-
-    // Safety replies are rule-based and always work. Anything that needs the
-    // model fails loudly when the key is missing, instead of quietly
-    // answering with canned text that looks like a broken coach.
-    const intent = classifyIntent(message);
-    if (!isDeterministic(intent) && !hasGroqKey()) {
-      console.error('coach not configured: GROQ_API_KEY is not set');
-      return json({ error: 'not_configured' }, 503);
-    }
-
     // Service client for rate limiting + writes (user already authenticated).
     const admin = createClient(supabaseUrl, serviceKey);
 
     // ---- daily limit (user's timezone, server-side) ----
+    // The day ends at midnight in profiles.timezone (day_bounds_in_tz), so
+    // the app's countdown uses resets_at from here, not the phone's clock.
     const { data: profile } = await admin
       .from('profiles')
       .select('timezone, first_name')
@@ -119,6 +118,42 @@ Deno.serve(async (req: Request) => {
       bounds?.d ?? new Date().toISOString().slice(0, 10);
     const dayStart = bounds?.day_start ?? `${today}T00:00:00Z`;
     const dayEnd = bounds?.day_end ?? `${today}T23:59:59.999Z`;
+    const resetsAt = new Date(dayEnd).toISOString();
+
+    const { count: sentCount } = await admin
+      .from('messages')
+      .select('id, conversations!inner(user_id)', { count: 'exact', head: true })
+      .eq('conversations.user_id', user.id)
+      .eq('role', 'user')
+      .gte('created_at', dayStart)
+      .lt('created_at', dayEnd);
+    const sentToday = sentCount ?? 0;
+
+    if (wantsStatus) {
+      return json(
+        {
+          limit: DAILY_LIMIT,
+          sent_today: sentToday,
+          remaining_today: Math.max(0, DAILY_LIMIT - sentToday),
+          resets_at: resetsAt,
+        },
+        200,
+      );
+    }
+
+    if (message.length === 0) return json({ error: 'empty_message' }, 400);
+    if (message.length > INPUT_MAX) {
+      return json({ error: 'message_too_long', max: INPUT_MAX }, 400);
+    }
+
+    // Safety replies are rule-based and always work. Anything that needs the
+    // model fails loudly when the key is missing, instead of quietly
+    // answering with canned text that looks like a broken coach.
+    const intent = classifyIntent(message);
+    if (!isDeterministic(intent) && !hasGroqKey()) {
+      console.error('coach not configured: GROQ_API_KEY is not set');
+      return json({ error: 'not_configured' }, 503);
+    }
 
     // The client names the chat it is showing (it can start new ones);
     // otherwise use the newest. Ownership is checked because this client
@@ -154,20 +189,13 @@ Deno.serve(async (req: Request) => {
       conversationId = created.id as string;
     }
 
-    const { count: sentToday } = await admin
-      .from('messages')
-      .select('id, conversations!inner(user_id)', { count: 'exact', head: true })
-      .eq('conversations.user_id', user.id)
-      .eq('role', 'user')
-      .gte('created_at', dayStart)
-      .lt('created_at', dayEnd);
-
-    if ((sentToday ?? 0) >= DAILY_LIMIT) {
+    if (sentToday >= DAILY_LIMIT) {
       return json(
         {
           error: 'rate_limit_exceeded',
           message: 'Daily message limit reached. Resets at midnight.',
           remaining_today: 0,
+          resets_at: resetsAt,
         },
         429,
       );
@@ -352,14 +380,7 @@ Deno.serve(async (req: Request) => {
       weakest_pillars: pillarAverages(ctx).weakestTwo,
     };
 
-    // ---- intent routing: safety first, LLM second ----
-    let reply: string;
-    let model = 'safety-rules';
-    let degraded = false;
-
-    if (isDeterministic(intent)) {
-      reply = safetyResponse(intent);
-    } else {
+    const buildTurns = (): ChatTurn[] => {
       const history: ChatTurn[] = (historyRes.data ?? [])
         .reverse()
         .map((m: { role: 'user' | 'assistant'; content: string }) => ({
@@ -371,7 +392,7 @@ Deno.serve(async (req: Request) => {
         tail.push({
           role: 'system',
           content:
-            'They seem tired, stressed, unwell or low. Lead with care, offer a lighter day, no diagnosis or medication.',
+            'They seem tired, stressed, unwell or low. Lead with care, offer a lighter day, no diagnosis or medication. If they feel dizzy or unwell: tell them to sit down, drink some water and rest, and to get medical help if it is severe or does not pass. Never turn a health issue into a quest or XP.',
         });
       }
       tail.push({ role: 'user', content: message });
@@ -393,7 +414,34 @@ Deno.serve(async (req: Request) => {
           truncated: fit.truncated,
         });
       }
-      const turns = fit.turns;
+      return fit.turns;
+    };
+
+    if (wantsStream) {
+      return streamReply({
+        admin,
+        conversationId,
+        message,
+        intent,
+        safetyReply: isDeterministic(intent) ? safetyResponse(intent) : null,
+        turns: isDeterministic(intent) ? [] : buildTurns(),
+        fallback: () => fallbackReply(ctx),
+        remainingToday: DAILY_LIMIT - sentToday - 1,
+        resetsAt,
+        contextUsed,
+        suggestions: suggestions(ctx),
+      });
+    }
+
+    // ---- intent routing: safety first, LLM second ----
+    let reply: string;
+    let model = 'safety-rules';
+    let degraded = false;
+
+    if (isDeterministic(intent)) {
+      reply = safetyResponse(intent);
+    } else {
+      const turns = buildTurns();
 
       const llm = await callGroq(turns, {
         maxTokens: 220,
@@ -441,7 +489,8 @@ Deno.serve(async (req: Request) => {
         conversation_id: conversationId,
         user_message: userRow,
         ai_message: aiRow,
-        remaining_today: DAILY_LIMIT - (sentToday ?? 0) - 1,
+        remaining_today: DAILY_LIMIT - sentToday - 1,
+        resets_at: resetsAt,
         context_used: contextUsed,
         suggestions: suggestions(ctx),
         intent,
@@ -459,6 +508,180 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+// ---- streaming reply -------------------------------------------------------
+
+interface StreamArgs {
+  admin: SupabaseClient;
+  conversationId: string;
+  message: string;
+  intent: string;
+  /** Rule-based answer (crisis, acute medical...). Never goes to the model. */
+  safetyReply: string | null;
+  turns: ChatTurn[];
+  fallback: () => string;
+  remainingToday: number;
+  resetsAt: string;
+  contextUsed: Record<string, unknown>;
+  suggestions: string[];
+}
+
+type EdgeRuntimeLike = { waitUntil(p: Promise<unknown>): void };
+
+/**
+ * Server-Sent Events:
+ *   meta   { conversation_id, user_message, remaining_today, resets_at, ... }
+ *          sent once the user's message is saved (so it counts at once)
+ *   delta  { text }  a piece of the reply, already safety-shaped
+ *   done   { ai_message, text, model, degraded, remaining_today, resets_at }
+ *          text is the saved reply; the app shows it in place of the deltas
+ *   error  { error }
+ * If the app goes away (Stop, lost signal) the model call is aborted and
+ * whatever was already written is saved, so the chat history matches what
+ * the person saw.
+ */
+function streamReply(a: StreamArgs): Response {
+  const encoder = new TextEncoder();
+  const groqAbort = new AbortController();
+  let clientGone = false;
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (event: string, data: unknown) => {
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(sseFrame(event, data)));
+        } catch {
+          clientGone = true;
+        }
+      };
+      const close = () => {
+        if (clientGone) return;
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
+      };
+
+      const work = (async () => {
+        // The user's message is saved first: it is what the daily limit
+        // counts, so a dropped stream cannot dodge the limit.
+        const { data: userRow, error: userError } = await a.admin
+          .from('messages')
+          .insert({ conversation_id: a.conversationId, role: 'user', content: a.message })
+          .select('id, content, created_at')
+          .single();
+        if (!userRow) {
+          console.error('coach message insert', userError?.message);
+          send('error', { error: 'storage_failed' });
+          close();
+          return;
+        }
+        send('meta', {
+          conversation_id: a.conversationId,
+          user_message: userRow,
+          remaining_today: a.remainingToday,
+          resets_at: a.resetsAt,
+          intent: a.intent,
+          context_used: a.contextUsed,
+          suggestions: a.suggestions,
+        });
+
+        let reply: string | null;
+        let model = 'safety-rules';
+        let degraded = false;
+        if (a.safetyReply !== null) {
+          reply = a.safetyReply;
+          send('delta', { text: reply });
+        } else {
+          const shaper = new ReplyShaper();
+          let banned = false;
+          let llmError: string | null = null;
+          try {
+            for await (
+              const ev of streamGroq(a.turns, {
+                maxTokens: 220,
+                temperature: 0.8,
+                timeoutMs: 12000,
+                idleTimeoutMs: 8000,
+                retries: 1,
+                useFallbackModel: true,
+                signal: groqAbort.signal,
+              })
+            ) {
+              if (ev.type === 'start') {
+                model = ev.model;
+                continue;
+              }
+              const step = shaper.push(ev.text);
+              if (step.banned) {
+                banned = true;
+                break;
+              }
+              if (step.emit) send('delta', { text: step.emit });
+              if (step.full) break;
+            }
+          } catch (e) {
+            llmError = e instanceof Error ? e.message : 'unknown';
+          }
+          reply = banned ? null : shaper.finish();
+          if (clientGone) {
+            // Stopped or disconnected: keep only what was really written.
+            if (!reply) return;
+          } else if (!reply) {
+            reply = a.fallback();
+            degraded = true;
+            model = `fallback(${banned ? 'filtered' : llmError ?? 'empty'})`;
+            console.error('coach llm fallback', model);
+          }
+        }
+
+        const { data: aiRow, error: aiError } = await a.admin
+          .from('messages')
+          .insert({ conversation_id: a.conversationId, role: 'assistant', content: reply })
+          .select('id, content, created_at')
+          .single();
+        if (!aiRow) {
+          console.error('coach message insert', aiError?.message);
+          send('error', { error: 'storage_failed' });
+          close();
+          return;
+        }
+        send('done', {
+          ai_message: aiRow,
+          text: aiRow.content,
+          model,
+          degraded,
+          remaining_today: a.remainingToday,
+          resets_at: a.resetsAt,
+        });
+        close();
+      })().catch((e) => {
+        console.error('coach stream', e instanceof Error ? e.message : e);
+        send('error', { error: 'internal' });
+        close();
+      });
+
+      // Let the save finish even after the app hangs up.
+      (globalThis as { EdgeRuntime?: EdgeRuntimeLike }).EdgeRuntime?.waitUntil(work);
+    },
+    cancel() {
+      clientGone = true;
+      groqAbort.abort();
+    },
+  });
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
