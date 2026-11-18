@@ -8,6 +8,8 @@ import analyticsReducer from './slices/analyticsSlice';
 import themeReducer from './slices/themeSlice';
 import syncReducer from './slices/syncSlice';
 import { syncMachineMiddleware } from './syncMachineMiddleware';
+import celebrationsReducer from './slices/celebrationsSlice';
+import { celebrationMiddleware } from './celebrationMiddleware';
 import { THEMES } from '../theme/themes';
 import { applyThemeColors } from '../theme/tokens';
 
@@ -21,8 +23,10 @@ export const store = configureStore({
     analytics: analyticsReducer,
     theme: themeReducer,
     sync: syncReducer,
+    celebrations: celebrationsReducer,
   },
-  middleware: (getDefault) => getDefault().concat(syncMachineMiddleware),
+  middleware: (getDefault) =>
+    getDefault().prepend(celebrationMiddleware.middleware).concat(syncMachineMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

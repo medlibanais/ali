@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import TypingDots from '../components/TypingDots';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -34,9 +35,13 @@ import {
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   chatErrorCleared,
+  DAILY_MESSAGE_LIMIT,
   fetchChatHistory,
+  isLocalMessage,
   isPendingMessage,
+  LOW_MESSAGES_WARNING,
   MESSAGE_MAX_LENGTH,
+  refreshCoachQuota,
   remainingMessages,
   sendChatMessage,
   setMessageFeedback,
@@ -54,6 +59,8 @@ import {
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
+const DAILY_LIMIT_LABEL = DAILY_MESSAGE_LIMIT;
+
 const DEFAULT_QUICK_REPLIES = [
   'Am I on track?',
   'Motivate me',
@@ -61,7 +68,49 @@ const DEFAULT_QUICK_REPLIES = [
 ];
 
 /** Shown in the subtitle once the daily allowance runs low. */
-const LOW_REMAINING = 5;
+const LOW_REMAINING = LOW_MESSAGES_WARNING;
+
+/** Next local midnight, used only until the server has told us its reset. */
+function localMidnight(): number {
+  const d = new Date();
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  return [h, m, sec].map((n) => `${n}`.padStart(2, '0')).join(':');
+}
+
+/** Ticks once a second until the server's daily reset; null when off. */
+function useCountdown(active: boolean, resetsAt: string | null, onEnd: () => void) {
+  const [left, setLeft] = useState<number | null>(null);
+  const endRef = useRef(onEnd);
+  endRef.current = onEnd;
+  useEffect(() => {
+    if (!active) {
+      setLeft(null);
+      return undefined;
+    }
+    const target = resetsAt ? Date.parse(resetsAt) : localMidnight();
+    let ended = false;
+    const tick = () => {
+      const ms = target - Date.now();
+      setLeft(Math.max(0, ms));
+      if (ms <= 0 && !ended) {
+        ended = true;
+        endRef.current();
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [active, resetsAt]);
+  return left;
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -84,20 +133,42 @@ function CoachBackdrop() {
   );
 }
 
-function TypingBubble() {
+/** The reply being written: dots first, then the words as they arrive. */
+const StreamingBubble = React.memo(function StreamingBubble({
+  text,
+  phase,
+}: {
+  text: string;
+  phase: 'waiting' | 'streaming' | 'reconnecting';
+}) {
+  const reconnecting = phase === 'reconnecting';
   return (
     <View style={[styles.bubbleRow, styles.coachRow]}>
-      <View
-        style={[styles.bubble, styles.coachBubble, styles.typingBubble]}
-        accessibilityLabel="Coach is typing"
-      >
-        <Skeleton width={140} height={12} style={styles.typingLine} />
-        <Skeleton width={110} height={12} style={styles.typingLine} />
-        <Skeleton width={70} height={12} />
+      <View style={styles.bubbleColumn}>
+        <View
+          style={[styles.bubble, styles.coachBubble, !text && styles.typingBubble]}
+          accessibilityLabel={text ? undefined : 'Coach is typing'}
+          accessibilityLiveRegion="polite"
+        >
+          {text ? (
+            <Txt variant="body" color={colors.ink} style={styles.bubbleText}>
+              {text}
+            </Txt>
+          ) : (
+            <TypingDots />
+          )}
+        </View>
+        {reconnecting ? (
+          <View style={styles.metaRow} accessibilityRole="alert">
+            <Txt variant="caption" color={colors.inkSoft}>
+              Reconnecting…
+            </Txt>
+          </View>
+        ) : null}
       </View>
     </View>
   );
-}
+});
 
 function ThumbButton({
   direction,
@@ -143,6 +214,7 @@ function MessageBubble({
 }) {
   const isUser = message.role === 'user';
   const pending = isPendingMessage(message);
+  const rateable = !isUser && !isLocalMessage(message);
   return (
     <View
       style={[
@@ -170,7 +242,7 @@ function MessageBubble({
           <Txt variant="caption" color={colors.inkFaint} style={styles.metaTime}>
             {formatTime(message.timestamp)}
           </Txt>
-          {!isUser ? (
+          {rateable ? (
             <>
               <ThumbButton
                 direction="up"
@@ -227,6 +299,8 @@ export function CoachScreen() {
   const chat = useAppSelector((state) => state.chat);
   const profile = useAppSelector((state) => state.user.profile);
   const [draft, setDraft] = useState('');
+  // The running send; aborting it stops generating.
+  const inFlight = useRef<{ abort: () => void } | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   // What was typed before the mic was tapped; dictation is added after it.
   const voiceBase = useRef('');
@@ -256,8 +330,25 @@ export function CoachScreen() {
     voice.cancel();
     setDraft('');
     // On failure the slice keeps the text and the banner offers a retry.
-    await dispatch(sendChatMessage(toSend));
+    const running = dispatch(sendChatMessage(toSend));
+    inFlight.current = running;
+    await running;
+    if (inFlight.current === running) inFlight.current = null;
   };
+
+  const stop = () => {
+    inFlight.current?.abort();
+    inFlight.current = null;
+  };
+
+  const limitReached = remaining <= 0;
+  const countdown = useCountdown(limitReached, chat.resetsAt, () => {
+    dispatch(refreshCoachQuota());
+  });
+  // A 429 from an older count: learn the real reset time from the server.
+  useEffect(() => {
+    if (limitReached && !chat.resetsAt) dispatch(refreshCoachQuota());
+  }, [dispatch, limitReached, chat.resetsAt]);
 
   const toggleMic = () => {
     if (!voice.listening) voiceBase.current = draft;
@@ -397,7 +488,11 @@ export function CoachScreen() {
               </Txt>
             ) : null
           }
-          ListHeaderComponent={chat.sending ? <TypingBubble /> : null}
+          ListHeaderComponent={
+            chat.streaming ? (
+              <StreamingBubble text={chat.streaming.text} phase={chat.streaming.phase} />
+            ) : null
+          }
         />
       )}
 
@@ -409,10 +504,25 @@ export function CoachScreen() {
           </Txt>
         </View>
       ) : null}
-      {chat.rateLimitedMessage ? (
-        <View style={[styles.banner, styles.errorBanner]}>
-          <Txt variant="caption" color={colors.danger}>
-            {chat.rateLimitedMessage}
+      {limitReached ? (
+        <View
+          style={[styles.banner, styles.errorBanner]}
+          accessibilityRole="timer"
+          accessibilityLabel={`Daily limit reached. Your coach is back in ${countdown === null ? 'a few hours' : formatCountdown(countdown)}`}
+        >
+          <Txt variant="caption" color={colors.danger} style={styles.errorText}>
+            {`You've used all ${DAILY_LIMIT_LABEL} messages today. Your coach is back at midnight.`}
+          </Txt>
+          {countdown !== null ? (
+            <Txt variant="bodySemi" color={colors.danger} style={styles.countdown} testID="coach-countdown">
+              {formatCountdown(countdown)}
+            </Txt>
+          ) : null}
+        </View>
+      ) : remaining <= LOW_MESSAGES_WARNING ? (
+        <View style={[styles.banner, styles.infoBanner]} accessibilityRole="alert">
+          <Txt variant="caption" color={colors.inkSoft}>
+            {`You have ${remaining} ${remaining === 1 ? 'message' : 'messages'} left today.`}
           </Txt>
         </View>
       ) : null}
@@ -467,7 +577,7 @@ export function CoachScreen() {
             multiline
             // Web renders a multiline input as a 2-row textarea by default.
             numberOfLines={1}
-            editable={remaining > 0}
+            editable={!limitReached}
             accessibilityLabel="Message your future self"
           />
           {draft.length > MESSAGE_MAX_LENGTH - 100 ? (
@@ -495,17 +605,30 @@ export function CoachScreen() {
               color={voice.listening ? colors.onAccent : colors.inkSoft}
             />
           </PressableScale>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            accessibilityState={{ disabled: !canSend }}
-            onPress={() => send()}
-            disabled={!canSend}
-            pressedScale={0.9}
-            style={[styles.sendButton, !canSend && styles.sendDisabled]}
-          >
-            <ArrowUpGlyph size={20} />
-          </PressableScale>
+          {chat.sending ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Stop generating"
+              onPress={stop}
+              pressedScale={0.9}
+              style={styles.sendButton}
+              testID="coach-stop"
+            >
+              <View style={styles.stopSquare} />
+            </PressableScale>
+          ) : (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+              accessibilityState={{ disabled: !canSend }}
+              onPress={() => send()}
+              disabled={!canSend}
+              pressedScale={0.9}
+              style={[styles.sendButton, !canSend && styles.sendDisabled]}
+            >
+              <ArrowUpGlyph size={20} />
+            </PressableScale>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Screen>
@@ -643,10 +766,17 @@ const styles = themed(() =>
       paddingHorizontal: spacing.sm,
     },
     typingBubble: {
-      width: 160,
+      paddingVertical: spacing.md,
     },
-    typingLine: {
-      marginBottom: spacing.xs,
+    stopSquare: {
+      width: 14,
+      height: 14,
+      borderRadius: 3,
+      backgroundColor: colors.onAccent,
+    },
+    countdown: {
+      marginLeft: spacing.md,
+      fontVariant: ['tabular-nums'],
     },
     historySkeleton: {
       paddingHorizontal: spacing.lg,

@@ -64,6 +64,8 @@ Deno.test('safety paths stay deterministic', () => {
   assertEquals(classifyIntent('I have chest pain right now'), 'health_symptom');
   assertEquals(classifyIntent('what dosage of ibuprofen'), 'out_of_scope');
   assertEquals(classifyIntent('which stocks should I buy'), 'out_of_scope');
+  assertEquals(classifyIntent('I feel dizzy'), 'wellbeing');
+  assertEquals(classifyIntent('my chest hurts'), 'health_symptom');
 });
 
 Deno.test('postFilter softens instead of discarding', () => {
