@@ -368,6 +368,11 @@ export function CloseGlyph({ size = 20, color = colors.ink }: IconProps) {
   return <Outline size={size} color={color} d="M6 6l12 12M18 6 6 18" />;
 }
 
+export function SearchGlyph({ size = 20, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM15.5 15.5 20 20" />;
+}
+
 export function UndoGlyph({ size = 20, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />;

@@ -10,6 +10,8 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { ChevronGlyph } from '../components/icons';
+import { QuestSearchBar, QuestSearchResults } from '../features/questSearch/QuestSearch';
+import { useQuestSearch } from '../features/questSearch/useQuestSearch';
 import type { Quest } from '../api/types';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -61,6 +63,9 @@ export function QuestsScreen({ navigation }: Props) {
   const { quests, loading, date } = useAppSelector((state) => state.quests);
   const [filter, setFilter] = useState<Filter>('all');
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const search = useQuestSearch(searchText);
+  const searchActive = searchText.trim().length > 0;
 
   useEffect(() => {
     if (date === null) {
@@ -121,7 +126,15 @@ export function QuestsScreen({ navigation }: Props) {
         <View style={{ flex: Math.max(0.0001, 1 - doneCount / Math.max(1, dayQuests.length)) }} />
       </View>
 
-      {initialLoading ? (
+      <QuestSearchBar
+        value={searchText}
+        onChangeText={setSearchText}
+        searching={search.searching}
+      />
+
+      {searchActive ? (
+        <QuestSearchResults search={search} />
+      ) : initialLoading ? (
         <QuestsSkeleton />
       ) : (
         <>
