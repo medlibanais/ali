@@ -24,6 +24,8 @@ import { cheerCooldownLeft, displayName, type RankedRow } from './logic';
 
 export const ROW_HEIGHT = 72;
 const MOVE_MS = 420;
+/** Fixed so "Cheer" and "Cheered" keep the XP column still. */
+const CHEER_WIDTH = 88;
 
 export interface FriendsLeaderboardProps {
   rows: RankedRow[];
@@ -202,7 +204,7 @@ const styles = themed(() =>
       marginRight: spacing.sm,
     },
     cheer: {
-      minWidth: 72,
+      width: CHEER_WIDTH,
       minHeight: 44,
       marginLeft: spacing.md,
       paddingHorizontal: spacing.md,
@@ -219,7 +221,7 @@ const styles = themed(() =>
       backgroundColor: withAlpha(colors.accent, 0.15),
     },
     cheerSpacer: {
-      width: 72,
+      width: CHEER_WIDTH,
       marginLeft: spacing.md,
     },
   }),
