@@ -2,13 +2,13 @@
 // Runs hourly via pg_cron (cron secret only). For each user it works in
 // their own timezone and sends at most one nudge per run:
 //   missed_quest      quests still open at 6 PM               1x/day
-//   streak_risk       live streak, nothing done today by 7 PM 1x/day
+//   (streak_risk moved to smart-notify: 4-8 PM local, 1x/day)
 //   low_pillar        a pillar averaged < 30% over 3 days     1x/3 days
 //   behavior_pattern  same quest missed 3 days in a row       1x/week
 // Level-up messages are written by the database the moment it happens.
 // Delivery (center + push, opt-outs, quiet hours, 3/day cap) is shared.
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { deliver } from '../_shared/push.ts';
 
 const corsHeaders = {
@@ -27,7 +27,7 @@ const PILLAR_LABEL: Record<string, string> = {
 };
 const DAY_MS = 86400000;
 
-type Admin = ReturnType<typeof createClient>;
+type Admin = SupabaseClient;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -99,18 +99,13 @@ async function nudgeUser(
   // Coach speaks only between 8 AM and 10 PM local (FR-5.2 time window).
   if (hour < 8 || hour >= 22) return 'outside_window';
 
-  const [questsRes, gamRes, goalsRes] = await Promise.all([
+  const [questsRes, goalsRes] = await Promise.all([
     admin
       .from('quests')
       .select('id, title, pillar, xp_reward, skipped, assigned_date, quest_completions(id, undone_at)')
       .eq('user_id', user.id)
       .gte('assigned_date', shiftDate(today, -3))
       .lte('assigned_date', today),
-    admin
-      .from('gamification')
-      .select('current_streak, last_active_date')
-      .eq('user_id', user.id)
-      .maybeSingle(),
     admin
       .from('user_goals')
       .select('career_goal, skill_to_develop, religion, workouts_per_week')
@@ -132,9 +127,7 @@ async function nudgeUser(
     (q.quest_completions ?? []).some((c) => c.undone_at === null);
   const todays = quests.filter((q) => q.assigned_date === today);
   const openToday = todays.filter((q) => !q.skipped && !done(q));
-  const doneToday = todays.filter(done).length;
   const goals = goalsRes.data ?? {};
-  const streak = gamRes.data?.current_streak ?? 0;
 
   // 1) Missed quest: still open at 6 PM.
   if (
@@ -152,21 +145,7 @@ async function nudgeUser(
     return `missed_quest:${r.reason ?? 'ok'}`;
   }
 
-  // 2) Streak risk: a live streak and nothing done yet today.
-  if (
-    hour >= 19 &&
-    streak > 0 &&
-    doneToday === 0 &&
-    gamRes.data?.last_active_date !== today &&
-    !(await sentSince(admin, user.id, 'streak_risk', dayStart))
-  ) {
-    const r = await deliver(admin, user.id, {
-      type: 'streak_risk',
-      title: 'Our streak is at risk',
-      body: `Our ${streak}-day streak is at risk, ${name}. Let's do one quest together.`,
-    });
-    return `streak_risk:${r.reason ?? 'ok'}`;
-  }
+  // Streak risk is handled by smart-notify (4-8 PM local, every 2 hours).
 
   // 3) Low pillar: average under 30% across the last 3 full days.
   const threeDaysAgo = new Date(Date.parse(dayStart) - 3 * DAY_MS).toISOString();

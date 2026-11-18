@@ -1,5 +1,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { Quest } from '../api/types';
+import type { PillarId } from '../components/PillarBubble';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -19,7 +20,8 @@ export type OnboardingStackParamList = {
 };
 
 export type MainTabParamList = {
-  Today: undefined;
+  // pillar: open with that pillar's quests expanded (push notification tap)
+  Today: { pillar?: PillarId } | undefined;
   Quests: undefined;
   Coach: undefined;
   Insights: undefined;
@@ -40,3 +42,6 @@ export type AppStackParamList = {
   EditPhoto: undefined;
   Friends: { code?: string } | undefined;
 };
+
+/** Everything the root NavigationContainer can route to. */
+export type RootParamList = AuthStackParamList & AppStackParamList;
