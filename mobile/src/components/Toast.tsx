@@ -169,7 +169,7 @@ const styles = themed(() =>
       flexShrink: 1,
     },
     action: {
-      marginLeft: spacing.lg,
+      marginStart: spacing.lg,
       minHeight: 32,
       justifyContent: 'center',
     },

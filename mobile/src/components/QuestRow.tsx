@@ -163,7 +163,7 @@ const styles = themed(() =>
       borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
       backgroundColor: colors.card,
     },
     checkDone: {
@@ -186,7 +186,7 @@ const styles = themed(() =>
     coachTag: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       paddingHorizontal: spacing.sm - 1,
       paddingVertical: 1,
       borderRadius: radius.pill,
@@ -195,19 +195,19 @@ const styles = themed(() =>
     coachText: {
       fontSize: 12,
       lineHeight: 16,
-      marginLeft: 4,
+      marginStart: 4,
     },
     xpPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       paddingHorizontal: spacing.sm + 2,
       paddingVertical: 5,
       borderRadius: radius.pill,
       backgroundColor: colors.paper,
     },
     xp: {
-      marginLeft: 4,
+      marginStart: 4,
       fontSize: 13,
       lineHeight: 17,
     },

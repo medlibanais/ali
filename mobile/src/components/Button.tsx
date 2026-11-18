@@ -218,7 +218,7 @@ const styles = themed(() =>
       fontSize: 15,
     },
     icon: {
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
     },
   }),
 );

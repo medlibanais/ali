@@ -536,7 +536,7 @@ const styles = themed(() =>
       ...softSurface(1),
     },
     headerText: {
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       flex: 1,
     },
     headerTitle: {
@@ -552,7 +552,7 @@ const styles = themed(() =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      marginRight: 6,
+      marginEnd: 6,
       backgroundColor: colors.accent,
     },
     statusDotResting: {
@@ -565,7 +565,7 @@ const styles = themed(() =>
       borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       ...softSurface(1),
     },
     newChatDisabled: {
@@ -631,7 +631,7 @@ const styles = themed(() =>
     },
     metaTime: {
       fontSize: 11,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     thumbButton: {
       minWidth: 32,
@@ -689,7 +689,7 @@ const styles = themed(() =>
     retryButton: {
       minHeight: 36,
       justifyContent: 'center',
-      paddingLeft: spacing.md,
+      paddingStart: spacing.md,
     },
     quickReplies: {
       flexDirection: 'row',
@@ -702,8 +702,8 @@ const styles = themed(() =>
       alignItems: 'flex-end',
       marginHorizontal: spacing.lg,
       marginBottom: spacing.sm,
-      paddingLeft: spacing.lg,
-      paddingRight: 6,
+      paddingStart: spacing.lg,
+      paddingEnd: 6,
       paddingVertical: 6,
       borderRadius: radius.lg,
       ...softSurface(2),
@@ -729,7 +729,7 @@ const styles = themed(() =>
       borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.xs,
+      marginEnd: spacing.xs,
     },
     micListening: {
       backgroundColor: colors.danger,

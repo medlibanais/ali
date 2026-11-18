@@ -107,11 +107,11 @@ const styles = themed(() =>
       justifyContent: 'center',
     },
     inputWithToggle: {
-      paddingRight: 48,
+      paddingEnd: 48,
     },
     toggle: {
       position: 'absolute',
-      right: 2,
+      end: 2,
       top: 0,
       bottom: 0,
       width: 44,

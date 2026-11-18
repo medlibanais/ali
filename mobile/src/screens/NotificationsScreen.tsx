@@ -153,7 +153,7 @@ const styles = themed(() =>
   },
   rowBody: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginStart: spacing.md,
   },
   rowHeader: {
     flexDirection: 'row',
@@ -162,7 +162,7 @@ const styles = themed(() =>
   },
   rowTitle: {
     flex: 1,
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
   },
   rowDetail: {
     marginTop: spacing.xs,

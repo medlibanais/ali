@@ -1146,8 +1146,8 @@ const styles = themed(() =>
     },
     lookMain: {
       minHeight: 44,
-      paddingLeft: spacing.md,
-      paddingRight: spacing.xs,
+      paddingStart: spacing.md,
+      paddingEnd: spacing.xs,
       justifyContent: 'center',
     },
     lookRemove: {

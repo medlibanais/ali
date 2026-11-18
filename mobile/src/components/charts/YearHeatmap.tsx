@@ -389,7 +389,7 @@ const styles = themed(() =>
     column: {
       width: CELL,
       height: GRID_H,
-      marginRight: GAP,
+      marginEnd: GAP,
     },
     tooltip: {
       position: 'absolute',
@@ -409,7 +409,7 @@ const styles = themed(() =>
     },
     footerText: {
       flex: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     legend: {
       flexDirection: 'row',

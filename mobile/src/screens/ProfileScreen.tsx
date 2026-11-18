@@ -23,6 +23,8 @@ import ProfileAvatar from '../components/ProfileAvatar';
 import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
+import LanguagePicker from '../components/LanguagePicker';
+import { LANGUAGE_OPTIONS } from '../i18n/languages';
 import { useToast } from '../components/Toast';
 import Card from '../components/Card';
 import {
@@ -39,6 +41,7 @@ import {
   HelpGlyph,
   PencilGlyph,
   SettingsGlyph,
+  GlobeGlyph,
   ShareGlyph,
   ShieldCheckGlyph,
   SparklesGlyph,
@@ -79,7 +82,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type SectionKey = 'avatar' | 'theme' | 'goals' | 'privacy' | 'help';
+type SectionKey = 'avatar' | 'theme' | 'language' | 'goals' | 'privacy' | 'help';
 
 /** A row inside an opened "Make GROW yours" group. */
 function SubRow({
@@ -155,7 +158,7 @@ function SettingsRow({
           {detail}
         </Txt>
       </View>
-      <View style={open ? styles.chevronOpen : undefined}>
+      <View style={open ? (i18n.dir(i18n.language) === 'rtl' ? styles.chevronOpenRtl : styles.chevronOpen) : undefined}>
         <ChevronGlyph color={colors.inkSoft} />
       </View>
     </Pressable>
@@ -629,6 +632,22 @@ export function ProfileScreen({ navigation }: Props) {
             </Txt>
             <Card padded={false} style={styles.settings}>
               <SettingsRow
+                icon={<GlobeGlyph size={20} color={colors.ink} />}
+                label={t('language.title')}
+                detail={
+                  LANGUAGE_OPTIONS.find((option) => option.code === i18n.language)?.nativeName ??
+                  'English'
+                }
+                open={openSection === 'language'}
+                onPress={() => toggle('language')}
+              />
+              {openSection === 'language' ? (
+                <View style={styles.subList}>
+                  <LanguagePicker />
+                </View>
+              ) : null}
+              <Hairline style={styles.divider} />
+              <SettingsRow
                 icon={<BellGlyph size={20} color={colors.ink} />}
                 label={t('profile.reminders')}
                 detail={t('profile.dailyCheckInsAnd')}
@@ -729,7 +748,7 @@ const styles = themed(() =>
     },
     identityText: {
       flex: 1,
-      marginLeft: 22,
+      marginStart: 22,
       gap: spacing.sm,
     },
     inline: {
@@ -737,7 +756,7 @@ const styles = themed(() =>
       alignItems: 'center',
     },
     inlineText: {
-      marginLeft: 6,
+      marginStart: 6,
       flexShrink: 1,
     },
     actionPill: {
@@ -751,7 +770,7 @@ const styles = themed(() =>
       backgroundColor: withAlpha(colors.accent, 0.08),
     },
     actionText: {
-      marginLeft: 6,
+      marginStart: 6,
       fontSize: 14,
     },
     identityActions: {
@@ -825,7 +844,7 @@ const styles = themed(() =>
     groupLabel: {
       marginTop: spacing.lg,
       marginBottom: spacing.sm,
-      marginLeft: spacing.xs,
+      marginStart: spacing.xs,
     },
     subLeft: {
       flexDirection: 'row',
@@ -833,7 +852,7 @@ const styles = themed(() =>
       flexShrink: 1,
     },
     subLabel: {
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
     row: {
       flexDirection: 'row',
@@ -850,16 +869,20 @@ const styles = themed(() =>
     },
     rowText: {
       flex: 1,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
     chevronOpen: {
       transform: [{ rotate: '90deg' }],
+    },
+    // The chevron is mirrored in right-to-left, so it turns the other way.
+    chevronOpenRtl: {
+      transform: [{ rotate: '-90deg' }],
     },
     divider: {
       backgroundColor: colors.line,
     },
     subList: {
-      marginLeft: 48,
+      marginStart: 48,
       paddingBottom: spacing.sm,
     },
     subRow: {
@@ -872,10 +895,10 @@ const styles = themed(() =>
       flexDirection: 'row',
       alignItems: 'center',
       flexShrink: 1,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
     subValue: {
-      marginRight: spacing.xs,
+      marginEnd: spacing.xs,
       flexShrink: 1,
     },
     themeBlock: {

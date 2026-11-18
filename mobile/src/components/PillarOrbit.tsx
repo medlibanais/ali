@@ -287,7 +287,7 @@ const styles = themed(() =>
       borderColor: colors.card,
     },
     levelText: {
-      marginLeft: 4,
+      marginStart: 4,
     },
     orb: {
       position: 'absolute',

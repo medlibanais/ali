@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillarLabel: {
-    marginLeft: spacing.sm,
+    marginStart: spacing.sm,
     textTransform: 'uppercase',
   },
   title: {

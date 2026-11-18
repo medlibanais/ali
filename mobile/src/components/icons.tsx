@@ -522,3 +522,15 @@ export function ResetGlyph({ size = 18, color = colors.ink }: IconProps) {
   return <Outline size={size} color={color} d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />;
 }
 
+
+/** Globe for the language setting. */
+export function GlobeGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Outline
+      size={size}
+      color={color}
+      d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM3.5 12h17M12 3.5c2.3 2.3 3.5 5.2 3.5 8.5s-1.2 6.2-3.5 8.5c-2.3-2.3-3.5-5.2-3.5-8.5s1.2-6.2 3.5-8.5Z"
+    />
+  );
+}

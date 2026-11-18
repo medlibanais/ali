@@ -587,7 +587,7 @@ const styles = themed(() =>
     },
     rowBody: {
       flex: 1,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
     rowBodyFlat: {
       flex: 1,
@@ -604,7 +604,7 @@ const styles = themed(() =>
     },
     acceptButton: {
       flex: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     declineButton: {
       flex: 1,
@@ -648,7 +648,7 @@ const styles = themed(() =>
       color: colors.ink,
       fontSize: 16,
       letterSpacing: 2,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     codeButton: {
       minWidth: 96,

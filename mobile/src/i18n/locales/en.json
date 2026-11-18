@@ -1513,5 +1513,14 @@
   },
   "qr": {
     "qrCode": "QR code"
+  },
+  "language": {
+    "title": "Language",
+    "names": {
+      "en": "English",
+      "fr": "French",
+      "ar": "Arabic"
+    },
+    "restartNote": "Close and reopen GROW to finish switching the layout direction. Text has already switched."
   }
 }

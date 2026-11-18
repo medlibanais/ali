@@ -49,7 +49,7 @@ const styles = themed(() =>
       borderColor: colors.outline ?? colors.line,
       backgroundColor: colors.card,
       paddingHorizontal: spacing.lg - 2,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
       marginBottom: spacing.sm,
     },
     selected: {
@@ -60,7 +60,7 @@ const styles = themed(() =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      marginRight: 7,
+      marginEnd: 7,
     },
     text: {
       fontSize: 14,

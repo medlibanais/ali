@@ -683,7 +683,7 @@ const styles = themed(() =>
   },
   progressLabel: {
     marginTop: spacing.xl,
-    marginLeft: spacing.xs,
+    marginStart: spacing.xs,
   },
   stripCell: {
     flex: 1,
@@ -728,7 +728,7 @@ const styles = themed(() =>
     alignItems: 'center',
   },
   questHeaderTextIcon: {
-    marginLeft: spacing.sm,
+    marginStart: spacing.sm,
   },
   allDone: {
     marginBottom: spacing.md,

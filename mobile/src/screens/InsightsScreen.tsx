@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   bigNumber: {
     fontSize: 52,
     lineHeight: 58,
-    marginRight: spacing.md,
+    marginEnd: spacing.md,
   },
   changePill: {
     borderRadius: radius.md,
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginTop: 9,
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
   },
   bulletText: {
     flex: 1,

@@ -66,7 +66,7 @@ const styles = themed(() =>
       alignItems: 'center',
     },
     label: {
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       fontSize: 14,
     },
     track: {
