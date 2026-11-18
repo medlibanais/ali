@@ -398,7 +398,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                 <FaceGlyph />
               </RoundButton>
             </View>
-            <View style={styles.row}>
+            <View style={[styles.row, styles.rowEnd]}>
               <RoundButton
                 label="Surprise me: a whole new random avatar"
                 onPress={() => config && commit(randomAvatarConfig(level))}
@@ -963,6 +963,13 @@ const styles = themed(() =>
       bottom: radius.lg + spacing.sm,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      // Narrow phones: the right-hand group moves up a line instead of
+      // running off the screen.
+      flexWrap: 'wrap',
+      rowGap: spacing.sm,
+    },
+    rowEnd: {
+      marginLeft: 'auto',
     },
     row: {
       flexDirection: 'row',

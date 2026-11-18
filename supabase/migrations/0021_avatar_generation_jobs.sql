@@ -1,4 +1,4 @@
--- PrayerLock 0015: "Make it look like me".
+-- PrayerLock 0021: "Make it look like me".
 -- The app uploads a square selfie to the private `selfies` bucket
 -- ({user_id}.jpg, under 500 KB) and inserts a row here. The insert calls
 -- the generate-avatar-config Edge Function (a database webhook made in
