@@ -5,7 +5,7 @@
 //    Each event refetches party_state, which every member's progress bar
 //    renders from.
 //  * Cheers: broadcast "cheer" events. The channel is private, so the
-//    realtime.messages policies from migration 0032 decide who may join,
+//    realtime.messages policies from migration 0035 decide who may join,
 //    listen and send: members only.
 
 import { useCallback, useEffect, useRef, useState } from 'react';

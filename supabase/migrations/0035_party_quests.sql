@@ -1,4 +1,4 @@
--- PrayerLock 0032: Party Quests.
+-- PrayerLock 0035: Party Quests.
 --
 -- A party quest is one quest that 2 to 8 friends do together. The
 -- creator shares an invite link; accepted friends of the creator can
