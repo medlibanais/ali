@@ -67,7 +67,7 @@ export const CIRCLE_KEY = ['friends', 'circle'] as const;
 
 // You + accepted friends with level, streak and this week's XP, from the
 // friends_weekly_xp view (security_invoker, so RLS decides what you see).
-// Falls back to the friend_leaderboard RPC until migration 0026 is pushed.
+// Falls back to the friend_leaderboard RPC until migration 0036 is pushed.
 export function useCircle() {
   return useQuery({
     queryKey: CIRCLE_KEY,
