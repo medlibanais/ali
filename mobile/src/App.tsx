@@ -23,6 +23,7 @@ import { useAppDispatch, useAppSelector } from './store/hooks';
 import { hydrateTheme, syncThemeWithProfile } from './store/slices/themeSlice';
 import ThemeTransition from './components/ThemeTransition';
 import { usePushNotifications } from './features/notifications/usePushNotifications';
+import OfflineBanner from './features/offline/OfflineBanner';
 import { holdSplash } from './lib/bootSplash';
 
 // Keep the native splash up until the first real screen has been drawn
@@ -103,6 +104,7 @@ function ThemedRoot() {
         <Avatar3DHost />
       </ThemeTransition>
       <CelebrationHost />
+      {userId !== null ? <OfflineBanner /> : null}
     </NavigationContainer>
   );
 }

@@ -68,7 +68,9 @@ export function QuestDetailScreen({ navigation, route }: Props) {
       const xp = result.payload.xp_awarded;
       const questId = result.payload.quest_id;
       toast.showToast({
-        message: `+${xp} XP. ${quest.title} is done.`,
+        message: result.payload.offline
+          ? `${quest.title} is done. Saved offline: about +${xp} XP once it syncs.`
+          : `+${xp} XP. ${quest.title} is done.`,
         actionLabel: 'Undo',
         countdownSeconds: 10,
         durationMs: 10000,

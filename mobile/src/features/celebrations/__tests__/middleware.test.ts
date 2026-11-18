@@ -77,6 +77,7 @@ const done = (id: string, xp = 20) =>
       best_streak: 0,
       new_badges: [],
       completedAt: Date.now(),
+      offline: false,
     },
     'req',
     quest(id),
