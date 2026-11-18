@@ -143,6 +143,7 @@ function rpcError(error: { message?: string } | null, fallback: string): string 
   }
   if (msg.includes('quest_not_today')) return 'This quest is from another day.';
   if (msg.includes('quest_skipped')) return 'This quest was skipped.';
+  if (msg.includes('rate_limited')) return 'Slow down a little, then try again.';
   return fallback;
 }
 
@@ -302,7 +303,14 @@ export const completeQuest = createAsyncThunk<
       reportOffline();
       return saveOffline(true);
     }
-    dispatch(questRolledBack(quest.quest_id));
+    const message = (error as { message?: string }).message ?? '';
+    if (message.includes('already_completed')) {
+      // The server already has it (e.g. a retry after a dropped reply):
+      // keep the tick and refresh XP instead of un-ticking it.
+      dispatch(fetchGamification());
+    } else {
+      dispatch(questRolledBack(quest.quest_id));
+    }
     return rejectWithValue({
       questId: quest.quest_id,
       message: rpcError(error as { message?: string }, 'Could not complete this quest.'),

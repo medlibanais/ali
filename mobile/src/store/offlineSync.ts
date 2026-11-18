@@ -139,6 +139,13 @@ export async function syncOne(item: QueuedAction): Promise<Outcome> {
       // Migration 0022 is not on this database yet: fall back to the
       // online RPC (counts on the sync day, still never twice).
       const old = await callRpc('complete_quest', { p_quest_id: item.questId });
+      if (!old.thrown && old.error?.message?.includes('already_completed')) {
+        // Already on the server (this device's lost answer or another one):
+        // nothing to resend and the XP is not counted twice.
+        return item.afterOnlineAttempt
+          ? { kind: 'ok', duplicate: true }
+          : { kind: 'conflict', reason: COMPLETED_ELSEWHERE };
+      }
       return classifyFailure(old.error, old.thrown) ?? { kind: 'ok', duplicate: false };
     }
     const outcome =

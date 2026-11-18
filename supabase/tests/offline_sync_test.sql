@@ -2,7 +2,13 @@
 -- streak repair, and the bounds on the client's claimed time.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;
-select plan(36);
+select plan(40);
+
+-- 0031 puts the sync RPCs under complete_quest's rate limit (10 / 5 s).
+-- now() does not move inside this transaction, so lift it until the
+-- rate limit section at the end.
+create or replace function public.complete_quest_rate_max()
+returns int language sql immutable as $$ select 1000 $$;
 
 -- Pick a fixed-offset zone where it is now between 02:00 and 20:59, so
 -- "yesterday 21:00" and "today 01:00" are both in the past and inside
@@ -235,6 +241,34 @@ select lives_ok(
   $$select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 1'),
       '44444444-4444-4444-8444-000000000002', now())$$,
   'and does not spill into today');
+
+---------------------------------------------------------------- rate limit (0031)
+select pg_temp.as_admin();
+create or replace function public.complete_quest_rate_max()
+returns int language sql immutable as $$ select 10 $$;
+delete from public.rate_limits;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b4');
+-- Ten replays of the same completion: accepted (duplicates), each counted.
+select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 1'),
+  '44444444-4444-4444-8444-000000000002', now())
+from generate_series(1, 9);
+select is(
+  (public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 1'),
+     '44444444-4444-4444-8444-000000000002', now())->>'duplicate')::boolean,
+  true, 'the 10th sync call in 5 seconds is still accepted');
+select throws_ok(
+  $$select public.sync_quest_completion(pg_temp.q(auth.uid(), 'Today 1'),
+      '44444444-4444-4444-8444-000000000002', now())$$,
+  'rate_limited', 'the 11th sync call in 5 seconds is refused (shared with complete_quest)');
+select throws_ok(
+  $$select public.sync_quest_undo(pg_temp.q(auth.uid(), 'Today 1'), now())$$,
+  'rate_limited', 'sync undo counts in the same bucket');
+select is(
+  has_function_privilege('authenticated',
+    'public.sync_quest_completion_core(uuid, uuid, timestamptz)', 'EXECUTE')
+  or has_function_privilege('authenticated',
+    'public.sync_quest_undo_core(uuid, timestamptz)', 'EXECUTE'),
+  false, 'the unlimited core functions cannot be called by the app');
 
 select * from finish();
 rollback;
