@@ -20,7 +20,8 @@ import CelebrationHost from './features/celebrations/CelebrationHost';
 import type { RootParamList } from './navigation/types';
 import { useTheme } from './theme/useTheme';
 import { useAppDispatch, useAppSelector } from './store/hooks';
-import { hydrateTheme } from './store/slices/themeSlice';
+import { hydrateTheme, syncThemeWithProfile } from './store/slices/themeSlice';
+import ThemeTransition from './components/ThemeTransition';
 import { usePushNotifications } from './features/notifications/usePushNotifications';
 
 const navigationRef = createNavigationContainerRef<RootParamList>();
@@ -49,9 +50,18 @@ function ThemedRoot() {
   // Streak alerts and other pushes: token on login, tap opens Today.
   usePushNotifications(navigationRef, userId, appReady, navReady);
 
+  const profileLoaded = useAppSelector((state) => state.user.profile !== null);
+  const remoteTheme = useAppSelector((state) => state.user.profile?.theme_preference ?? null);
+
   useEffect(() => {
     dispatch(hydrateTheme());
   }, [dispatch]);
+
+  // Follow the theme saved on the profile (picked on another device), or
+  // upload this device's pick, once both the local and remote values exist.
+  useEffect(() => {
+    if (themeHydrated && profileLoaded) dispatch(syncThemeWithProfile(remoteTheme));
+  }, [dispatch, themeHydrated, profileLoaded, remoteTheme]);
 
   const navigationTheme = useMemo(
     () => ({
@@ -83,8 +93,10 @@ function ThemedRoot() {
         style={theme.dark ? 'light' : 'dark'}
         backgroundColor={theme.colors.paper}
       />
-      <RootNavigator />
-      <Avatar3DHost />
+      <ThemeTransition>
+        <RootNavigator />
+        <Avatar3DHost />
+      </ThemeTransition>
       <CelebrationHost />
     </NavigationContainer>
   );
