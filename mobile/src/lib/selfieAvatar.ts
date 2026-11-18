@@ -3,6 +3,7 @@
 // No AI key is ever in the app; the function holds them.
 
 import { Platform } from 'react-native';
+import i18n from '../i18n';
 import { pollJob, type JobRow, type PollOutcome } from '../avatar/selfie';
 import { base64ToBytes, PhotoError, pickSquarePhoto } from './profilePhoto';
 import { supabase } from './supabase';
@@ -31,8 +32,8 @@ export async function captureSelfie(source: SelfieSource): Promise<Uint8Array> {
   try {
     const base64 = await pickSquarePhoto(Platform.OS === 'web' ? 'gallery' : source);
     const bytes = base64ToBytes(base64);
-    if (bytes.length === 0) throw new SelfieError('Could not read that photo.');
-    if (bytes.length > MAX_BYTES) throw new SelfieError('That photo is still over 500 KB. Try another one.', 'too_large');
+    if (bytes.length === 0) throw new SelfieError(i18n.t('selfie.couldNotReadThat'));
+    if (bytes.length > MAX_BYTES) throw new SelfieError(i18n.t('selfie.thatPhotoIsStill'), 'too_large');
     return bytes;
   } catch (e) {
     if (e instanceof SelfieError) throw e;
@@ -40,7 +41,7 @@ export async function captureSelfie(source: SelfieSource): Promise<Uint8Array> {
       const code = e.code === 'cancelled' || e.code === 'permission' || e.code === 'too_large' ? e.code : 'failed';
       throw new SelfieError(e.message, code);
     }
-    throw new SelfieError('Could not open the camera or photos.');
+    throw new SelfieError(i18n.t('selfie.couldNotOpenThe'));
   }
 }
 
@@ -49,12 +50,12 @@ export async function startSelfieJob(bytes: Uint8Array): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new SelfieError('You are signed out. Sign in and try again.', 'upload');
+  if (!user) throw new SelfieError(i18n.t('selfie.youAreSignedOut'), 'upload');
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(`${user.id}.jpg`, bytes.buffer as ArrayBuffer, { contentType: 'image/jpeg', upsert: true });
-  if (uploadError) throw new SelfieError(`Could not upload the photo: ${uploadError.message}`, 'upload');
+  if (uploadError) throw new SelfieError(i18n.t('selfie.couldNotUploadThe', { message: uploadError.message }), 'upload');
 
   const { data, error } = await supabase
     .from('avatar_generation_jobs')
@@ -63,12 +64,12 @@ export async function startSelfieJob(bytes: Uint8Array): Promise<string> {
     .single();
   if (error || !data) {
     const text = `${error?.message ?? ''}`;
-    if (text.includes('daily_limit')) throw new SelfieError('You have made 10 avatars from a photo today. Try again tomorrow.', 'daily_limit');
-    if (text.includes('job_in_progress')) throw new SelfieError('Your last photo is still being read. Give it a moment.', 'busy');
+    if (text.includes('daily_limit')) throw new SelfieError(i18n.t('selfie.youHaveMade10'), 'daily_limit');
+    if (text.includes('job_in_progress')) throw new SelfieError(i18n.t('selfie.yourLastPhotoIs'), 'busy');
     if (/relation .* does not exist|avatar_generation_jobs/.test(text)) {
-      throw new SelfieError('This feature is not set up on the server yet (database update missing).');
+      throw new SelfieError(i18n.t('selfie.thisFeatureIsNot'));
     }
-    throw new SelfieError('Could not start reading your photo. Try again.');
+    throw new SelfieError(i18n.t('selfie.couldNotStartReading'));
   }
   return (data as { id: string }).id;
 }

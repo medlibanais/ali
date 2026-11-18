@@ -11,6 +11,7 @@ import LevelUpModal from './LevelUpModal';
 import PerfectDayTakeover from './PerfectDayTakeover';
 import XpParticles from './XpParticles';
 import { notifyXpArrived } from './anchors';
+import { playHaptic } from '../../lib/haptics';
 
 export const CelebrationHost = memo(function CelebrationHost() {
   const dispatch = useAppDispatch();
@@ -22,6 +23,12 @@ export const CelebrationHost = memo(function CelebrationHost() {
   const dismiss = useCallback(() => {
     if (current) dispatch(celebrationDismissed(current.id));
   }, [dispatch, current]);
+
+  // A takeover lands with a heavy double thump (lib/haptics PRESETS).
+  React.useEffect(() => {
+    if (current?.kind === 'levelUp') playHaptic('levelUp');
+    else if (current?.kind === 'perfectDay') playHaptic('perfectDay');
+  }, [current?.id, current?.kind]);
 
   // Reduced motion: no flying particles, just the bar's glow.
   React.useEffect(() => {

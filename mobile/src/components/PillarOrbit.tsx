@@ -13,7 +13,8 @@
 // that survive re-renders and use the native driver on iOS/Android.
 
 import React, { memo } from 'react';
-import { Animated, Image, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Animated, Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Ellipse } from 'react-native-svg';
 import AvatarView from '../avatar/AvatarView';
 import type { AvatarConfig, Mood } from '../avatar/types';
@@ -24,6 +25,7 @@ import {
   selectPillarScore,
   selectPillarTotal,
 } from '../store/selectors/today';
+import { useHeroSource } from './HeroSource';
 import { useFloat } from './Motion';
 import PillarBubble, { type PillarId } from './PillarBubble';
 import Txt from './Txt';
@@ -63,6 +65,8 @@ export interface PillarOrbitProps {
   expandedPillar: PillarId | null;
   /** Keep this stable (useCallback) so the bubbles can skip re-renders. */
   onPillarPress: (pillar: PillarId) => void;
+  /** Tapping the avatar (opens Profile; the avatar flies there). Keep stable. */
+  onAvatarPress?: () => void;
 }
 
 /** A pillar bubble wired to its own slice of the store. */
@@ -113,6 +117,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
   // SharedValue never changes identity, so the avatar never re-renders
   // for a score change.
   const lifeScore = useLifeScoreValue();
+  const { t } = useTranslation();
   return (
     <>
       <View style={[styles.avatarClip, { borderRadius: size / 2 }]}>
@@ -121,7 +126,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
             source={{ uri: photoUrl }}
             style={{ width: size, height: size }}
             resizeMode="cover"
-            accessibilityLabel={name ? `Avatar of ${name}` : 'Your avatar'}
+            accessibilityLabel={name ? t('avatar.avatarOf', { name }) : t('avatar.yours')}
           />
         ) : (
           <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} />
@@ -131,7 +136,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
         <View style={styles.levelBadge}>
           <StarGlyph size={13} />
           <Txt variant="label" color={colors.onAccent} style={styles.levelText}>
-            {`Lv ${level}`}
+            {t('common.levelShort', { level })}
           </Txt>
         </View>
       ) : null}
@@ -169,8 +174,12 @@ function PillarOrbitBase({
   mood,
   expandedPillar,
   onPillarPress,
+  onAvatarPress,
 }: PillarOrbitProps) {
   useTheme();
+  const { t } = useTranslation();
+  // Profile's avatar starts its flight from here (see components/Hero).
+  const heroRef = useHeroSource('avatar');
   const { width } = useWindowDimensions();
   const k = Math.min(MAX_WIDTH, width) / DESIGN_WIDTH;
   const rx = RX * k;
@@ -187,7 +196,7 @@ function PillarOrbitBase({
     <View style={styles.outer}>
       <View
         style={{ width: boxW, height: boxH + LABEL_ROOM }}
-        accessibilityLabel="Your avatar with your five pillars guarding it"
+        accessibilityLabel={t('pillarBubble.orbitA11y')}
       >
         <Svg width={boxW} height={boxH} style={StyleSheet.absoluteFill}>
           {/* dashed guard ring */}
@@ -218,6 +227,8 @@ function PillarOrbitBase({
             },
           ]}
         >
+          {/* Measured by the Profile hero flight (plain View: measurable everywhere). */}
+          <View ref={heroRef} collapsable={false} style={StyleSheet.absoluteFill} />
           <OrbitAvatar
             avatarConfig={avatarConfig}
             photoUrl={photoUrl}
@@ -227,6 +238,22 @@ function PillarOrbitBase({
             size={avatar - RIM * 2}
           />
         </Animated.View>
+
+        {onAvatarPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('today.openYourProfile')}
+            onPress={onAvatarPress}
+            style={{
+              position: 'absolute',
+              width: avatar,
+              height: avatar,
+              borderRadius: avatar / 2,
+              left: cx - avatar / 2,
+              top: cy - avatar / 2,
+            }}
+          />
+        ) : null}
 
         {ORBIT_ORDER.map((pillar, index) => {
           const angle = (ORBIT_ANGLES[pillar] * Math.PI) / 180;
@@ -284,7 +311,7 @@ const styles = themed(() =>
       borderColor: colors.card,
     },
     levelText: {
-      marginLeft: 4,
+      marginStart: 4,
     },
     orb: {
       position: 'absolute',

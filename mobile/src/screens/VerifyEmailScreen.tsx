@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -33,6 +34,7 @@ function paramsFromUrl(url: string): URLSearchParams | null {
 }
 
 export function VerifyEmailScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { busy } = useAppSelector((state) => state.auth);
@@ -63,12 +65,12 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
         if (error) throw error;
       }
       setState('verified');
-      setMessage('Your email is verified. Setting up your account…');
+      setMessage(t('verifyEmail.yourEmailIsVerified'));
       // The auth state listener moves the app into onboarding automatically.
     } catch {
       setState('failed');
       setMessage(
-        'That link is invalid or has expired. Request a new one below.',
+        t('verifyEmail.thatLinkIsInvalid'),
       );
     }
   }, []);
@@ -93,28 +95,27 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
 
   const resend = async () => {
     if (!email) {
-      setResendNote('Sign in again to request a new link.');
+      setResendNote(t('verifyEmail.signInAgainTo'));
       return;
     }
     setResendNote(null);
     const result = await dispatch(resendVerification({ email }));
     if (resendVerification.fulfilled.match(result)) {
-      setResendNote('A new link is on its way. Check spam if it does not arrive.');
+      setResendNote(t('verifyEmail.aNewLinkIs'));
     } else {
-      setResendNote(result.payload ?? 'Could not resend the email.');
+      setResendNote(result.payload ?? t('verifyEmail.couldNotResendThe'));
     }
   };
 
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <Txt variant="display">Check your inbox</Txt>
+        <Txt testID="verify-title" variant="display">{t('verifyEmail.checkYourInbox')}</Txt>
         <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
           {email
-            ? `We sent a verification link to ${email}.`
-            : 'We sent you a verification link.'}{' '}
-          Open it on this device to activate your account. The link stays valid
-          for 24 hours.
+            ? t('verifyEmail.weSentAVerification', { email })
+            : t('verifyEmail.weSentYouA')}{' '}
+          {t('verifyEmail.openItOnThis')}
         </Txt>
       </View>
 
@@ -122,10 +123,10 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
         <Card style={styles.statusCard}>
           <Txt variant="heading">
             {state === 'verifying'
-              ? 'Verifying your link'
+              ? t('verifyEmail.verifyingYourLink')
               : state === 'verified'
-                ? 'Email verified'
-                : 'Verification failed'}
+                ? t('verifyEmail.emailVerified')
+                : t('verifyEmail.verificationFailed')}
           </Txt>
           {message ? (
             <Txt
@@ -138,7 +139,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
           ) : null}
           {state === 'verified' ? (
             <Button
-              title="Continue"
+              title={t('verifyEmail.continue')}
               onPress={() => navigation.navigate('Login')}
               style={styles.statusButton}
             />
@@ -148,10 +149,10 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
 
       <View style={styles.resendSection}>
         <Txt variant="body" color={colors.inkSoft} style={styles.resendText}>
-          Nothing arrived yet. Check spam first, then request a new link.
+          {t('verifyEmail.nothingArrivedYetCheck')}
         </Txt>
         <Button
-          title="Resend verification email"
+          title={t('verifyEmail.resendVerificationEmail')}
           variant="secondary"
           onPress={resend}
           loading={busy}
@@ -164,7 +165,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
       </View>
 
       <Button
-        title="Back to sign in"
+        title={t('verifyEmail.backToSignIn')}
         testID="verify-back-to-sign-in"
         variant="ghost"
         onPress={() => navigation.navigate('Login')}

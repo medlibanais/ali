@@ -31,7 +31,9 @@ async function textOf(id: string): Promise<string> {
 }
 
 function parseXp(text: string): number {
-  return Number(text.replace(/[^0-9]/g, ''));
+  // The app shows digits in the device language (Arabic uses ٠-٩).
+  const latin = text.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+  return Number(latin.replace(/[^0-9]/g, ''));
 }
 
 /** Android 13+ asks for notification permission on Today; grant it up front. */
@@ -75,7 +77,7 @@ describe('New user journey', () => {
     await element(by.id('register-submit')).tap();
 
     // Email confirmation is on, so the app asks the user to check their inbox.
-    await waitFor(element(by.text('Check your inbox'))).toBeVisible().withTimeout(LONG);
+    await waitFor(element(by.id('verify-title'))).toBeVisible().withTimeout(LONG);
   });
 
   it('confirms the email and signs in', async () => {
@@ -87,13 +89,13 @@ describe('New user journey', () => {
     await element(by.id('login-password')).replaceText(PASSWORD);
     await element(by.id('login-submit')).tap();
 
-    await waitFor(element(by.text('Step 1 of 7'))).toBeVisible().withTimeout(LONG);
+    await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
   });
 
   it('2. completes the onboarding', async () => {
     // Steps 1-6 have usable defaults; step 7 needs a name and a username.
     for (let step = 1; step <= 6; step += 1) {
-      await waitFor(element(by.text(`Step ${step} of 7`))).toExist().withTimeout(LONG);
+      await waitFor(element(by.id(`onboarding-step-${step}`))).toExist().withTimeout(LONG);
       await tapInScroll('onboarding-continue', 'onboarding-scroll');
     }
     await waitFor(element(by.id('onboarding-first-name'))).toBeVisible().withTimeout(LONG);

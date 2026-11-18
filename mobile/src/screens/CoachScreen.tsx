@@ -1,6 +1,8 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import TypingDots from '../components/TypingDots';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +19,7 @@ import EmptyState from '../components/EmptyState';
 import { PressableScale } from '../components/Motion';
 import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
+import { ChatSkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import {
@@ -61,10 +64,10 @@ import { useTheme } from '../theme/useTheme';
 
 const DAILY_LIMIT_LABEL = DAILY_MESSAGE_LIMIT;
 
-const DEFAULT_QUICK_REPLIES = [
-  'Am I on track?',
-  'Motivate me',
-  'What should I do next?',
+const DEFAULT_QUICK_REPLIES = (): string[] => [
+  i18n.t('coach.amIOnTrack'),
+  i18n.t('coach.motivateMe'),
+  i18n.t('coach.whatShouldIDo'),
 ];
 
 /** Shown in the subtitle once the daily allowance runs low. */
@@ -141,13 +144,14 @@ const StreamingBubble = React.memo(function StreamingBubble({
   text: string;
   phase: 'waiting' | 'streaming' | 'reconnecting';
 }) {
+  const { t } = useTranslation();
   const reconnecting = phase === 'reconnecting';
   return (
     <View style={[styles.bubbleRow, styles.coachRow]}>
       <View style={styles.bubbleColumn}>
         <View
           style={[styles.bubble, styles.coachBubble, !text && styles.typingBubble]}
-          accessibilityLabel={text ? undefined : 'Coach is typing'}
+          accessibilityLabel={text ? undefined : t('coach.coachIsTyping')}
           accessibilityLiveRegion="polite"
         >
           {text ? (
@@ -161,7 +165,7 @@ const StreamingBubble = React.memo(function StreamingBubble({
         {reconnecting ? (
           <View style={styles.metaRow} accessibilityRole="alert">
             <Txt variant="caption" color={colors.inkSoft}>
-              Reconnecting…
+              {t('coach.reconnecting')}
             </Txt>
           </View>
         ) : null}
@@ -179,10 +183,11 @@ function ThumbButton({
   active: boolean;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={direction === 'up' ? 'Helpful response' : 'Not helpful'}
+      accessibilityLabel={direction === 'up' ? t('coach.helpfulResponse') : t('coach.notHelpful')}
       accessibilityState={{ selected: active }}
       onPress={onPress}
       hitSlop={8}
@@ -212,6 +217,7 @@ const MessageBubble = memo(function MessageBubble({
   onRegenerate: () => void;
   canRegenerate: boolean;
 }) {
+  const { t } = useTranslation();
   const isUser = message.role === 'user';
   const pending = isPendingMessage(message);
   const rateable = !isUser && !isLocalMessage(message);
@@ -261,7 +267,7 @@ const MessageBubble = memo(function MessageBubble({
               {canRegenerate ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Regenerate response"
+                  accessibilityLabel={t('coach.regenerateResponse')}
                   onPress={onRegenerate}
                   hitSlop={8}
                   style={({ pressed }) => [
@@ -270,7 +276,7 @@ const MessageBubble = memo(function MessageBubble({
                   ]}
                 >
                   <Txt variant="caption" color={colors.accent}>
-                    Regenerate
+                    {t('coach.regenerate')}
                   </Txt>
                 </Pressable>
               ) : null}
@@ -282,16 +288,6 @@ const MessageBubble = memo(function MessageBubble({
   );
 });
 
-function HistorySkeleton() {
-  return (
-    <View style={styles.historySkeleton}>
-      <Skeleton height={56} width="72%" style={styles.historyBlock} />
-      <Skeleton height={40} width="58%" style={styles.historyBlockRight} />
-      <Skeleton height={64} width="80%" style={styles.historyBlock} />
-    </View>
-  );
-}
-
 const messageKey = (m: ChatMessage): string => m.id;
 // User and coach bubbles have different layouts; recycle them separately.
 const messageType = (m: ChatMessage): ChatMessage['role'] => m.role;
@@ -300,6 +296,7 @@ const ESTIMATED_BUBBLE = 96;
 
 export function CoachScreen() {
   useTheme();
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const toast = useToast();
   const chat = useAppSelector((state) => state.chat);
@@ -379,13 +376,13 @@ export function CoachScreen() {
     const result = await dispatch(startNewChat());
     if (startNewChat.fulfilled.match(result)) {
       setDraft('');
-      toast.showToast({ message: 'New chat started. Your old one is saved.' });
+      toast.showToast({ message: t('coach.newChatStartedYour') });
     }
   };
 
   const quickReplies = chat.suggestions.length
     ? chat.suggestions
-    : DEFAULT_QUICK_REPLIES;
+    : DEFAULT_QUICK_REPLIES();
 
   const lastUserMessage = [...chat.messages]
     .reverse()
@@ -427,14 +424,14 @@ export function CoachScreen() {
   );
 
   const subtitle = chat.rateLimitedMessage || remaining <= 0
-    ? 'Resting until midnight'
+    ? t('coach.restingUntilMidnight')
     : remaining <= LOW_REMAINING
-      ? `${remaining} ${remaining === 1 ? 'message' : 'messages'} left today`
-      : 'Your coach · knows your 5 pillars';
+      ? t('coach.leftToday', { count: remaining })
+      : t('coach.yourCoachKnowsYour');
 
   const context = chat.contextUsed;
   const contextLine = context
-    ? `Level ${context.user_level ?? '-'} · ${context.daily_score ?? '-'}% today · ${context.streak ?? '-'}-day streak`
+    ? t('coach.levelTodayDayStreak', { level: context.user_level ?? '-', score: context.daily_score ?? '-', streak: context.streak ?? '-' })
     : null;
 
   return (
@@ -446,7 +443,7 @@ export function CoachScreen() {
         </View>
         <View style={styles.headerText}>
           <Txt variant="title" style={styles.headerTitle} numberOfLines={1}>
-            Future you
+            {t('coach.futureYou')}
           </Txt>
           <View style={styles.statusRow}>
             <View
@@ -462,8 +459,8 @@ export function CoachScreen() {
         </View>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="New chat"
-          accessibilityHint="Starts a fresh conversation. Your current chat stays saved."
+          accessibilityLabel={t('coach.newChat')}
+          accessibilityHint={t('coach.startsAFreshConversation')}
           accessibilityState={{ disabled: !canStartNewChat }}
           disabled={!canStartNewChat}
           onPress={newChat}
@@ -476,13 +473,13 @@ export function CoachScreen() {
       </View>
 
       {chat.loadingHistory ? (
-        <HistorySkeleton />
+        <ChatSkeleton />
       ) : (
         !hasMessages && !chat.streaming ? (
           <View style={[styles.list, styles.emptyWrap]}>
             <EmptyState
-              title={chat.conversationId ? 'Fresh page' : 'No messages yet'}
-              body="Ask your future self about today's quests, your streak, or the week ahead."
+              title={chat.conversationId ? t('coach.freshPage') : t('coach.noMessagesYet')}
+              body={t('coach.askYourFutureSelf')}
             />
           </View>
         ) : (
@@ -510,7 +507,7 @@ export function CoachScreen() {
                     align="center"
                     style={styles.dayLabel}
                   >
-                    {contextLine ? `Today · ${contextLine}` : 'Today'}
+                    {contextLine ? t('coach.today', { contextLine }) : t('coach.today2')}
                   </Txt>
                 ) : null
               }
@@ -527,8 +524,7 @@ export function CoachScreen() {
       {chat.degradedReply && !chat.error ? (
         <View style={[styles.banner, styles.infoBanner]}>
           <Txt variant="caption" color={colors.inkSoft}>
-            The AI could not be reached, so that reply came from your saved
-            plan. Try again in a moment for a full answer.
+            {t('coach.theAiCouldNot')}
           </Txt>
         </View>
       ) : null}
@@ -536,10 +532,10 @@ export function CoachScreen() {
         <View
           style={[styles.banner, styles.errorBanner]}
           accessibilityRole="timer"
-          accessibilityLabel={`Daily limit reached. Your coach is back in ${countdown === null ? 'a few hours' : formatCountdown(countdown)}`}
+          accessibilityLabel={t('coach.limitReachedA11y', { time: countdown === null ? t('coach.aFewHours') : formatCountdown(countdown) })}
         >
           <Txt variant="caption" color={colors.danger} style={styles.errorText}>
-            {`You've used all ${DAILY_LIMIT_LABEL} messages today. Your coach is back at midnight.`}
+            {t('coach.usedAll', { limit: DAILY_LIMIT_LABEL })}
           </Txt>
           {countdown !== null ? (
             <Txt variant="bodySemi" color={colors.danger} style={styles.countdown} testID="coach-countdown">
@@ -550,7 +546,7 @@ export function CoachScreen() {
       ) : remaining <= LOW_MESSAGES_WARNING ? (
         <View style={[styles.banner, styles.infoBanner]} accessibilityRole="alert">
           <Txt variant="caption" color={colors.inkSoft}>
-            {`You have ${remaining} ${remaining === 1 ? 'message' : 'messages'} left today.`}
+            {t('coach.youHaveLeft', { count: remaining })}
           </Txt>
         </View>
       ) : null}
@@ -566,13 +562,13 @@ export function CoachScreen() {
           {chat.failedText ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Retry sending"
+              accessibilityLabel={t('coach.retrySending')}
               onPress={retry}
               disabled={chat.sending}
               style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
             >
               <Txt variant="bodySemi" color={colors.accent}>
-                Retry
+                {t('coach.retry')}
               </Txt>
             </Pressable>
           ) : null}
@@ -599,14 +595,14 @@ export function CoachScreen() {
             style={styles.input}
             value={draft}
             onChangeText={onChangeDraft}
-            placeholder={voice.listening ? 'Listening…' : 'Ask your future self'}
+            placeholder={voice.listening ? t('coach.listening') : t('coach.askYourFutureSelf2')}
             placeholderTextColor={colors.inkFaint}
             maxLength={MESSAGE_MAX_LENGTH}
             multiline
             // Web renders a multiline input as a 2-row textarea by default.
             numberOfLines={1}
             editable={!limitReached}
-            accessibilityLabel="Message your future self"
+            accessibilityLabel={t('coach.messageYourFutureSelf')}
           />
           {draft.length > MESSAGE_MAX_LENGTH - 100 ? (
             <Txt variant="caption" color={colors.inkFaint} style={styles.counter}>
@@ -615,7 +611,7 @@ export function CoachScreen() {
           ) : null}
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={voice.listening ? 'Stop voice input' : 'Speak your message'}
+            accessibilityLabel={voice.listening ? t('coach.stopVoiceInput') : t('coach.speakYourMessage')}
             accessibilityState={{ disabled: !canUseMic, selected: voice.listening }}
             onPress={toggleMic}
             disabled={!canUseMic}
@@ -636,7 +632,7 @@ export function CoachScreen() {
           {chat.sending ? (
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Stop generating"
+              accessibilityLabel={t('coach.stopGenerating')}
               onPress={stop}
               pressedScale={0.9}
               style={styles.sendButton}
@@ -647,7 +643,7 @@ export function CoachScreen() {
           ) : (
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Send message"
+              accessibilityLabel={t('coach.sendMessage')}
               accessibilityState={{ disabled: !canSend }}
               onPress={() => send()}
               disabled={!canSend}
@@ -682,7 +678,7 @@ const styles = themed(() =>
       ...softSurface(1),
     },
     headerText: {
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       flex: 1,
     },
     headerTitle: {
@@ -698,7 +694,7 @@ const styles = themed(() =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      marginRight: 6,
+      marginEnd: 6,
       backgroundColor: colors.accent,
     },
     statusDotResting: {
@@ -711,7 +707,7 @@ const styles = themed(() =>
       borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       ...softSurface(1),
     },
     newChatDisabled: {
@@ -754,11 +750,11 @@ const styles = themed(() =>
     },
     userBubble: {
       backgroundColor: colors.accent,
-      borderBottomRightRadius: radius.xs,
+      borderBottomEndRadius: radius.xs,
     },
     coachBubble: {
       ...softSurface(1),
-      borderBottomLeftRadius: radius.xs,
+      borderBottomStartRadius: radius.xs,
     },
     bubbleText: {
       fontSize: 15,
@@ -775,7 +771,7 @@ const styles = themed(() =>
     },
     metaTime: {
       fontSize: 11,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     thumbButton: {
       minWidth: 32,
@@ -801,20 +797,8 @@ const styles = themed(() =>
       backgroundColor: colors.onAccent,
     },
     countdown: {
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       fontVariant: ['tabular-nums'],
-    },
-    historySkeleton: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xl,
-      flex: 1,
-    },
-    historyBlock: {
-      marginBottom: spacing.md,
-    },
-    historyBlockRight: {
-      marginBottom: spacing.md,
-      alignSelf: 'flex-end',
     },
     pendingRow: {
       opacity: 0.6,
@@ -840,7 +824,7 @@ const styles = themed(() =>
     retryButton: {
       minHeight: 36,
       justifyContent: 'center',
-      paddingLeft: spacing.md,
+      paddingStart: spacing.md,
     },
     quickReplies: {
       flexDirection: 'row',
@@ -853,8 +837,8 @@ const styles = themed(() =>
       alignItems: 'flex-end',
       marginHorizontal: spacing.lg,
       marginBottom: spacing.sm,
-      paddingLeft: spacing.lg,
-      paddingRight: 6,
+      paddingStart: spacing.lg,
+      paddingEnd: 6,
       paddingVertical: 6,
       borderRadius: radius.lg,
       ...softSurface(2),
@@ -880,7 +864,7 @@ const styles = themed(() =>
       borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.xs,
+      marginEnd: spacing.xs,
     },
     micListening: {
       backgroundColor: colors.danger,

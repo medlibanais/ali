@@ -3,6 +3,7 @@
 // phone cameras read as well as square ones.
 
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { inFinder, qrMatrix } from '../lib/qr';
 
@@ -16,6 +17,7 @@ export interface QrCodeProps {
 const QUIET = 2;
 
 export function QrCode({ value, size, color, background }: QrCodeProps) {
+  const { t } = useTranslation();
   const matrix = useMemo(() => qrMatrix(value), [value]);
   const n = matrix.length;
   const d = useMemo(() => {
@@ -34,7 +36,7 @@ export function QrCode({ value, size, color, background }: QrCodeProps) {
     [QUIET, QUIET + n - 7],
   ];
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${total} ${total}`} accessibilityLabel="QR code">
+    <Svg width={size} height={size} viewBox={`0 0 ${total} ${total}`} accessibilityLabel={t('qr.qrCode')}>
       <Rect x={0} y={0} width={total} height={total} rx={2} fill={background} />
       <Path d={d} fill={color} />
       {finders.map(([x, y]) => (

@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Pressable,
@@ -7,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -18,10 +21,12 @@ import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import {
+  cheerErrorText,
   friendErrorText as errorText,
   inviteResultText,
   useBlockedUsers,
   useBlockUser,
+  useCheer,
   useCircle,
   useFriendRequests,
   useRedeemInvite,
@@ -35,8 +40,16 @@ import {
   type SearchHit,
   type UserSearchResult,
 } from '../features/friends/api';
-import { displayName, friendsOnly, inviteMessage, rankLeaderboard } from '../features/friends/logic';
-import { pluralize, streakLabel } from '../lib/format';
+import FriendsLeaderboard from '../features/friends/FriendsLeaderboard';
+import {
+  displayName,
+  friendsOnly,
+  inviteMessage,
+  rankLeaderboard,
+  type RankedRow,
+} from '../features/friends/logic';
+import { useFriendsXpRealtime } from '../features/friends/useFriendsXpRealtime';
+import { bestStreakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
@@ -45,9 +58,9 @@ import { useTheme } from '../theme/useTheme';
 type Section = 'friends' | 'requests' | 'find';
 
 const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'friends', label: 'Friends' },
-  { key: 'requests', label: 'Requests' },
-  { key: 'find', label: 'Find' },
+  { key: 'friends', get label() { return i18n.t('friends.friends'); } },
+  { key: 'requests', get label() { return i18n.t('friends.requests'); } },
+  { key: 'find', get label() { return i18n.t('friends.find'); } },
 ];
 
 function userToProfile(u: UserSearchResult) {
@@ -60,13 +73,22 @@ function userToProfile(u: UserSearchResult) {
 }
 
 const SEARCH_ACTION: Record<SearchHit['relation'], string> = {
-  none: 'Add',
-  incoming: 'Accept',
-  outgoing: 'Requested',
-  friends: 'Friends',
+  get none() {
+    return i18n.t('friends.add');
+  },
+  get incoming() {
+    return i18n.t('friends.accept');
+  },
+  get outgoing() {
+    return i18n.t('friends.requested');
+  },
+  get friends() {
+    return i18n.t('friends.friends');
+  },
 };
 
 export function FriendsScreen({ route }: { route?: { params?: { code?: string } } }) {
+  const { t } = useTranslation();
   useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -85,6 +107,29 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const block = useBlockUser();
   const unblock = useUnblockUser();
   const redeem = useRedeemInvite();
+  const cheer = useCheer();
+  const isFocused = useIsFocused();
+  const [pulse, setPulse] = useState<{ id: string | null; tick: number }>({ id: null, tick: 0 });
+  const [now, setNow] = useState(() => Date.now());
+
+  // Live XP from friends while this screen is on top and the Friends tab
+  // is showing; channels close as soon as you leave.
+  const onXpChange = useCallback((userId: string, delta: number) => {
+    if (delta > 0) setPulse((p) => ({ id: userId, tick: p.tick + 1 }));
+  }, []);
+  useFriendsXpRealtime({
+    rows: circle.data,
+    enabled: isFocused && section === 'friends',
+    onXpChange,
+  });
+
+  // Re-check cheer cooldowns once a minute while visible.
+  useEffect(() => {
+    if (!isFocused) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [isFocused]);
 
   const friends = useMemo(() => friendsOnly(circle.data ?? []), [circle.data]);
   const leaderboard = useMemo(() => rankLeaderboard(circle.data ?? []), [circle.data]);
@@ -135,7 +180,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
     try {
       await Share.share({ message: inviteMessage(code) });
     } catch {
-      toast.showToast({ message: 'Sharing is not available on this device.' });
+      toast.showToast({ message: t('friends.sharingIsNotAvailable') });
     }
   };
 
@@ -145,7 +190,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
     try {
       const result = await redeem.mutateAsync(code);
       if (result.redeemed) {
-        toast.showToast({ message: 'You are connected. Welcome to your circle.' });
+        toast.showToast({ message: t('friends.youAreConnectedWelcome') });
         setInviteCode('');
         setSection('friends');
       } else {
@@ -158,11 +203,18 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
 
   const onError = (e: unknown) => toast.showToast({ message: errorText(e) });
 
+  const cheerOn = (row: RankedRow) =>
+    cheer.mutate(row.id, {
+      onSuccess: () =>
+        toast.showToast({ message: t('friends.youCheeredOn', { name: displayName(row) }) }),
+      onError: (e) => toast.showToast({ message: cheerErrorText(e) }),
+    });
+
   const confirmUnfriend = (friend: FriendRow) => {
-    Alert.alert('Unfriend', `Remove ${displayName(friend)} from your friends?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('friends.unfriend'), t('friends.removeFromYourFriends', { name: displayName(friend) }), [
+      { text: t('friends.cancel'), style: 'cancel' },
       {
-        text: 'Unfriend',
+        text: t('friends.unfriend'),
         style: 'destructive',
         onPress: () => unfriend.mutate(friend.friendship_id, { onError }),
       },
@@ -170,10 +222,10 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   };
 
   const confirmBlock = (userId: string, name: string) => {
-    Alert.alert('Block user', `Block ${name}? They will not find you in search or be able to add you.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('friends.blockUser'), t('friends.blockTheyWillNot', { name }), [
+      { text: t('friends.cancel'), style: 'cancel' },
       {
-        text: 'Block',
+        text: t('friends.block'),
         style: 'destructive',
         onPress: () => block.mutate(userId, { onError }),
       },
@@ -182,10 +234,10 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
 
   const friendOptions = (friend: FriendRow) =>
     Alert.alert(displayName(friend), `@${friend.username}`, [
-      { text: 'Close', style: 'cancel' },
-      { text: 'Unfriend', style: 'destructive', onPress: () => confirmUnfriend(friend) },
+      { text: t('friends.close'), style: 'cancel' },
+      { text: t('friends.unfriend'), style: 'destructive', onPress: () => confirmUnfriend(friend) },
       {
-        text: 'Block',
+        text: t('friends.block'),
         style: 'destructive',
         onPress: () => confirmBlock(friend.id, displayName(friend)),
       },
@@ -198,8 +250,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         onSuccess: () =>
           toast.showToast({
             message: accept
-              ? `You and ${displayName(request.user)} are now friends.`
-              : 'Request declined.',
+              ? t('friends.youAndAreNow', { name: displayName(request.user) })
+              : t('friends.requestDeclined'),
           }),
         onError,
       },
@@ -212,8 +264,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         toast.showToast({
           message:
             row.status === 'accepted'
-              ? `You and ${displayName(user)} are now friends.`
-              : 'Request sent.',
+              ? t('friends.youAndAreNow', { name: displayName(user) })
+              : t('friends.requestSent'),
         }),
       onError,
     });
@@ -226,9 +278,9 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   return (
     <Screen padded={false} scroll>
       <View style={styles.header}>
-        <Txt variant="title">Friends</Txt>
+        <Txt variant="title">{t('friends.friends')}</Txt>
         <Txt variant="caption" color={colors.inkFaint}>
-          Grow together. Your stats stay private unless you share them.
+          {t('friends.growTogetherYourStats')}
         </Txt>
       </View>
 
@@ -257,7 +309,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
       <View style={styles.body}>
         {section === 'friends' ? (
           <>
-            <Button title="Invite friends" onPress={shareInvite} style={styles.inviteButton} />
+            <Button title={t('friends.inviteFriends')} onPress={shareInvite} style={styles.inviteButton} />
             {circle.isLoading ? (
               <View>
                 <Skeleton height={72} style={styles.skeletonBlock} />
@@ -266,11 +318,11 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
             ) : circle.isError ? (
               <>
                 <EmptyState
-                  title="Could not load your friends"
-                  body="Check your connection and try again."
+                  title={t('friends.couldNotLoadYour')}
+                  body={t('friends.checkYourConnectionAnd')}
                 />
                 <Button
-                  title="Try again"
+                  title={t('friends.tryAgain')}
                   variant="secondary"
                   onPress={() => circle.refetch()}
                   style={styles.inviteButton}
@@ -278,44 +330,30 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
               </>
             ) : friends.length === 0 ? (
               <EmptyState
-                title="No friends yet"
-                body="Invite people you trust, or find them by username in the Find tab."
+                title={t('friends.noFriendsYet')}
+                body={t('friends.invitePeopleYouTrust')}
               />
             ) : (
               <>
                 <Card padded={false} style={styles.card}>
                   <View style={styles.sectionHeader}>
-                    <Txt variant="label">This week, by XP</Txt>
+                    <Txt variant="label">{t('friends.thisWeekByXp')}</Txt>
                   </View>
                   <Hairline />
-                  {leaderboard.map((row, index) => (
-                    <View key={row.id}>
-                      {index > 0 ? <Hairline /> : null}
-                      <View style={[styles.row, row.is_me && styles.meRow]}>
-                        <Txt variant="bodySemi" color={colors.gold} style={styles.rank}>
-                          {`${row.rank}`}
-                        </Txt>
-                        <ProfileAvatar profile={userToProfile(row)} size={44} animated={false} />
-                        <View style={styles.rowBody}>
-                          <Txt variant="bodySemi">
-                            {row.is_me ? 'You' : displayName(row)}
-                          </Txt>
-                          <Txt variant="caption" color={colors.inkFaint}>
-                            {`Level ${row.level ?? 1} · ${streakLabel(row.current_streak ?? 0)}`}
-                          </Txt>
-                        </View>
-                        <Txt variant="bodySemi" color={colors.accent}>
-                          {`${row.weekly_xp ?? 0} XP`}
-                        </Txt>
-                      </View>
-                    </View>
-                  ))}
+                  <FriendsLeaderboard
+                    rows={leaderboard}
+                    pulseId={pulse.id}
+                    pulseTick={pulse.tick}
+                    onCheer={cheerOn}
+                    cheeringId={cheer.isPending ? cheer.variables ?? null : null}
+                    now={now}
+                  />
                   {privateCount > 0 ? (
                     <>
                       <Hairline />
                       <View style={styles.sectionHeader}>
                         <Txt variant="caption" color={colors.inkFaint}>
-                          {`${pluralize(privateCount, 'friend')} keep${privateCount === 1 ? 's' : ''} stats private`}
+                          {t('friends.keepStatsPrivate', { count: privateCount })}
                         </Txt>
                       </View>
                     </>
@@ -324,7 +362,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
 
                 <Card padded={false} style={styles.card}>
                   <View style={styles.sectionHeader}>
-                    <Txt variant="label">{`Your friends (${friends.length})`}</Txt>
+                    <Txt variant="label">{t('friends.yourFriends', { length: friends.length })}</Txt>
                   </View>
                   <Hairline />
                   {friends.map((friend, index) => (
@@ -332,7 +370,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                       {index > 0 ? <Hairline /> : null}
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Options for ${displayName(friend)}`}
+                        accessibilityLabel={t('friends.optionsFor', { name: displayName(friend) })}
                         onPress={() => friendOptions(friend)}
                         onLongPress={() => friendOptions(friend)}
                         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -342,8 +380,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                           <Txt variant="bodySemi">{displayName(friend)}</Txt>
                           <Txt variant="caption" color={colors.inkFaint}>
                             {friend.stats_shared
-                              ? `Level ${friend.level ?? 1} · best ${pluralize(friend.best_streak ?? 0, 'day')}`
-                              : `@${friend.username} · stats private`}
+                              ? t('friends.levelBest', { level: friend.level ?? 1, best: bestStreakLabel(friend.best_streak ?? 0) })
+                              : t('friends.statsPrivate', { username: friend.username })}
                           </Txt>
                         </View>
                         <Txt variant="bodySemi" color={colors.inkFaint}>
@@ -363,8 +401,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
             <Skeleton height={72} style={styles.skeletonBlock} />
           ) : (requests.data ?? []).length === 0 ? (
             <EmptyState
-              title="No pending requests"
-              body="When someone adds you, their request lands here in real time."
+              title={t('friends.noPendingRequests')}
+              body={t('friends.whenSomeoneAddsYou')}
             />
           ) : (
             (requests.data ?? []).map((request: FriendRequest) => (
@@ -375,22 +413,22 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                     <Txt variant="bodySemi">{displayName(request.user)}</Txt>
                     <Txt variant="caption" color={colors.inkFaint}>
                       {request.direction === 'incoming'
-                        ? `@${request.user.username} wants to connect`
-                        : 'Waiting for them to answer'}
+                        ? t('friends.wantsToConnect', { username: request.user.username })
+                        : t('friends.waitingForThemTo')}
                     </Txt>
                   </View>
                 </View>
                 {request.direction === 'incoming' ? (
                   <View style={styles.requestActions}>
                     <Button
-                      title="Accept"
+                      title={t('friends.accept')}
                       onPress={() => answer(request, true)}
                       disabled={isBusy(request.friendship_id)}
                       loading={isBusy(request.friendship_id) && respond.variables?.accept === true}
                       style={styles.acceptButton}
                     />
                     <Button
-                      title="Decline"
+                      title={t('friends.decline')}
                       variant="ghost"
                       onPress={() => answer(request, false)}
                       disabled={isBusy(request.friendship_id)}
@@ -399,7 +437,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                   </View>
                 ) : (
                   <Button
-                    title="Cancel request"
+                    title={t('friends.cancelRequest')}
                     variant="ghost"
                     onPress={() => unfriend.mutate(request.friendship_id, { onError })}
                     disabled={isBusy(request.friendship_id)}
@@ -418,11 +456,11 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                 style={styles.search}
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search by username"
+                placeholder={t('friends.searchByUsername')}
                 placeholderTextColor={colors.inkFaint}
                 autoCapitalize="none"
                 autoCorrect={false}
-                accessibilityLabel="Search by username"
+                accessibilityLabel={t('friends.searchByUsername')}
               />
             </View>
             {query.trim().length >= 2 ? (
@@ -430,8 +468,8 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                 <Skeleton height={64} style={styles.skeletonBlock} />
               ) : (search.data ?? []).length === 0 ? (
                 <EmptyState
-                  title="No one found"
-                  body="Check the spelling, or invite them with your personal link."
+                  title={t('friends.noOneFound')}
+                  body={t('friends.checkTheSpellingOr')}
                 />
               ) : (
                 <Card padded={false} style={styles.card}>
@@ -467,7 +505,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
 
             <Card style={styles.card}>
               <Txt variant="label" style={styles.haveCodeLabel}>
-                Have an invite code?
+                {t('friends.haveAnInviteCode')}
               </Txt>
               <View style={styles.codeRow}>
                 <TextInput
@@ -478,10 +516,10 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                   placeholderTextColor={colors.inkFaint}
                   autoCapitalize="characters"
                   autoCorrect={false}
-                  accessibilityLabel="Invite code"
+                  accessibilityLabel={t('friends.inviteCode')}
                 />
                 <Button
-                  title="Connect"
+                  title={t('friends.connect')}
                   onPress={redeemCode}
                   loading={redeem.isPending}
                   style={styles.codeButton}
@@ -490,7 +528,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
             </Card>
 
             <Button
-              title="Share my invite link"
+              title={t('friends.shareMyInviteLink')}
               variant="secondary"
               onPress={shareInvite}
               style={styles.shareButton}
@@ -499,7 +537,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
             {(blocked.data ?? []).length > 0 ? (
               <Card padded={false} style={styles.card}>
                 <View style={styles.sectionHeader}>
-                  <Txt variant="label">{`Blocked (${(blocked.data ?? []).length})`}</Txt>
+                  <Txt variant="label">{t('friends.blocked', { length: (blocked.data ?? []).length })}</Txt>
                 </View>
                 {(blocked.data ?? []).map((user) => (
                   <View key={user.id}>
@@ -512,7 +550,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                         </Txt>
                       </View>
                       <Button
-                        title="Unblock"
+                        title={t('friends.unblock')}
                         variant="ghost"
                         loading={unblock.isPending && unblock.variables === user.id}
                         onPress={() => unblock.mutate(user.id, { onError })}
@@ -571,18 +609,12 @@ const styles = themed(() =>
       padding: spacing.lg,
       minHeight: 64,
     },
-    rank: {
-      width: 24,
-    },
     rowBody: {
       flex: 1,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
     rowBodyFlat: {
       flex: 1,
-    },
-    meRow: {
-      backgroundColor: colors.paperAlt,
     },
     requestCard: {
       marginBottom: spacing.md,
@@ -593,7 +625,7 @@ const styles = themed(() =>
     },
     acceptButton: {
       flex: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     declineButton: {
       flex: 1,
@@ -637,7 +669,7 @@ const styles = themed(() =>
       color: colors.ink,
       fontSize: 16,
       letterSpacing: 2,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     codeButton: {
       minWidth: 96,

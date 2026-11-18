@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import Card from '../components/Card';
 import Hairline from '../components/Hairline';
@@ -40,13 +42,13 @@ const DEFAULT_PREFS: Prefs = {
 };
 
 const TYPE_ROWS: { key: keyof Prefs; label: string }[] = [
-  { key: 'friend_requests', label: 'Friend requests' },
-  { key: 'quest_reminders', label: 'Missed quest at 6 PM' },
-  { key: 'streak_risk', label: 'Streak at risk' },
-  { key: 'low_pillar', label: 'Neglected pillar' },
-  { key: 'behavior_patterns', label: 'Patterns the coach notices' },
-  { key: 'coach_messages', label: 'Level-ups' },
-  { key: 'weekly_report', label: 'Weekly report' },
+  { key: 'friend_requests', get label() { return i18n.t('notificationSettings.friendRequests'); } },
+  { key: 'quest_reminders', get label() { return i18n.t('notificationSettings.missedQuestAt6'); } },
+  { key: 'streak_risk', get label() { return i18n.t('notificationSettings.streakAtRisk'); } },
+  { key: 'low_pillar', get label() { return i18n.t('notificationSettings.neglectedPillar'); } },
+  { key: 'behavior_patterns', get label() { return i18n.t('notificationSettings.patternsTheCoachNotices'); } },
+  { key: 'coach_messages', get label() { return i18n.t('notificationSettings.levelUps'); } },
+  { key: 'weekly_report', get label() { return i18n.t('notificationSettings.weeklyReport'); } },
 ];
 
 function shiftHour(time: string, delta: number): string {
@@ -56,6 +58,7 @@ function shiftHour(time: string, delta: number): string {
 }
 
 export function NotificationSettingsScreen() {
+  const { t } = useTranslation();
   useTheme();
   const toast = useToast();
   const [prefs, setPrefs] = useState<Prefs | null>(null);
@@ -91,7 +94,7 @@ export function NotificationSettingsScreen() {
             message:
               e instanceof Error
                 ? e.message
-                : 'Could not load preferences. Showing defaults.',
+                : t('notificationSettings.couldNotLoadPreferences'),
           });
         }
       } finally {
@@ -134,7 +137,7 @@ export function NotificationSettingsScreen() {
         message:
           e instanceof Error
             ? e.message
-            : 'Could not save preferences. Try again.',
+            : t('notificationSettings.couldNotSavePreferences'),
       });
     } finally {
       setSaving(false);
@@ -156,10 +159,10 @@ export function NotificationSettingsScreen() {
   return (
     <Screen scroll>
       <Txt variant="title" style={styles.title}>
-        Notifications
+        {t('notificationSettings.notifications')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.subtitle}>
-        {`At most ${prefs?.max_per_day ?? 3} messages per day, none during quiet hours.`}
+        {t('notificationSettings.atMostMessagesPer', { count: prefs?.max_per_day ?? 3 })}
       </Txt>
 
       {loading || !prefs ? (
@@ -172,20 +175,20 @@ export function NotificationSettingsScreen() {
         <>
           <Card padded={false} style={styles.card}>
             <View style={styles.row}>
-              <Txt variant="body">Push notifications</Txt>
+              <Txt variant="body">{t('notificationSettings.pushNotifications')}</Txt>
               <Switch
                 value={prefs.push_enabled}
                 onValueChange={(v) => toggle('push_enabled', v)}
                 trackColor={trackColor}
                 thumbColor={colors.card}
-                accessibilityLabel="Push notifications"
+                accessibilityLabel={t('notificationSettings.pushNotifications')}
               />
             </View>
           </Card>
 
           <Card padded={false} style={styles.card}>
             <View style={styles.sectionHeader}>
-              <Txt variant="label">Types</Txt>
+              <Txt variant="label">{t('notificationSettings.types')}</Txt>
             </View>
             <Hairline />
             {TYPE_ROWS.map(({ key, label }, index) => (
@@ -207,13 +210,13 @@ export function NotificationSettingsScreen() {
 
           <Card padded={false} style={styles.card}>
             <View style={styles.sectionHeader}>
-              <Txt variant="label">Quiet hours</Txt>
+              <Txt variant="label">{t('notificationSettings.quietHours')}</Txt>
             </View>
             <Hairline />
             {(
               [
-                { key: 'quiet_start' as const, label: 'From' },
-                { key: 'quiet_end' as const, label: 'Until' },
+                { key: 'quiet_start' as const, label: t('notificationSettings.from') },
+                { key: 'quiet_end' as const, label: t('notificationSettings.until') },
               ]
             ).map(({ key, label }, index) => (
               <View key={key}>
@@ -223,7 +226,7 @@ export function NotificationSettingsScreen() {
                   <View style={styles.timeAdjuster}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`${label} one hour earlier`}
+                      accessibilityLabel={t('notificationSettings.oneHourEarlier', { label })}
                       onPress={() => adjustQuiet(key, -1)}
                       style={({ pressed }) => [
                         styles.timeButton,
@@ -237,7 +240,7 @@ export function NotificationSettingsScreen() {
                     </Txt>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`${label} one hour later`}
+                      accessibilityLabel={t('notificationSettings.oneHourLater', { label })}
                       onPress={() => adjustQuiet(key, 1)}
                       style={({ pressed }) => [
                         styles.timeButton,
@@ -258,7 +261,7 @@ export function NotificationSettingsScreen() {
             align="center"
             style={styles.saveNote}
           >
-            {saving ? 'Saving' : 'Changes save automatically.'}
+            {saving ? t('notificationSettings.saving') : t('notificationSettings.changesSaveAutomatically')}
           </Txt>
         </>
       )}

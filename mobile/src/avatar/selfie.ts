@@ -4,6 +4,7 @@
 // supabase/functions/generate-avatar-config.
 
 import { fitToSex, VALID_OPTION_IDS } from './options';
+import i18n from '../i18n';
 import type { AvatarChoiceKey, AvatarConfig } from './types';
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -79,15 +80,15 @@ export function applySelfieResult(config: AvatarConfig, result: SelfieResult): A
 /** What to tell the person once the avatar is loaded. */
 export function resultNote(result: SelfieResult | null, error: string | null): string {
   if (!result || result.source === 'random') {
-    if (error === 'no_face') return 'We could not see a face in that photo, so here is a random start. Try a clear, front-facing selfie.';
-    if (error === 'not_configured') return 'Photo reading is not switched on yet, so here is a random start.';
-    if (error && /rate_limited/.test(error)) return 'The AI is busy right now, so here is a random start. Try again in a minute.';
-    return 'We could not read the photo this time, so here is a random start to edit.';
+    if (error === 'no_face') return i18n.t('selfie.weCouldNotSee');
+    if (error === 'not_configured') return i18n.t('selfie.photoReadingIsNot');
+    if (error && /rate_limited/.test(error)) return i18n.t('selfie.theAiIsBusy');
+    return i18n.t('selfie.weCouldNotRead');
   }
   const beard = result.facialHair !== 'none'
-    ? ` The avatar cannot show ${result.facialHair === 'stubble' ? 'stubble' : `a ${result.facialHair}`} yet.`
+    ? ` ${i18n.t('selfie.theAvatarCannotShow', { what: i18n.t(`selfie.facial.${result.facialHair}`) })}`
     : '';
-  return `We matched your skin tone, hair, eye color and glasses. Fine-tune the face in the tabs below.${beard}`;
+  return i18n.t('selfie.weMatchedYourSkin', { beard });
 }
 
 export interface PollDeps {

@@ -3,7 +3,9 @@
 // the editor gets a random avatar instead, so the person is never stuck.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomAvatarConfig } from '../avatar/options';
 import { applySelfieResult, resultNote } from '../avatar/selfie';
@@ -14,6 +16,7 @@ import { colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
+import LoadingDots from './LoadingDots';
 
 interface Props {
   visible: boolean;
@@ -27,11 +30,12 @@ interface Props {
 type Step = 'idle' | 'upload' | 'read';
 
 const SOURCE_LABEL: Record<SelfieSource, string> = {
-  camera: 'Take a selfie',
-  gallery: 'Choose a photo',
+  camera: i18n.t('selfie.takeASelfie'),
+  gallery: i18n.t('selfie.chooseAPhoto'),
 };
 
 export default function SelfieAvatarSheet({ visible, config, level, onApply, onClose }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const [step, setStep] = useState<Step>('idle');
   const [message, setMessage] = useState<string | null>(null);
@@ -80,7 +84,7 @@ export default function SelfieAvatarSheet({ visible, config, level, onApply, onC
         if (e.code !== 'cancelled') setMessage(e.message);
         setNeedsSettings(e.code === 'permission');
       } else {
-        setMessage('Something went wrong. Try again.');
+        setMessage(t('selfie.somethingWentWrongTry'));
       }
     } finally {
       if (!cancelled.current) setStep('idle');
@@ -91,26 +95,25 @@ export default function SelfieAvatarSheet({ visible, config, level, onApply, onC
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
       <SafeAreaView style={styles.screen}>
         <View style={styles.header}>
-          <Txt variant="title">Make it look like me</Txt>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.close}>
-            <Txt variant="bodySemi">{busy ? 'Cancel' : 'Close'}</Txt>
+          <Txt variant="title">{t('selfie.makeItLookLike')}</Txt>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('selfie.close')} onPress={onClose} style={styles.close}>
+            <Txt variant="bodySemi">{busy ? t('selfie.cancel') : t('selfie.close')}</Txt>
           </Pressable>
         </View>
         <Txt variant="body" color={colors.inkSoft} style={styles.intro}>
-          Take a clear, front-facing selfie in good light. The AI picks your skin tone, hairstyle, hair color, eye color and
-          glasses. Your photo is private, used once, then deleted.
+          {t('selfie.takeAClearFront')}
         </Txt>
 
         <View style={styles.frame}>
           {busy ? (
             <View style={styles.center} accessibilityLiveRegion="polite">
-              <ActivityIndicator color={colors.accent} />
-              <Txt variant="bodySemi">{step === 'upload' ? 'Uploading your photo…' : 'Reading your photo…'}</Txt>
-              <Txt variant="caption" color={colors.inkSoft}>This usually takes 5 to 15 seconds.</Txt>
+              <LoadingDots color={colors.accent} accessibilityLabel={t('selfie.workingOnYourAvatar')} />
+              <Txt variant="bodySemi">{step === 'upload' ? t('selfie.uploadingYourPhoto') : t('selfie.readingYourPhoto')}</Txt>
+              <Txt variant="caption" color={colors.inkSoft}>{t('selfie.thisUsuallyTakes5')}</Txt>
             </View>
           ) : (
             <View style={styles.center}>
-              <Txt variant="caption" color={colors.inkSoft}>Face the camera, no hat, hair visible.</Txt>
+              <Txt variant="caption" color={colors.inkSoft}>{t('selfie.faceTheCameraNo')}</Txt>
             </View>
           )}
         </View>
@@ -138,11 +141,11 @@ export default function SelfieAvatarSheet({ visible, config, level, onApply, onC
           {needsSettings ? (
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Open settings to allow camera and photos"
+              accessibilityLabel={t('selfie.openSettingsToAllow')}
               onPress={openAppSettings}
               style={styles.secondary}
             >
-              <Txt variant="bodySemi">Open settings</Txt>
+              <Txt variant="bodySemi">{t('selfie.openSettings')}</Txt>
             </PressableScale>
           ) : null}
         </View>

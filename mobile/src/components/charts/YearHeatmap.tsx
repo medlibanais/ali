@@ -12,7 +12,9 @@
 // - One Pressable covers the grid and maps the tap position to a day,
 //   instead of 365 touchables.
 
+import i18n, { appLocale, monthShort } from '../../i18n';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AccessibilityInfo,
   Animated,
@@ -134,7 +136,7 @@ const WeekColumn = memo(function WeekColumn({ cells, fills, progress }: ColumnPr
 /** Continuous color scale. Memoized: it only changes with the data or theme. */
 const Legend = memo(function Legend({ scaleMax }: { scaleMax: number; themeId: string }) {
   return (
-    <View style={styles.legend} accessibilityLabel={`Color scale from 0 to ${scaleMax} XP or more`}>
+    <View style={styles.legend} accessibilityLabel={i18n.t('charts.heatLegendA11y', { max: scaleMax })}>
       <Txt variant="caption" color={colors.inkFaint}>
         0
       </Txt>
@@ -157,7 +159,7 @@ const Legend = memo(function Legend({ scaleMax }: { scaleMax: number; themeId: s
         <Rect x={0} y={0} width={64} height={10} rx={3} fill="url(#yearHeatLegend)" />
       </Svg>
       <Txt variant="caption" color={colors.inkFaint}>
-        {`${scaleMax}+ XP`}
+        {i18n.t('charts.heatLegendMax', { max: scaleMax })}
       </Txt>
     </View>
   );
@@ -165,6 +167,7 @@ const Legend = memo(function Legend({ scaleMax }: { scaleMax: number; themeId: s
 
 export function YearHeatmap({ days, today }: YearHeatmapProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const grid = useMemo(() => buildYearGrid(days, today), [days, today]);
   const [selected, setSelected] = useState<HeatCell | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -252,14 +255,15 @@ export function YearHeatmap({ days, today }: YearHeatmapProps) {
 
   const summary =
     grid.activeDays === 0
-      ? 'No XP in the last 365 days yet.'
-      : `${grid.totalXp.toLocaleString()} XP over ${grid.activeDays} active days in the last year.`;
+      ? t('charts.heatEmpty')
+      : t('charts.heatSummary', { xp: grid.totalXp.toLocaleString(appLocale()), count: grid.activeDays });
 
+  // The calendar grid keeps weeks running left to right in every language.
   return (
-    <View>
+    <View style={styles.ltr}>
       <View style={styles.body}>
         <View style={styles.dayLabels} accessibilityElementsHidden importantForAccessibility="no">
-          {['Mon', 'Wed', 'Fri'].map((d, i) => (
+          {[t('charts.mon'), t('charts.wed'), t('charts.fri')].map((d, i) => (
             <Txt
               key={d}
               variant="caption"
@@ -286,13 +290,13 @@ export function YearHeatmap({ days, today }: YearHeatmapProps) {
                   color={colors.inkFaint}
                   style={[styles.month, { left: m.col * PITCH }]}
                 >
-                  {m.label}
+                  {monthShort(m.month)}
                 </Txt>
               ))}
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Year of activity. ${summary} Tap a day to see its date and XP.`}
+              accessibilityLabel={t('charts.heatA11y', { summary })}
               onPress={onPress}
               style={[styles.grid, { width, height: GRID_H }]}
             >
@@ -333,7 +337,7 @@ export function YearHeatmap({ days, today }: YearHeatmapProps) {
                   color={selected.xp > 0 ? colors.accent : colors.ink}
                   numberOfLines={1}
                 >
-                  {selected.xp > 0 ? `${selected.xp.toLocaleString()} XP earned` : 'No XP'}
+                  {selected.xp > 0 ? t('charts.heatEarned', { xp: selected.xp.toLocaleString(appLocale()) }) : t('charts.heatNone')}
                 </Txt>
               </View>
             ) : null}
@@ -343,7 +347,7 @@ export function YearHeatmap({ days, today }: YearHeatmapProps) {
 
       <View style={styles.footer}>
         <Txt variant="caption" color={colors.inkFaint} style={styles.footerText} numberOfLines={2}>
-          {grid.best ? `Best day: ${formatHeatDate(grid.best.date)}, ${grid.best.xp} XP` : summary}
+          {grid.best ? t('charts.heatBest', { date: formatHeatDate(grid.best.date), xp: grid.best.xp }) : summary}
         </Txt>
         <Legend scaleMax={grid.scaleMax} themeId={theme.id} />
       </View>
@@ -353,6 +357,7 @@ export function YearHeatmap({ days, today }: YearHeatmapProps) {
 
 const styles = themed(() =>
   StyleSheet.create({
+    ltr: { direction: 'ltr' },
     body: {
       flexDirection: 'row',
     },
@@ -384,7 +389,7 @@ const styles = themed(() =>
     column: {
       width: CELL,
       height: GRID_H,
-      marginRight: GAP,
+      marginEnd: GAP,
     },
     tooltip: {
       position: 'absolute',
@@ -404,7 +409,7 @@ const styles = themed(() =>
     },
     footerText: {
       flex: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     legend: {
       flexDirection: 'row',

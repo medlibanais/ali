@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 // Single source of truth for XP / level math on the client.
 // Mirrors supabase/migrations/0001_init.sql (xp_for_level,
 // cumulative_xp_for_level, level_for_xp, title_for_level).
@@ -42,9 +43,9 @@ export function levelProgress(totalXp: number): number {
 }
 
 export function titleForLevel(level: number): string {
-  if (level >= 76) return 'Legendary';
-  if (level >= 51) return 'Guardian of Family';
-  if (level >= 26) return 'Iron Mind';
-  if (level >= 11) return 'Disciplined Human';
-  return 'Novice';
+  if (level >= 76) return i18n.t('levelTitles.legendary');
+  if (level >= 51) return i18n.t('levelTitles.guardian');
+  if (level >= 26) return i18n.t('levelTitles.ironMind');
+  if (level >= 11) return i18n.t('levelTitles.disciplined');
+  return i18n.t('levelTitles.novice');
 }

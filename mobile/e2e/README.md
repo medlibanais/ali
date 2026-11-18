@@ -72,10 +72,10 @@ Failing steps save a screenshot and the device log in `e2e/artifacts/`.
 - Detox's automatic idle-waiting is off: the app has never-ending
   animations (ambient background, breathing avatar), so every step waits for
   its own element instead.
-- The test finds things by `testID`. If you rename or remove one of these,
+- The test finds things by `testID`, never by text, so it works in English, French and Arabic. If you rename or remove one of these,
   update the test: `login-create-account`, `login-email`, `login-password`,
   `login-submit`, `register-email`, `register-password`, `register-submit`,
-  `verify-back-to-sign-in`, `onboarding-scroll`, `onboarding-continue`,
+  `verify-title`, `verify-back-to-sign-in`, `onboarding-step-1` to `onboarding-step-7`, `onboarding-scroll`, `onboarding-continue`,
   `onboarding-first-name`, `onboarding-username`, `ai-avatar-design-by-hand`,
   `avatar-randomize`, `avatar-save`, `today-scroll`, `quest-complete`,
   `today-total-xp`.

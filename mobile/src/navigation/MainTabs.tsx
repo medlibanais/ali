@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import Glass from '../components/Glass';
 import Txt from '../components/Txt';
 import {
@@ -20,12 +21,22 @@ import {
   QuestsIcon,
   TodayIcon,
 } from '../components/icons';
-import TodayScreen from '../screens/TodayScreen';
-import QuestsScreen from '../screens/QuestsScreen';
-import CoachScreen from '../screens/CoachScreen';
-import InsightsScreen from '../screens/InsightsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import TodayScreenBase from '../screens/TodayScreen';
+import QuestsScreenBase from '../screens/QuestsScreen';
+import CoachScreenBase from '../screens/CoachScreen';
+import InsightsScreenBase from '../screens/InsightsScreen';
+import ProfileScreenBase from '../screens/ProfileScreen';
+import { withTabTransition } from '../components/TabScene';
+import { playHaptic } from '../lib/haptics';
+import { launchHero } from '../lib/hero';
 import type { MainTabParamList } from './types';
+
+// Each tab rises into place on focus (custom transition, UI thread).
+const TodayScreen = withTabTransition(TodayScreenBase);
+const QuestsScreen = withTabTransition(QuestsScreenBase);
+const CoachScreen = withTabTransition(CoachScreenBase);
+const InsightsScreen = withTabTransition(InsightsScreenBase);
+const ProfileScreen = withTabTransition(ProfileScreenBase);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -58,9 +69,24 @@ function tabIcon(Icon: TabIcon, label: string) {
 
 export function MainTabs() {
   useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
+      screenListeners={({ navigation, route }) => ({
+        tabPress: (e) => {
+          const state = navigation.getState();
+          const current = state.routes[state.index]?.name;
+          if (current === route.name) return;
+          playHaptic('tab');
+          // Today -> Profile: the avatar flies across (components/Hero).
+          // Hold the switch until Today's avatar is measured (a frame).
+          if (current === 'Today' && route.name === 'Profile') {
+            e.preventDefault();
+            launchHero('avatar').then(() => navigation.navigate('Profile'));
+          }
+        },
+      })}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -75,27 +101,27 @@ export function MainTabs() {
       <Tab.Screen
         name="Today"
         component={TodayScreen}
-        options={{ tabBarIcon: tabIcon(TodayIcon, 'Today'), tabBarAccessibilityLabel: 'Today' }}
+        options={{ tabBarIcon: tabIcon(TodayIcon, t('tabs.today')), tabBarAccessibilityLabel: t('tabs.today') }}
       />
       <Tab.Screen
         name="Quests"
         component={QuestsScreen}
-        options={{ tabBarIcon: tabIcon(QuestsIcon, 'Quests'), tabBarAccessibilityLabel: 'Quests' }}
+        options={{ tabBarIcon: tabIcon(QuestsIcon, t('tabs.quests')), tabBarAccessibilityLabel: t('tabs.quests') }}
       />
       <Tab.Screen
         name="Coach"
         component={CoachScreen}
-        options={{ tabBarIcon: tabIcon(CoachIcon, 'Coach'), tabBarAccessibilityLabel: 'Coach' }}
+        options={{ tabBarIcon: tabIcon(CoachIcon, t('tabs.coach')), tabBarAccessibilityLabel: t('tabs.coach') }}
       />
       <Tab.Screen
         name="Insights"
         component={InsightsScreen}
-        options={{ tabBarIcon: tabIcon(InsightsIcon, 'Insights'), tabBarAccessibilityLabel: 'Insights' }}
+        options={{ tabBarIcon: tabIcon(InsightsIcon, t('tabs.insights')), tabBarAccessibilityLabel: t('tabs.insights') }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarIcon: tabIcon(ProfileIcon, 'Profile'), tabBarAccessibilityLabel: 'Profile' }}
+        options={{ tabBarIcon: tabIcon(ProfileIcon, t('tabs.profile')), tabBarAccessibilityLabel: t('tabs.profile') }}
       />
     </Tab.Navigator>
   );
@@ -106,8 +132,8 @@ const styles = themed(() =>
     // A floating pill card above the bottom edge instead of a hard bar.
     bar: {
       position: 'absolute',
-      left: 16,
-      right: 16,
+      start: 16,
+      end: 16,
       height: 64,
       paddingTop: 0,
       paddingBottom: 0,

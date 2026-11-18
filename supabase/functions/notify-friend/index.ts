@@ -11,7 +11,14 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-type NotifyType = 'friend_request' | 'friend_accepted' | 'friend_streak_milestone';
+type NotifyType =
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'friend_streak_milestone'
+  | 'cheer';
+
+// A cheer is pushed only if its row is this fresh (stops late replays).
+const CHEER_MAX_AGE_MS = 5 * 60 * 1000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -84,6 +91,25 @@ Deno.serve(async (req: Request) => {
       const name = await displayName(admin, otherId);
       title = 'Request accepted';
       message = `${name} accepted your request. Streaks together now.`;
+    } else if (type === 'cheer') {
+      // send_cheer() already checked the friendship and the rate limits
+      // and wrote the row. Here we only push a row the caller sent, once.
+      if (!actorId) return json({ error: 'unauthorized' }, 401);
+      const { data: cheer } = await admin
+        .from('cheers')
+        .update({ notified_at: new Date().toISOString() })
+        .eq('id', body?.cheer_id ?? '')
+        .eq('from_user', actorId)
+        .is('notified_at', null)
+        .gte('created_at', new Date(Date.now() - CHEER_MAX_AGE_MS).toISOString())
+        .select('to_user')
+        .maybeSingle();
+      if (!cheer) return json({ delivered: false, reason: 'no_cheer' }, 200);
+      recipientId = cheer.to_user as string;
+      otherId = actorId;
+      const name = await displayName(admin, actorId);
+      title = 'Cheer';
+      message = `${name} cheered you on!`;
     } else if (type === 'friend_streak_milestone') {
       // Sent by the database trigger only.
       if (!isCron) return json({ error: 'unauthorized' }, 401);
