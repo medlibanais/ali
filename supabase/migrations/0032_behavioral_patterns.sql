@@ -1,6 +1,6 @@
--- PrayerLock 0025: behavioral pattern detection for Insights.
+-- PrayerLock 0032: behavioral pattern detection for Insights.
 --
--- (Numbered 0025: 0015-0024 are on main or claimed by open branches.
+-- (Numbered 0032: lower numbers are on main or claimed by open branches.
 -- Gaps are fine for supabase db push.)
 --
 -- 1. View public.user_behavioral_patterns: one row for the signed-in user.
