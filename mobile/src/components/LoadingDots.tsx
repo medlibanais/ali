@@ -3,6 +3,7 @@
 // would not fit. Runs on the UI thread (Reanimated).
 
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -51,7 +52,7 @@ function Dot({
     <Animated.View
       style={[
         { width: size, height: size, borderRadius: size / 2, backgroundColor: color },
-        index > 0 && { marginLeft: size * 0.8 },
+        index > 0 && { marginStart: size * 0.8 },
         animated,
       ]}
     />
@@ -62,8 +63,9 @@ export function LoadingDots({
   color,
   size = 7,
   style,
-  accessibilityLabel = 'Loading',
+  accessibilityLabel,
 }: LoadingDotsProps) {
+  const { t } = useTranslation();
   const clock = useSharedValue(0);
   useEffect(() => {
     clock.value = withRepeat(
@@ -79,7 +81,7 @@ export function LoadingDots({
       style={[styles.row, { height: size * 2.4 }, style]}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? t('common.loading')}
       accessibilityState={{ busy: true }}
     >
       {[0, 1, 2].map((i) => (

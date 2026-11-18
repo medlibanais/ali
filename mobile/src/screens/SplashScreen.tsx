@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import Screen from '../components/Screen';
 import Txt from '../components/Txt';
@@ -7,6 +8,7 @@ import { colors, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 export function SplashScreen() {
+  const { t } = useTranslation();
   useTheme();
   return (
     <Screen padded={false}>
@@ -16,7 +18,7 @@ export function SplashScreen() {
         </Txt>
         <Hairline style={styles.rule} />
         <Txt variant="caption" color={colors.inkFaint}>
-          Who are you becoming
+          {t('splash.whoAreYouBecoming')}
         </Txt>
       </View>
     </Screen>

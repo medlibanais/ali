@@ -1,6 +1,7 @@
 // Friends data layer: React Query hooks over the friends RPCs.
 // All heavy rules (duplicates, blocks, privacy) live in Postgres/RLS.
 
+import i18n from '../../i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { CircleRow, SearchHit } from './logic';
@@ -40,7 +41,7 @@ async function myId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  if (!user) throw new Error(i18n.t('errors.notSignedIn'));
   return user.id;
 }
 
@@ -66,7 +67,7 @@ export const CIRCLE_KEY = ['friends', 'circle'] as const;
 
 // You + accepted friends with level, streak and this week's XP, from the
 // friends_weekly_xp view (security_invoker, so RLS decides what you see).
-// Falls back to the friend_leaderboard RPC until migration 0026 is pushed.
+// Falls back to the friend_leaderboard RPC until migration 0036 is pushed.
 export function useCircle() {
   return useQuery({
     queryKey: CIRCLE_KEY,

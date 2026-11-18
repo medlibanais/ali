@@ -2,6 +2,7 @@
 // tap-to-inspect tooltip and a fade-in animation.
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -36,9 +37,10 @@ export function LineChart({
   color,
   showAverage = true,
   areaFill = true,
-  emptyLabel = 'No data yet',
+  emptyLabel,
 }: LineChartProps) {
   useTheme();
+  const { t } = useTranslation();
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const fade = useMemo(() => new Animated.Value(0), []);
@@ -86,14 +88,15 @@ export function LineChart({
     return (
       <View style={[styles.empty, { height }]}>
         <Txt variant="caption" color={colors.inkFaint}>
-          {emptyLabel}
+          {emptyLabel ?? t('charts.noData')}
         </Txt>
       </View>
     );
   }
 
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
+    // Charts keep time running left to right in every language.
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height, direction: 'ltr' }}>
       {geometry ? (
         <Animated.View style={{ opacity: fade }}>
           <Svg width={width} height={height}>
@@ -201,7 +204,7 @@ export function LineChart({
           ) : null}
           {showAverage ? (
             <Txt variant="caption" color={colors.inkFaint} style={styles.avgNote}>
-              {`Average ${Math.round(geometry.avg)}`}
+              {t('charts.average', { value: Math.round(geometry.avg) })}
             </Txt>
           ) : null}
         </Animated.View>

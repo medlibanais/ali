@@ -3,6 +3,7 @@
 // (FAL_KEY lives only there) turns that picture into a photo, and the
 // result is saved on the profile. The 3D avatar stays the default.
 
+import i18n from '../i18n';
 import { renderOnce } from '../avatar/Avatar3D';
 import { suggestOutfitWords } from '../avatar/shape';
 import type { AvatarConfig, Mood } from '../avatar/types';
@@ -24,7 +25,7 @@ export async function makePhotoreal(config: AvatarConfig, view: PhotoView, mood:
   try {
     picture = await renderOnce(config, mood, view === 'full' ? 'body-hd' : 'head-hd', {});
   } catch (e) {
-    throw new AiAvatarError(e instanceof Error ? e.message : 'The picture could not be drawn.');
+    throw new AiAvatarError(e instanceof Error ? e.message : i18n.t('photoreal.drawFailed'));
   }
   const { data, error } = await supabase.functions.invoke('generate-avatar', {
     body: {
@@ -37,7 +38,7 @@ export async function makePhotoreal(config: AvatarConfig, view: PhotoView, mood:
   });
   if (error) throw avatarFailure(await describeFunctionError(error));
   const payload = data as { url?: string; remaining_today?: number } | null;
-  if (!payload?.url) throw new AiAvatarError('We could not make the photo this time. Try again.');
+  if (!payload?.url) throw new AiAvatarError(i18n.t('photoreal.makeFailed'));
   return { url: payload.url, view, remainingToday: payload.remaining_today ?? 0 };
 }
 
@@ -46,7 +47,7 @@ export async function setPhotoAsProfilePicture(url: string): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new AiAvatarError('Sign in again to do that.', 'session');
+  if (!user) throw new AiAvatarError(i18n.t('photoreal.signInAgain'), 'session');
   const { error } = await supabase.from('profiles').update({ ai_avatar_url: url, avatar_mode: 'ai' }).eq('id', user.id);
-  if (error) throw new AiAvatarError('We could not save that. Try again.');
+  if (error) throw new AiAvatarError(i18n.t('photoreal.saveFailed'));
 }

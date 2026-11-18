@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { MinusGlyph, PlusGlyph } from './icons';
@@ -27,6 +28,7 @@ export function Stepper({
   unit,
 }: StepperProps) {
   useTheme();
+  const { t } = useTranslation();
   const canDecrease = value - step >= min;
   const canIncrease = value + step <= max;
 
@@ -41,7 +43,7 @@ export function Stepper({
     <View style={styles.row}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Decrease"
+        accessibilityLabel={t('stepper.decrease')}
         accessibilityState={{ disabled: !canDecrease }}
         onPress={() => adjust(-step)}
         disabled={!canDecrease}
@@ -61,7 +63,7 @@ export function Stepper({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Increase"
+        accessibilityLabel={t('stepper.increase')}
         accessibilityState={{ disabled: !canIncrease }}
         onPress={() => adjust(step)}
         disabled={!canIncrease}

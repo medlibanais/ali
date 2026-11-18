@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,6 +26,7 @@ import { useTheme } from '../theme/useTheme';
 type Busy = 'camera' | 'gallery' | 'remove' | 'mode' | null;
 
 export function EditPhotoScreen() {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -40,15 +42,15 @@ export function EditPhotoScreen() {
   const handleError = (error: unknown) => {
     if (error instanceof PhotoError && error.code === 'cancelled') return;
     if (error instanceof PhotoError && error.code === 'permission') {
-      Alert.alert('Permission needed', error.message, [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open settings', onPress: openAppSettings },
+      Alert.alert(t('editPhoto.permissionNeeded'), error.message, [
+        { text: t('editPhoto.notNow'), style: 'cancel' },
+        { text: t('editPhoto.openSettings'), onPress: openAppSettings },
       ]);
       return;
     }
     toast.showToast({
       message:
-        error instanceof Error ? error.message : 'Something went wrong.',
+        error instanceof Error ? error.message : t('editPhoto.somethingWentWrong'),
     });
   };
 
@@ -57,7 +59,7 @@ export function EditPhotoScreen() {
     try {
       await pickAndUploadPhoto(source);
       await dispatch(fetchProfile());
-      toast.showToast({ message: 'Your photo is updated.' });
+      toast.showToast({ message: t('editPhoto.yourPhotoIsUpdated') });
     } catch (error) {
       handleError(error);
     } finally {
@@ -72,7 +74,7 @@ export function EditPhotoScreen() {
       return;
     }
     if (next === 'photo' && !hasPhoto) {
-      toast.showToast({ message: 'Add a photo first, then switch modes.' });
+      toast.showToast({ message: t('editPhoto.addAPhotoFirst') });
       return;
     }
     setBusy('mode');
@@ -88,19 +90,19 @@ export function EditPhotoScreen() {
 
   const confirmRemove = () => {
     Alert.alert(
-      'Remove photo',
-      'Your photo is deleted from storage. Your avatar stays as it is.',
+      t('editPhoto.removePhoto'),
+      t('editPhoto.yourPhotoIsDeleted'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('editPhoto.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('editPhoto.remove'),
           style: 'destructive',
           onPress: async () => {
             setBusy('remove');
             try {
               await removePhoto();
               await dispatch(fetchProfile());
-              toast.showToast({ message: 'Photo removed.' });
+              toast.showToast({ message: t('editPhoto.photoRemoved') });
             } catch (error) {
               handleError(error);
             } finally {
@@ -115,10 +117,10 @@ export function EditPhotoScreen() {
   return (
     <Screen scroll>
       <Txt variant="title" style={styles.title}>
-        Profile photo
+        {t('editPhoto.profilePhoto')}
       </Txt>
       <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-        Show your custom avatar or a real photo — your choice, change anytime.
+        {t('editPhoto.showYourCustomAvatar')}
       </Txt>
 
       <View style={styles.preview}>
@@ -129,30 +131,30 @@ export function EditPhotoScreen() {
         )}
         <Txt variant="caption" color={colors.inkFaint} style={styles.previewNote}>
           {mode === 'ai'
-            ? 'Showing your AI avatar'
+            ? t('editPhoto.showingYourAiAvatar')
             : mode === 'photo'
-              ? 'Showing your photo'
-              : 'Showing your avatar'}
+              ? t('editPhoto.showingYourPhoto')
+              : t('editPhoto.showingYourAvatar')}
         </Txt>
       </View>
 
       <Card padded={false} style={styles.card}>
         <Button
-          title={hasAiAvatar ? 'Use my AI avatar' : 'Create an AI avatar'}
+          title={hasAiAvatar ? t('editPhoto.useMyAiAvatar') : t('editPhoto.createAnAiAvatar')}
           variant={mode === 'ai' ? 'primary' : 'ghost'}
           onPress={() => switchMode('ai')}
           loading={busy === 'mode' && mode !== 'ai'}
           style={styles.modeButton}
         />
         <Button
-          title="Use my avatar"
+          title={t('editPhoto.useMyAvatar')}
           variant={mode === 'avatar' ? 'primary' : 'ghost'}
           onPress={() => switchMode('avatar')}
           loading={busy === 'mode' && mode !== 'avatar'}
           style={styles.modeButton}
         />
         <Button
-          title="Use my photo"
+          title={t('editPhoto.useMyPhoto')}
           variant={mode === 'photo' ? 'primary' : 'ghost'}
           onPress={() => switchMode('photo')}
           loading={busy === 'mode' && mode !== 'photo'}
@@ -162,17 +164,17 @@ export function EditPhotoScreen() {
 
       <Card style={styles.card}>
         <Txt variant="label" style={styles.cardLabel}>
-          {hasPhoto ? 'Replace photo' : 'Add a photo'}
+          {hasPhoto ? t('editPhoto.replacePhoto') : t('editPhoto.addAPhoto')}
         </Txt>
         <Button
-          title="Take a photo"
+          title={t('editPhoto.takeAPhoto')}
           onPress={() => pick('camera')}
           loading={busy === 'camera'}
           disabled={busy !== null}
           style={styles.actionButton}
         />
         <Button
-          title="Choose from gallery"
+          title={t('editPhoto.chooseFromGallery')}
           variant="secondary"
           onPress={() => pick('gallery')}
           loading={busy === 'gallery'}
@@ -180,14 +182,13 @@ export function EditPhotoScreen() {
           style={styles.actionButton}
         />
         <Txt variant="caption" color={colors.inkFaint} style={styles.hint}>
-          Square crop, resized to 512px, compressed under 500 KB. JPG, PNG and
-          HEIC are converted automatically.
+          {t('editPhoto.squareCropResizedTo')}
         </Txt>
       </Card>
 
       {hasPhoto ? (
         <Button
-          title="Remove photo"
+          title={t('editPhoto.removePhoto')}
           variant="ghost"
           onPress={confirmRemove}
           loading={busy === 'remove'}

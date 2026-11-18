@@ -3,6 +3,8 @@
 // is always one tap away, and stays the fallback when generation fails.
 
 import React, { useEffect, useRef, useState } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Alert, Image, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -31,14 +33,15 @@ type Phase = 'idle' | 'preparing' | 'generating' | 'done';
 
 const PREVIEW = 220;
 
-const PROGRESS_LINES = [
-  'Reading your photo…',
-  'Meeting your future self…',
-  'Adding the glow…',
-  'Almost there…',
+const PROGRESS_LINES = (): string[] => [
+  i18n.t('aiAvatar.readingYourPhoto'),
+  i18n.t('aiAvatar.meetingYourFutureSelf'),
+  i18n.t('aiAvatar.addingTheGlow'),
+  i18n.t('aiAvatar.almostThere'),
 ];
 
 export function AiAvatarScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -82,9 +85,9 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       if (e instanceof PhotoError) {
         if (e.code === 'cancelled') return;
         if (e.code === 'permission') {
-          Alert.alert('Permission needed', e.message, [
-            { text: 'Not now', style: 'cancel' },
-            { text: 'Open settings', onPress: openAppSettings },
+          Alert.alert(t('aiAvatar.permissionNeeded'), e.message, [
+            { text: t('aiAvatar.notNow'), style: 'cancel' },
+            { text: t('aiAvatar.openSettings'), onPress: openAppSettings },
           ]);
           return;
         }
@@ -94,7 +97,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       setError(
         e instanceof AiAvatarError || e instanceof Error
           ? e.message
-          : 'Something went wrong.',
+          : t('aiAvatar.somethingWentWrong'),
       );
     }
   };
@@ -104,7 +107,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       dispatch(onboardingCompletedLocally());
       return;
     }
-    toast.showToast({ message: 'Your AI avatar is set.' });
+    toast.showToast({ message: t('aiAvatar.yourAiAvatarIs') });
     navigation.goBack();
   };
 
@@ -113,17 +116,17 @@ export function AiAvatarScreen({ navigation, route }: Props) {
   };
 
   const progressLine =
-    PROGRESS_LINES[Math.min(PROGRESS_LINES.length - 1, Math.floor(elapsed / 3))];
+    PROGRESS_LINES()[Math.min(PROGRESS_LINES().length - 1, Math.floor(elapsed / 3))];
 
   return (
     <Screen scroll>
       <Txt variant="title" style={styles.title}>
-        {phase === 'done' ? 'This is you, levelled up' : 'Meet your future self'}
+        {phase === 'done' ? t('aiAvatar.thisIsYouLevelled') : t('aiAvatar.meetYourFutureSelf')}
       </Txt>
       <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
         {phase === 'done'
-          ? 'Your avatar grows with you. Keep it, or try another photo.'
-          : 'Take a selfie or pick a photo. We turn it into the best version of you, the one your quests are building.'}
+          ? t('aiAvatar.yourAvatarGrowsWith')
+          : t('aiAvatar.takeASelfieOr')}
       </Txt>
 
       <View style={styles.preview}>
@@ -131,7 +134,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
           <Image
             source={{ uri: resultUrl }}
             style={styles.resultImage}
-            accessibilityLabel="Your AI avatar"
+            accessibilityLabel={t('aiAvatar.yourAiAvatar')}
           />
         ) : (
           <View style={busy ? styles.dimmed : undefined}>
@@ -145,12 +148,12 @@ export function AiAvatarScreen({ navigation, route }: Props) {
         )}
         {busy ? (
           <Txt variant="bodySemi" color={colors.accent} style={styles.progress}>
-            {phase === 'preparing' ? 'Preparing your photo…' : progressLine}
+            {phase === 'preparing' ? t('aiAvatar.preparingYourPhoto') : progressLine}
           </Txt>
         ) : null}
         {phase === 'generating' ? (
           <Txt variant="caption" color={colors.inkFaint}>
-            {`${elapsed}s · usually under 15 seconds`}
+            {t('aiAvatar.sUsuallyUnder15', { elapsed })}
           </Txt>
         ) : null}
       </View>
@@ -164,10 +167,10 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       ) : null}
 
       {phase === 'done' ? (
-        <Button title="Keep this avatar" onPress={keep} style={styles.action} />
+        <Button title={t('aiAvatar.keepThisAvatar')} onPress={keep} style={styles.action} />
       ) : null}
       <Button
-        title={phase === 'done' ? 'Try another selfie' : 'Take a selfie'}
+        title={phase === 'done' ? t('aiAvatar.tryAnotherSelfie') : t('aiAvatar.takeASelfie')}
         variant={phase === 'done' ? 'secondary' : 'primary'}
         onPress={() => generate('camera')}
         disabled={busy}
@@ -175,22 +178,21 @@ export function AiAvatarScreen({ navigation, route }: Props) {
         style={styles.action}
       />
       <Button
-        title="Choose a photo"
+        title={t('aiAvatar.chooseAPhoto')}
         variant="secondary"
         onPress={() => generate('gallery')}
         disabled={busy}
         style={styles.action}
       />
       <Button
-        title="Design it by hand instead"
+        title={t('aiAvatar.designItByHand')}
         variant="ghost"
         onPress={designByHand}
         disabled={busy}
         style={styles.action}
       />
       <Txt variant="caption" color={colors.inkFaint} style={styles.hint}>
-        Your photo is sent to our AI image provider only to create the avatar.
-        We keep the avatar, not the photo. Up to 5 tries a day.
+        {t('aiAvatar.yourPhotoIsSent')}
       </Txt>
     </Screen>
   );

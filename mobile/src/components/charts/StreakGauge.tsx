@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import Txt from '../Txt';
 import { BAND_LABEL, streakBand, type StreakBand } from '../../features/analytics/streakPrediction';
 import { colors, isDarkPalette, radius, spacing, withAlpha } from '../../theme/tokens';
@@ -73,6 +74,7 @@ function useAnimatedFraction(target: number): number {
 }
 
 export function StreakGauge({ probability, size = 176, strokeWidth = 14 }: StreakGaugeProps) {
+  const { t } = useTranslation();
   useTheme();
   const band = streakBand(probability);
   const color = bandColor(band);
@@ -121,7 +123,7 @@ export function StreakGauge({ probability, size = 176, strokeWidth = 14 }: Strea
             {probability === null ? '—' : `${Math.round(fraction * 100)}%`}
           </Txt>
           <Txt variant="caption" color={colors.inkSoft}>
-            tomorrow
+            {t('streakOutlook.tomorrow')}
           </Txt>
         </View>
       </View>

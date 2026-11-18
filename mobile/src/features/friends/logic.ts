@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 // Pure friends helpers (no Supabase), kept apart so they can be unit tested.
 
 export type Relation = 'none' | 'friends' | 'outgoing' | 'incoming';
@@ -104,7 +105,7 @@ export function realtimeTopicIds(rows: CircleRow[]): string[] {
     .sort();
 }
 
-/** Same window as public.cheer_cooldown() in migration 0026. */
+/** Same window as public.cheer_cooldown() in migration 0036. */
 export const CHEER_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 
 /** Milliseconds until you may cheer this friend again (0 = now). */
@@ -122,10 +123,10 @@ export function cheerErrorText(error: unknown): string {
       : typeof error === 'object' && error && 'message' in error
         ? String((error as { message: unknown }).message)
         : String(error);
-  if (msg.includes('cheer_cooldown')) return 'You already cheered them recently. Try again later.';
-  if (msg.includes('cheer_limit')) return 'That is a lot of cheering for today. Try again tomorrow.';
-  if (msg.includes('not_friends')) return 'You can only cheer your friends.';
-  return 'Could not send your cheer. Try again.';
+  if (msg.includes('cheer_cooldown')) return i18n.t('friendErrors.youAlreadyCheeredThem');
+  if (msg.includes('cheer_limit')) return i18n.t('friendErrors.thatIsALot');
+  if (msg.includes('not_friends')) return i18n.t('friendErrors.youCanOnlyCheer');
+  return i18n.t('friendErrors.couldNotSendYour');
 }
 
 export function friendErrorText(error: unknown): string {
@@ -135,24 +136,24 @@ export function friendErrorText(error: unknown): string {
       : typeof error === 'object' && error && 'message' in error
         ? String((error as { message: unknown }).message)
         : String(error);
-  if (msg.includes('cannot_friend_yourself')) return 'That is your own account.';
-  if (msg.includes('already_friends')) return 'You are already friends.';
-  if (msg.includes('request_already_pending')) return 'A request is already pending.';
+  if (msg.includes('cannot_friend_yourself')) return i18n.t('friendErrors.ownAccount');
+  if (msg.includes('already_friends')) return i18n.t('friendErrors.alreadyFriends');
+  if (msg.includes('request_already_pending')) return i18n.t('friendErrors.pending');
   if (msg.includes('request_declined_recently'))
-    return 'They declined recently. You can ask again in a few days.';
+    return i18n.t('friendErrors.declinedRecently');
   if (msg.includes('too_many_pending'))
-    return 'You have too many pending requests. Wait for some answers first.';
-  if (msg.includes('cannot_request')) return 'You cannot send a request to this user.';
-  if (msg.includes('user_not_found')) return 'No user found with that username.';
-  if (msg.includes('already_responded')) return 'This request was already answered.';
-  if (msg.includes('not_found')) return 'This request no longer exists.';
-  return 'Something went wrong. Try again.';
+    return i18n.t('friendErrors.tooManyPending');
+  if (msg.includes('cannot_request')) return i18n.t('friendErrors.cannotRequest');
+  if (msg.includes('user_not_found')) return i18n.t('friendErrors.userNotFound');
+  if (msg.includes('already_responded')) return i18n.t('friendErrors.alreadyResponded');
+  if (msg.includes('not_found')) return i18n.t('friendErrors.requestGone');
+  return i18n.t('friendErrors.generic');
 }
 
 export function inviteResultText(reason: string | undefined): string {
-  if (reason === 'own_code') return 'That is your own code.';
-  if (reason === 'already_connected') return 'You are already connected.';
-  return 'That code is not valid.';
+  if (reason === 'own_code') return i18n.t('friendErrors.ownCode');
+  if (reason === 'already_connected') return i18n.t('friendErrors.alreadyConnected');
+  return i18n.t('friendErrors.invalidCode');
 }
 
 /** Deep link that opens the app on "add friend" with the code filled in. */
@@ -161,5 +162,5 @@ export function inviteLink(code: string): string {
 }
 
 export function inviteMessage(code: string): string {
-  return `Become who you want to be with me on PrayerLock. Add me with my code ${code}: ${inviteLink(code)}`;
+  return i18n.t('friendErrors.inviteMessage', { code, link: inviteLink(code) });
 }

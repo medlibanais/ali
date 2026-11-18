@@ -1,6 +1,7 @@
 // AI "Future Self" avatar: photo -> generate-avatar Edge Function -> stored
 // image in profiles.ai_avatar_url. The 3D avatar stays as the fallback.
 
+import i18n from '../i18n';
 import { describeFunctionError, type FunctionFailure } from './functionErrors';
 import { PhotoError, pickSquarePhoto } from './profilePhoto';
 import { supabase } from './supabase';
@@ -29,36 +30,36 @@ export class AiAvatarError extends Error {
 export function avatarFailure(failure: FunctionFailure): AiAvatarError {
   if (failure.kind === 'network') {
     return new AiAvatarError(
-      'No connection. Check your internet and try again.',
+      i18n.t('aiAvatarErrors.offline'),
       'network',
     );
   }
   switch (failure.status) {
     case 401:
       return new AiAvatarError(
-        'Your session has expired. Sign out and back in, then try again.',
+        i18n.t('aiAvatarErrors.session'),
         'session',
       );
     case 404:
       return new AiAvatarError(
-        'AI avatars are not set up on the server yet (the "generate-avatar" function is not deployed).',
+        i18n.t('aiAvatarErrors.notDeployed'),
         'not_deployed',
       );
     case 413:
-      return new AiAvatarError('That photo is too large. Try another one.');
+      return new AiAvatarError(i18n.t('aiAvatarErrors.tooLarge'));
     case 429:
       return new AiAvatarError(
-        'You have used today’s avatar generations. Try again tomorrow.',
+        i18n.t('aiAvatarErrors.dailyLimit'),
         'daily_limit',
       );
     case 503:
       return new AiAvatarError(
-        'AI avatars are not switched on yet: the server is missing its FAL_KEY. Design one by hand for now.',
+        i18n.t('aiAvatarErrors.notConfigured'),
         'not_configured',
       );
     case 504:
       return new AiAvatarError(
-        'That took too long. Try again, or design one by hand.',
+        i18n.t('aiAvatarErrors.timeout'),
         'timeout',
       );
     default:
@@ -66,18 +67,18 @@ export function avatarFailure(failure: FunctionFailure): AiAvatarError {
   }
   if (failure.code === 'provider_auth') {
     return new AiAvatarError(
-      'The AI image service refused our key (FAL_KEY is wrong or out of credit).',
+      i18n.t('aiAvatarErrors.providerAuth'),
       'provider_auth',
     );
   }
   if (failure.code === 'rejected') {
     return new AiAvatarError(
-      'The AI could not use that photo. Try a clear, well-lit selfie of your face.',
+      i18n.t('aiAvatarErrors.rejected'),
       'rejected',
     );
   }
   return new AiAvatarError(
-    'We could not create your avatar this time. Try another photo.',
+    i18n.t('aiAvatarErrors.generic'),
   );
 }
 
@@ -113,7 +114,7 @@ export async function generateAiAvatar(
   };
   if (!payload?.url) {
     throw new AiAvatarError(
-      'We could not create your avatar this time. Try another photo.',
+      i18n.t('aiAvatarErrors.generic'),
     );
   }
   return {

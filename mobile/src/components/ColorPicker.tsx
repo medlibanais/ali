@@ -2,6 +2,7 @@
 // swatch. Plain views, so it works on phones and the web alike.
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -49,6 +50,7 @@ export interface ColorPickerProps {
 
 export function ColorPicker({ title, value, onChange, onCommit }: ColorPickerProps) {
   useTheme();
+  const { t } = useTranslation();
   // Keep the sliders' own numbers: a grey has no hue to read back.
   const [hsl, setHsl] = useState<Hsl>(() => hexToHsl(value));
   const update = (patch: Partial<Hsl>, commit: boolean) => {
@@ -63,10 +65,10 @@ export function ColorPicker({ title, value, onChange, onCommit }: ColorPickerPro
     <View style={styles.box}>
       <View style={styles.head}>
         <View style={[styles.swatch, { backgroundColor: hex }]} />
-        <Txt variant="caption" color={colors.inkSoft}>{`Custom ${title.toLowerCase()} ${hex}`}</Txt>
+        <Txt variant="caption" color={colors.inkSoft}>{t('colorPicker.custom', { title, hex })}</Txt>
       </View>
       <Slider
-        label={`${title}: hue`}
+        label={t('colorPicker.hue', { title })}
         min={0}
         max={359}
         step={1}
@@ -77,26 +79,26 @@ export function ColorPicker({ title, value, onChange, onCommit }: ColorPickerPro
         onCommit={(h) => update({ h }, true)}
       />
       <Slider
-        label={`${title}: richness`}
+        label={t('colorPicker.richness', { title })}
         min={0}
         max={1}
         step={0.02}
         value={hsl.s}
         valueText={`${Math.round(hsl.s * 100)}%`}
-        low="Grey"
-        high="Vivid"
+        low={t('colorPicker.grey')}
+        high={t('colorPicker.vivid')}
         onChange={(s) => update({ s }, false)}
         onCommit={(s) => update({ s }, true)}
       />
       <Slider
-        label={`${title}: lightness`}
+        label={t('colorPicker.lightness', { title })}
         min={0.05}
         max={0.95}
         step={0.02}
         value={hsl.l}
         valueText={`${Math.round(hsl.l * 100)}%`}
-        low="Dark"
-        high="Light"
+        low={t('colorPicker.dark')}
+        high={t('colorPicker.light')}
         onChange={(l) => update({ l }, false)}
         onCommit={(l) => update({ l }, true)}
       />

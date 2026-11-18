@@ -7,6 +7,7 @@
 // One select of at most 365 rows; RLS lets us read it, and we filter to our
 // own user_id because friends' rows are readable too.
 
+import { appLocale } from '../../i18n';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
@@ -30,7 +31,7 @@ export interface YearGrid {
   /** Number of week columns (53 or 54). */
   weeks: number;
   /** Month labels: the column where each month's first day falls. */
-  months: { col: number; label: string }[];
+  months: { col: number; month: number; label: string }[];
   totalXp: number;
   activeDays: number;
   best: XpDay | null;
@@ -111,7 +112,7 @@ export function buildYearGrid(rows: XpDay[], today: string, days: number = YEAR_
   const startMs = toUtc(start);
   const startDow = new Date(startMs).getUTCDay();
   const cells: HeatCell[] = [];
-  const months: { col: number; label: string }[] = [];
+  const months: { col: number; month: number; label: string }[] = [];
   let totalXp = 0;
   let activeDays = 0;
   let best: XpDay | null = null;
@@ -132,9 +133,9 @@ export function buildYearGrid(rows: XpDay[], today: string, days: number = YEAR_
     if (dt.getUTCDate() === 1 || i === 0) {
       // Skip a label that would collide with the previous one.
       const prev = months[months.length - 1];
-      if (!prev || col - prev.col >= 3) months.push({ col, label: MONTHS[dt.getUTCMonth()] });
+      if (!prev || col - prev.col >= 3) months.push({ col, month: dt.getUTCMonth(), label: MONTHS[dt.getUTCMonth()] });
       else if (i !== 0 && prev)
-        months[months.length - 1] = { col, label: MONTHS[dt.getUTCMonth()] };
+        months[months.length - 1] = { col, month: dt.getUTCMonth(), label: MONTHS[dt.getUTCMonth()] };
     }
   }
 
@@ -153,7 +154,7 @@ export function buildYearGrid(rows: XpDay[], today: string, days: number = YEAR_
 /** "Sat, Nov 14, 2026" for a yyyy-mm-dd date (timezone-proof). */
 export function formatHeatDate(iso: string): string {
   const d = new Date(toUtc(iso));
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(appLocale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',

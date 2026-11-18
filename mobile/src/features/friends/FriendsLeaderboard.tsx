@@ -7,6 +7,7 @@
 // the same on Android and web (no layout-animation APIs needed).
 
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -47,12 +48,13 @@ export function FriendsLeaderboard({
   cheeringId,
   now,
 }: FriendsLeaderboardProps) {
+  const { t } = useTranslation();
   useTheme();
   return (
     <View
       style={[styles.list, { height: rows.length * ROW_HEIGHT }]}
       accessibilityRole="list"
-      accessibilityLabel="This week's leaderboard"
+      accessibilityLabel={t('friends.thisWeekSLeaderboard')}
     >
       {rows.map((row, index) => (
         <LeaderboardRow
@@ -79,6 +81,7 @@ interface RowProps {
 }
 
 function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowProps) {
+  const { t } = useTranslation();
   const top = useSharedValue(index * ROW_HEIGHT);
   const glow = useSharedValue(0);
   // The first render places the row; later index changes glide.
@@ -109,7 +112,7 @@ function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowPr
     opacity: 0.85 + glow.value * 0.15,
   }));
 
-  const name = row.is_me ? 'You' : displayName(row);
+  const name = row.is_me ? t('friends.you') : displayName(row);
   const xp = row.weekly_xp ?? 0;
   const cheerDisabled = cheering || cooling;
 
@@ -117,7 +120,7 @@ function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowPr
     <Animated.View
       style={[styles.row, row.is_me && styles.meRow, index > 0 && styles.rowDivider, rowStyle]}
       accessible
-      accessibilityLabel={`Rank ${row.rank}, ${name}, ${xp} XP this week`}
+      accessibilityLabel={t('friends.rankXpThisWeek', { rank: row.rank, name, xp })}
     >
       <Txt variant="bodySemi" color={colors.gold} style={styles.rank}>
         {`${row.rank}`}
@@ -137,7 +140,7 @@ function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowPr
           {name}
         </Txt>
         <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
-          {`Level ${row.level ?? 1} · ${streakLabel(row.current_streak ?? 0)}`}
+          {t('friends.level', { level: row.level ?? 1, streak: streakLabel(row.current_streak ?? 0) })}
         </Txt>
       </View>
       <Animated.View style={xpStyle}>
@@ -150,7 +153,7 @@ function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowPr
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={cooling ? `You cheered ${name} recently` : `Cheer on ${name}`}
+          accessibilityLabel={cooling ? t('friends.youCheeredRecently', { name }) : t('friends.cheerOn', { name })}
           accessibilityState={{ disabled: cheerDisabled, busy: cheering }}
           disabled={cheerDisabled}
           onPress={() => onCheer(row)}
@@ -162,7 +165,7 @@ function LeaderboardRow({ row, index, pulse, onCheer, cheering, cooling }: RowPr
           ]}
         >
           <Txt variant="caption" color={cooling ? colors.inkFaint : colors.accent}>
-            {cooling ? 'Cheered' : 'Cheer'}
+            {cooling ? t('friends.cheered') : t('friends.cheer')}
           </Txt>
         </Pressable>
       )}
@@ -200,13 +203,13 @@ const styles = themed(() =>
     body: {
       flex: 1,
       minWidth: 0,
-      marginLeft: spacing.md,
-      marginRight: spacing.sm,
+      marginStart: spacing.md,
+      marginEnd: spacing.sm,
     },
     cheer: {
       width: CHEER_WIDTH,
       minHeight: 44,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       paddingHorizontal: spacing.md,
       borderRadius: radius.sm,
       borderWidth: borderWidth.hairline,
@@ -222,7 +225,7 @@ const styles = themed(() =>
     },
     cheerSpacer: {
       width: CHEER_WIDTH,
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
     },
   }),
 );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import LoadingDots from '../../components/LoadingDots';
 import Txt from '../../components/Txt';
@@ -23,12 +24,13 @@ interface SearchBarProps {
 }
 
 export function QuestSearchBar({ value, onChangeText, searching }: SearchBarProps) {
+  const { t } = useTranslation();
   useTheme();
   return (
     <View style={styles.bar}>
       <View style={styles.leading} pointerEvents="none">
         {searching ? (
-          <LoadingDots color={colors.accent} size={4} accessibilityLabel="Searching" />
+          <LoadingDots color={colors.accent} size={4} accessibilityLabel={t('questSearch.searching')} />
         ) : (
           <SearchGlyph size={20} color={colors.inkSoft} />
         )}
@@ -36,10 +38,10 @@ export function QuestSearchBar({ value, onChangeText, searching }: SearchBarProp
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder="Search all quests, e.g. calm time with mom"
+        placeholder={t('questSearch.searchAllQuestsE')}
         placeholderTextColor={colors.inkFaint}
-        accessibilityLabel="Search the quest library"
-        accessibilityHint="Finds quests by meaning, not just matching words"
+        accessibilityLabel={t('questSearch.searchTheQuestLibrary')}
+        accessibilityHint={t('questSearch.findsQuestsByMeaning')}
         returnKeyType="search"
         autoCorrect={false}
         maxLength={200}
@@ -49,7 +51,7 @@ export function QuestSearchBar({ value, onChangeText, searching }: SearchBarProp
         <Pressable
           onPress={() => onChangeText('')}
           accessibilityRole="button"
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('questSearch.clearSearch')}
           style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
         >
           <CloseGlyph size={18} color={colors.inkSoft} />
@@ -73,13 +75,14 @@ function RelevancePill({ relevance }: { relevance: number }) {
 }
 
 function ResultCard({ quest }: { quest: QuestSearchResult }) {
+  const { t } = useTranslation();
   const pastel = pillarPastels(quest.pillar).base;
-  const minutes = quest.timeEstimateMinutes ? ` · ${quest.timeEstimateMinutes} min` : '';
+  const minutes = quest.timeEstimateMinutes ? t('questSearch.min', { timeEstimateMinutes: quest.timeEstimateMinutes }) : '';
   return (
     <View
       style={styles.card}
       accessible
-      accessibilityLabel={`${quest.title}. ${PILLAR_LABELS[quest.pillar]} quest, ${quest.xpReward} XP. Relevance ${quest.relevance} percent. ${quest.description}`}
+      accessibilityLabel={t('questSearch.questXpRelevancePercent', { title: quest.title, pillar: PILLAR_LABELS[quest.pillar], xpReward: quest.xpReward, relevance: quest.relevance, description: quest.description })}
     >
       <View style={styles.cardHead}>
         <View style={[styles.glyph, { backgroundColor: pastel }]}>
@@ -103,6 +106,7 @@ function ResultCard({ quest }: { quest: QuestSearchResult }) {
 }
 
 export function QuestSearchResults({ search }: { search: QuestSearchState }) {
+  const { t } = useTranslation();
   useTheme();
   if (search.error) {
     return (
@@ -113,11 +117,11 @@ export function QuestSearchResults({ search }: { search: QuestSearchState }) {
         <Pressable
           onPress={search.retry}
           accessibilityRole="button"
-          accessibilityLabel="Try the search again"
+          accessibilityLabel={t('questSearch.tryTheSearchAgain')}
           style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
         >
           <Txt variant="bodySemi" color={colors.accent}>
-            Try again
+            {t('questSearch.tryAgain')}
           </Txt>
         </Pressable>
       </View>
@@ -126,21 +130,21 @@ export function QuestSearchResults({ search }: { search: QuestSearchState }) {
   if (!search.query) {
     return (
       <Txt variant="caption" color={colors.inkSoft} style={styles.message}>
-        Type at least 3 letters.
+        {t('questSearch.typeAtLeast3')}
       </Txt>
     );
   }
   if (search.results.length === 0) {
     return (
       <Txt variant="body" color={colors.inkSoft} style={styles.message}>
-        {search.searching ? 'Searching the quest library…' : 'No quests found.'}
+        {search.searching ? t('questSearch.searchingTheQuestLibrary') : t('questSearch.noQuestsFound')}
       </Txt>
     );
   }
   return (
-    <View accessibilityRole="list" accessibilityLabel={`Top ${search.results.length} quests for ${search.query}`}>
+    <View accessibilityRole="list" accessibilityLabel={t('questSearch.topQuestsFor', { length: search.results.length, query: search.query })}>
       <Txt variant="label" color={colors.inkSoft} style={styles.heading}>
-        QUEST LIBRARY · BEST MATCHES
+        {t('questSearch.questLibraryBestMatches')}
       </Txt>
       {search.results.map((q) => (
         <ResultCard key={q.id} quest={q} />
@@ -204,11 +208,11 @@ const styles = themed(() =>
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
     },
     cardTitle: {
       flex: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     pill: {
       borderWidth: 1,

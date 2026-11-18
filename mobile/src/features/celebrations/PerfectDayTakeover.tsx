@@ -3,6 +3,7 @@
 // All SVG; strokes animate through animated props on the UI thread.
 
 import React, { memo, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AccessibilityInfo, Modal, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -80,6 +81,7 @@ export const PerfectDayTakeover = memo(function PerfectDayTakeover({
   questCount: number;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   useTheme();
   const reduceMotion = useReducedMotion();
   const fade = useSharedValue(reduceMotion ? 1 : 0);
@@ -89,7 +91,7 @@ export const PerfectDayTakeover = memo(function PerfectDayTakeover({
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(
-      `Perfect day. All ${questCount} quests done.`,
+      t('celebrations.perfectDayAllQuests', { questCount }),
     );
     if (reduceMotion) return;
     fade.value = withTiming(1, { duration: 280 });
@@ -172,17 +174,17 @@ export const PerfectDayTakeover = memo(function PerfectDayTakeover({
         </View>
         <Animated.View style={textStyle}>
           <Txt variant="label" color={colors.accent} align="center">
-            Perfect day
+            {t('celebrations.perfectDay')}
           </Txt>
           <Txt variant="title" align="center" style={styles.title}>
-            Every quest done
+            {t('celebrations.everyQuestDone')}
           </Txt>
           <Txt variant="body" color={colors.inkSoft} align="center" style={styles.body}>
-            {`All ${questCount} quests, across your pillars. This is who you are becoming.`}
+            {t('celebrations.allQuestsAcrossYour', { questCount })}
           </Txt>
         </Animated.View>
         <View style={styles.actions}>
-          <Button title="Beautiful" onPress={onDismiss} />
+          <Button title={t('celebrations.beautiful')} onPress={onDismiss} />
         </View>
       </Animated.View>
     </Modal>

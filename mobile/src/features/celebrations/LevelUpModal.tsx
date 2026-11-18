@@ -9,6 +9,7 @@
 // people share, so it looks like GROW whatever theme is set.
 
 import * as Sharing from 'expo-sharing';
+import { useTranslation } from 'react-i18next';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -74,6 +75,7 @@ export const LevelUpModal = memo(function LevelUpModal({
   info: LevelUpInfo;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const reduceMotion = useReducedMotion();
   const profile = useAppSelector((state) => state.user.profile);
   const shotRef = useRef<View>(null);
@@ -90,7 +92,7 @@ export const LevelUpModal = memo(function LevelUpModal({
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(
-      `Level up. Level ${info.toLevel}, ${info.toTitle}.`,
+      t('celebrations.levelUpLevel', { toLevel: info.toLevel, toTitle: info.toTitle }),
     );
     if (reduceMotion) return;
     fade.value = withTiming(1, { duration: 320 });
@@ -131,13 +133,13 @@ export const LevelUpModal = memo(function LevelUpModal({
     transform: [{ perspective: 900 }, { rotateY: `${flip.value - 180}deg` }],
   }));
 
-  const headline = `Level ${info.toLevel}: ${info.toTitle}`;
+  const headline = t('celebrations.level', { toLevel: info.toLevel, toTitle: info.toTitle });
   const front = info.titleChanged
-    ? { top: info.fromTitle, bottom: `Level ${info.fromLevel}` }
-    : { top: `Level ${info.fromLevel}`, bottom: info.fromTitle };
+    ? { top: info.fromTitle, bottom: t('celebrations.levelN', { level: info.fromLevel }) }
+    : { top: t('celebrations.levelN', { level: info.fromLevel }), bottom: info.fromTitle };
   const back = info.titleChanged
-    ? { top: info.toTitle, bottom: `Level ${info.toLevel} · new title` }
-    : { top: `Level ${info.toLevel}`, bottom: info.toTitle };
+    ? { top: info.toTitle, bottom: t('celebrations.levelNewTitle', { toLevel: info.toLevel }) }
+    : { top: t('celebrations.levelN', { level: info.toLevel }), bottom: info.toTitle };
 
   const canShare = Platform.OS !== 'web';
   const share = useCallback(async () => {
@@ -146,7 +148,7 @@ export const LevelUpModal = memo(function LevelUpModal({
     setShareNote(null);
     try {
       if (!(await Sharing.isAvailableAsync())) {
-        setShareNote('Sharing is not available on this phone.');
+        setShareNote(t('celebrations.sharingIsNotAvailable'));
         return;
       }
       const uri = await captureRef(shotRef, { format: 'png', quality: 1, result: 'tmpfile' });
@@ -154,10 +156,10 @@ export const LevelUpModal = memo(function LevelUpModal({
       await Sharing.shareAsync(uri, {
         mimeType: 'image/png',
         UTI: 'public.png',
-        dialogTitle: 'Share to Instagram',
+        dialogTitle: t('celebrations.shareToInstagram'),
       });
     } catch {
-      setShareNote('Could not create the image. Try again.');
+      setShareNote(t('celebrations.couldNotCreateThe'));
     } finally {
       setSharing(false);
     }
@@ -169,7 +171,7 @@ export const LevelUpModal = memo(function LevelUpModal({
         {/* Everything inside shotRef ends up in the shared picture. */}
         <View ref={shotRef} collapsable={false} style={styles.shot}>
           <Txt variant="label" color={N.accent} align="center">
-            Level up
+            {t('celebrations.levelUp')}
           </Txt>
           <View style={styles.stage}>
             <Animated.View style={[StyleSheet.absoluteFill, ringStyle]}>
@@ -212,20 +214,20 @@ export const LevelUpModal = memo(function LevelUpModal({
           </Animated.View>
           <View style={styles.card}>
             <Animated.View style={[styles.face, frontStyle]}>
-              <Face {...front} label="You were" highlight={false} />
+              <Face {...front} label={t('celebrations.youWere')} highlight={false} />
             </Animated.View>
             <Animated.View style={[styles.face, styles.faceBack, backStyle]}>
-              <Face {...back} label="You are now" highlight />
+              <Face {...back} label={t('celebrations.youAreNow')} highlight />
             </Animated.View>
           </View>
           <Txt variant="caption" color={N.inkFaint} align="center" style={styles.brand}>
-            GROW · Who are you becoming?
+            {t('celebrations.growWhoAreYou')}
           </Txt>
         </View>
         <View style={styles.actions}>
           {canShare ? (
             <Button
-              title="Share to Instagram"
+              title={t('celebrations.shareToInstagram')}
               variant="secondary"
               icon={ShareGlyph}
               onPress={share}
@@ -237,7 +239,7 @@ export const LevelUpModal = memo(function LevelUpModal({
               {shareNote}
             </Txt>
           ) : null}
-          <Button title="Keep growing" onPress={onDismiss} style={styles.keep} />
+          <Button title={t('celebrations.keepGrowing')} onPress={onDismiss} style={styles.keep} />
         </View>
       </Animated.View>
     </Modal>

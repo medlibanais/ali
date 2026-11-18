@@ -7,6 +7,7 @@
 // subway still shows the day.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import i18n from '../i18n';
 import { kvStore, readJson, writeJson } from './kvStore';
 import type { DailyQuestsResponse, Quest } from '../api/types';
 import type { Pillar } from '../theme/tokens';
@@ -356,15 +357,15 @@ export function isOfflineError(error: unknown): boolean {
 
 /** Server refusals that retrying later will not fix. */
 const PERMANENT_SYNC_ERRORS: Record<string, string> = {
-  undo_window_expired: 'the undo reached the server too late, so the completion stays',
-  offline_undo_too_old: 'the undo was saved more than 24 hours ago, so the completion stays',
-  daily_completion_limit: 'the daily limit of 15 quests was already reached',
-  quest_not_today: 'the quest belongs to another day',
-  offline_completion_too_old: 'it was saved more than 24 hours ago',
-  quest_not_found: 'the quest no longer exists',
-  quest_skipped: 'the quest was skipped',
-  not_your_quest: 'it belongs to another account',
-  invalid_sync_payload: 'the saved data was incomplete',
+  get undo_window_expired() { return i18n.t('offline.theUndoReachedThe'); },
+  get offline_undo_too_old() { return i18n.t('offline.theUndoWasSaved'); },
+  get daily_completion_limit() { return i18n.t('offline.theDailyLimitOf'); },
+  get quest_not_today() { return i18n.t('offline.theQuestBelongsTo'); },
+  get offline_completion_too_old() { return i18n.t('offline.itWasSavedMore'); },
+  get quest_not_found() { return i18n.t('offline.theQuestNoLonger'); },
+  get quest_skipped() { return i18n.t('offline.theQuestWasSkipped'); },
+  get not_your_quest() { return i18n.t('offline.itBelongsToAnother'); },
+  get invalid_sync_payload() { return i18n.t('offline.theSavedDataWas'); },
 };
 
 /** Friendly reason when the server will never accept this completion. */
