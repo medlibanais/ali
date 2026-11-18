@@ -1,6 +1,6 @@
 // Party Quests data layer: React Query hooks over the party RPCs.
 // Every rule (friends-only joins, membership, XP, races) lives in
-// Postgres (migration 0025); the app only calls RPCs and reads.
+// Postgres (migration 0032); the app only calls RPCs and reads.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';

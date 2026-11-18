@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Race test for Party Quests (0025): the last two members tap "I did my
+# Race test for Party Quests (0032): the last two members tap "I did my
 # part" at the same instant, many times. Every member must be paid
 # exactly once per party.
 #

@@ -1,4 +1,4 @@
--- Party Quests (0025): RLS, invites, completion, fair XP, idempotency.
+-- Party Quests (0032): RLS, invites, completion, fair XP, idempotency.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;
 select plan(30);
