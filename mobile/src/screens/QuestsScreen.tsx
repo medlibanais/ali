@@ -154,7 +154,7 @@ export function QuestsScreen({ navigation }: Props) {
               title={
                 filter === 'all'
                   ? t('quests.nothingLeftToDo')
-                  : t('quests.noQuestsLeftToday', { v1: PILLAR_LABELS[filter as Pillar].toLowerCase() })
+                  : t('quests.noQuestsLeftToday', { pillar: PILLAR_LABELS[filter as Pillar].toLowerCase() })
               }
               body={t('quests.everythingInThisView')}
             />

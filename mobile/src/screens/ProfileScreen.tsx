@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n, { appLocale, labelFor } from '../i18n';
 import {
   Alert,
   LayoutAnimation,
@@ -206,7 +207,7 @@ export function ProfileScreen({ navigation }: Props) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in.');
+      if (!user) throw new Error(i18n.t('errors.notSignedIn'));
 
       const [
         profile,
@@ -424,16 +425,16 @@ export function ProfileScreen({ navigation }: Props) {
 
           <FadeInUp delay={120} style={styles.growth}>
             <View style={styles.growthHeader}>
-              <Txt variant="heading">{`${totalXp.toLocaleString()} XP`}</Txt>
+              <Txt variant="heading">{t('common.xp', { count: totalXp, formatted: totalXp.toLocaleString(appLocale()) })}</Txt>
               <Txt variant="label" color={colors.inkSoft}>
-                {t('profile.levelAhead', { v1: gamification.level + 1 })}
+                {t('profile.levelAhead', { level: gamification.level + 1 })}
               </Txt>
             </View>
             <View style={styles.xpTrack}>
               <View style={[styles.xpFill, { width: `${Math.round(progress * 100)}%` }]} />
             </View>
             <Txt variant="caption" color={colors.inkSoft}>
-              {t('profile.xpToYourNext', { v1: toNext.toLocaleString() })}
+              {t('profile.xpToYourNext', { xp: toNext.toLocaleString(appLocale()) })}
             </Txt>
             <View style={styles.streakPill}>
               <FlameGlyph />
@@ -588,15 +589,15 @@ export function ProfileScreen({ navigation }: Props) {
               />
               {openSection === 'goals' ? (
                 <View style={styles.subList}>
-                  <SubRow label={t('profile.workouts')} value={t('profile.perWeek', { v1: goals?.workouts_per_week ?? '-' })} />
-                  <SubRow label={t('profile.sleep')} value={t('profile.hours', { v1: goals?.sleep_target_hours ?? '-' })} />
-                  <SubRow label={t('profile.water')} value={t('profile.liters', { v1: goals?.water_liters_per_day ?? '-' })} />
-                  <SubRow label={t('profile.callingParents')} value={`${goals?.call_parents_frequency ?? '-'}`} />
+                  <SubRow label={t('profile.workouts')} value={t('profile.perWeek', { value: goals?.workouts_per_week ?? '-' })} />
+                  <SubRow label={t('profile.sleep')} value={t('profile.hours', { value: goals?.sleep_target_hours ?? '-' })} />
+                  <SubRow label={t('profile.water')} value={t('profile.liters', { value: goals?.water_liters_per_day ?? '-' })} />
+                  <SubRow label={t('profile.callingParents')} value={goals?.call_parents_frequency ? labelFor('options', goals.call_parents_frequency) : '-'} />
                   <SubRow
                     label={t('profile.deepWork')}
-                    value={t('profile.hoursPerWeek', { v1: goals?.deep_work_hours_per_week ?? '-' })}
+                    value={t('profile.hoursPerWeek', { value: goals?.deep_work_hours_per_week ?? '-' })}
                   />
-                  <SubRow label={t('profile.funTime')} value={t('profile.hoursPerWeek', { v1: goals?.weekly_fun_hours ?? '-' })} />
+                  <SubRow label={t('profile.funTime')} value={t('profile.hoursPerWeek', { value: goals?.weekly_fun_hours ?? '-' })} />
                   <SubRow
                     label={t('profile.practice')}
                     value={

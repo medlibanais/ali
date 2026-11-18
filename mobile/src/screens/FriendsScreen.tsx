@@ -38,7 +38,7 @@ import {
   type UserSearchResult,
 } from '../features/friends/api';
 import { displayName, friendsOnly, inviteMessage, rankLeaderboard } from '../features/friends/logic';
-import { pluralize, streakLabel } from '../lib/format';
+import { bestStreakLabel, streakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
@@ -170,7 +170,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const onError = (e: unknown) => toast.showToast({ message: errorText(e) });
 
   const confirmUnfriend = (friend: FriendRow) => {
-    Alert.alert(t('friends.unfriend'), t('friends.removeFromYourFriends', { v1: displayName(friend) }), [
+    Alert.alert(t('friends.unfriend'), t('friends.removeFromYourFriends', { name: displayName(friend) }), [
       { text: t('friends.cancel'), style: 'cancel' },
       {
         text: t('friends.unfriend'),
@@ -209,7 +209,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         onSuccess: () =>
           toast.showToast({
             message: accept
-              ? t('friends.youAndAreNow', { v1: displayName(request.user) })
+              ? t('friends.youAndAreNow', { name: displayName(request.user) })
               : t('friends.requestDeclined'),
           }),
         onError,
@@ -223,7 +223,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
         toast.showToast({
           message:
             row.status === 'accepted'
-              ? t('friends.youAndAreNow', { v1: displayName(user) })
+              ? t('friends.youAndAreNow', { name: displayName(user) })
               : t('friends.requestSent'),
         }),
       onError,
@@ -312,7 +312,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                             {row.is_me ? t('friends.you') : displayName(row)}
                           </Txt>
                           <Txt variant="caption" color={colors.inkFaint}>
-                            {t('friends.level', { v1: row.level ?? 1, v2: streakLabel(row.current_streak ?? 0) })}
+                            {t('friends.level', { level: row.level ?? 1, streak: streakLabel(row.current_streak ?? 0) })}
                           </Txt>
                         </View>
                         <Txt variant="bodySemi" color={colors.accent}>
@@ -326,7 +326,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                       <Hairline />
                       <View style={styles.sectionHeader}>
                         <Txt variant="caption" color={colors.inkFaint}>
-                          {t('friends.keepStatsPrivate', { v1: pluralize(privateCount, 'friend'), v2: privateCount === 1 ? 's' : '' })}
+                          {t('friends.keepStatsPrivate', { count: privateCount })}
                         </Txt>
                       </View>
                     </>
@@ -343,7 +343,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                       {index > 0 ? <Hairline /> : null}
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={t('friends.optionsFor', { v1: displayName(friend) })}
+                        accessibilityLabel={t('friends.optionsFor', { name: displayName(friend) })}
                         onPress={() => friendOptions(friend)}
                         onLongPress={() => friendOptions(friend)}
                         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -353,7 +353,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                           <Txt variant="bodySemi">{displayName(friend)}</Txt>
                           <Txt variant="caption" color={colors.inkFaint}>
                             {friend.stats_shared
-                              ? t('friends.levelBest', { v1: friend.level ?? 1, v2: pluralize(friend.best_streak ?? 0, 'day') })
+                              ? t('friends.levelBest', { level: friend.level ?? 1, best: bestStreakLabel(friend.best_streak ?? 0) })
                               : t('friends.statsPrivate', { username: friend.username })}
                           </Txt>
                         </View>

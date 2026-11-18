@@ -162,7 +162,7 @@ export function NotificationSettingsScreen() {
         {t('notificationSettings.notifications')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.subtitle}>
-        {t('notificationSettings.atMostMessagesPer', { v1: prefs?.max_per_day ?? 3 })}
+        {t('notificationSettings.atMostMessagesPer', { count: prefs?.max_per_day ?? 3 })}
       </Txt>
 
       {loading || !prefs ? (

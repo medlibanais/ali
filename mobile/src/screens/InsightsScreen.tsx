@@ -3,7 +3,7 @@
 // bars. Everything reads real data (daily_scores, gamification, ai_insights).
 
 import React, { useMemo, useState } from 'react';
-import i18n from '../i18n';
+import i18n, { appLocale } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
@@ -46,38 +46,42 @@ const WEEKDAYS = (): string[] => [i18n.t('insights.sunday'), i18n.t('insights.mo
 function shortLabel(iso: string, period: Period): string {
   const d = new Date(`${iso}T12:00:00`);
   return period === 'week'
-    ? d.toLocaleDateString(undefined, { weekday: 'short' })
+    ? d.toLocaleDateString(appLocale(), { weekday: 'short' })
     : `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function verdict(s: PeriodSummary, period: Period): string {
   if (s.activeDays === 0) {
-    return i18n.t('insights.noQuestsFinishedYet', { v1: period === 'week' ? 'this week' : 'this month' });
+    return i18n.t('insights.noQuestsFinishedYet', { context: period });
   }
   if (s.prevAvgScore === null) {
     return i18n.t('insights.yourFirstStretchOn');
   }
   const diff = s.avgScore - s.prevAvgScore;
-  if (diff >= 5) return i18n.t('insights.betterThanLastWhatever', { period });
-  if (diff <= -5) return i18n.t('insights.aBitLowerThan', { period });
-  return i18n.t('insights.steadyComparedWithLast', { period });
+  if (diff >= 5) return i18n.t('insights.betterThanLastWhatever', { context: period });
+  if (diff <= -5) return i18n.t('insights.aBitLowerThan', { context: period });
+  return i18n.t('insights.steadyComparedWithLast', { context: period });
 }
 
 function takeaways(s: PeriodSummary, period: Period): string[] {
   const out: string[] = [];
   if (s.totalDays > 0) {
-    out.push(`You showed up on ${s.activeDays} of ${s.totalDays} days and finished ${s.completionRate}% of your quests.`);
+    out.push(i18n.t('insights.showedUp', { active: s.activeDays, total: s.totalDays, rate: s.completionRate }));
   }
   if (s.strongest) {
-    out.push(`${PILLAR_LABELS[s.strongest.pillar]} is your strongest pillar (${s.strongest.value}/100).`);
+    out.push(i18n.t('insights.strongest', { pillar: PILLAR_LABELS[s.strongest.pillar], value: s.strongest.value }));
   }
   if (s.weakest) {
     out.push(
-      `${PILLAR_LABELS[s.weakest.pillar]} needs the most love (${s.weakest.value}/100). One ${PILLAR_LABELS[s.weakest.pillar].toLowerCase()} quest tomorrow makes a difference.`,
+      i18n.t('insights.weakest', {
+        pillar: PILLAR_LABELS[s.weakest.pillar],
+        value: s.weakest.value,
+        lower: PILLAR_LABELS[s.weakest.pillar].toLowerCase(),
+      }),
     );
   }
   if (period === 'month' && s.bestWeekday !== null) {
-    out.push(`${WEEKDAYS()[s.bestWeekday]} is usually your best day.`);
+    out.push(i18n.t('insights.bestDay', { day: WEEKDAYS()[s.bestWeekday] }));
   }
   return out;
 }
@@ -103,7 +107,7 @@ function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
             ]}
           >
             <Txt variant="bodySemi" color={up ? colors.accent : colors.danger}>
-              {t('insights.vsLast', { v1: up ? '▲' : '▼', v2: Math.abs(diff), period })}
+              {t('insights.vsLast', { arrow: up ? '▲' : '▼', diff: Math.abs(diff), context: period })}
             </Txt>
           </View>
         ) : null}

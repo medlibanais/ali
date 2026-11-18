@@ -50,7 +50,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
         title={t('forgotPassword.resetPassword')}
         subtitle={
           sent
-            ? t('forgotPassword.ifAnAccountExists', { v1: email.trim() })
+            ? t('forgotPassword.ifAnAccountExists', { email: email.trim() })
             : t('forgotPassword.enterTheEmailYou')
         }
       />

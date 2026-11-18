@@ -315,12 +315,12 @@ export function CoachScreen() {
   const subtitle = chat.rateLimitedMessage || remaining <= 0
     ? t('coach.restingUntilMidnight')
     : remaining <= LOW_REMAINING
-      ? t('coach.leftToday', { remaining, v2: remaining === 1 ? 'message' : 'messages' })
+      ? t('coach.leftToday', { count: remaining })
       : t('coach.yourCoachKnowsYour');
 
   const context = chat.contextUsed;
   const contextLine = context
-    ? t('coach.levelTodayDayStreak', { v1: context.user_level ?? '-', v2: context.daily_score ?? '-', v3: context.streak ?? '-' })
+    ? t('coach.levelTodayDayStreak', { level: context.user_level ?? '-', score: context.daily_score ?? '-', streak: context.streak ?? '-' })
     : null;
 
   return (

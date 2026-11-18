@@ -1,5 +1,5 @@
 import React from 'react';
-import i18n from '../i18n';
+import i18n, { appLocale } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
@@ -26,7 +26,7 @@ function timeAgo(iso: string): string {
   if (minutes < 60) return i18n.t('notifications.mAgo', { minutes });
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return i18n.t('notifications.hAgo', { hours });
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',
   });

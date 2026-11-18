@@ -1,4 +1,4 @@
-import i18n from '../../i18n';
+import i18n, { appLocale } from '../../i18n';
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import type {
@@ -224,7 +224,7 @@ export const fetchMonthlyReport = createAsyncThunk<
         : null;
 
     return {
-      month: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+      month: now.toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' }),
       completion_rate: cur.rate,
       completion_change_percent: change,
       average_daily_score:

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import i18n from '../i18n';
+import i18n, { appLocale } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import BadgeMedallion from '../components/BadgeMedallion';
@@ -9,7 +9,6 @@ import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import type { Achievement, Rarity } from '../api/types';
-import { pluralize } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppDispatch } from '../store/hooks';
 import { fetchAllBadges } from '../store/slices/gamificationSlice';
@@ -50,7 +49,7 @@ function formatUnlockDate(iso: string): string {
   if (Number.isNaN(date.getTime())) {
     return iso;
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(appLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -126,10 +125,11 @@ export function AchievementsScreen() {
                 <Txt variant="heading">{currentTitle?.name ?? t('achievements.novice')}</Txt>
                 <Txt variant="caption" color={colors.inkFaint} style={styles.rowDetail}>
                   {nextTitle
-                    ? t('achievements.nextAtLevelTo', { name: nextTitle.name, target: nextTitle.target, v3: pluralize(
-                        Math.max(0, nextTitle.target - nextTitle.progress),
-                        'level',
-                      ) })
+                    ? t('achievements.nextAtLevelTo', {
+                        name: nextTitle.name,
+                        target: nextTitle.target,
+                        count: Math.max(0, nextTitle.target - nextTitle.progress),
+                      })
                     : t('achievements.everyLevelTitleUnlocked')}
                 </Txt>
                 {pillarTitles.map((title) => (
@@ -143,7 +143,7 @@ export function AchievementsScreen() {
                       </Txt>
                       <Txt variant="caption" color={colors.inkFaint}>
                         {title.unlocked_at
-                          ? t('achievements.unlocked', { v1: formatUnlockDate(title.unlocked_at) })
+                          ? t('achievements.unlocked', { date: formatUnlockDate(title.unlocked_at) })
                           : progressLabel(title)}
                       </Txt>
                     </View>
@@ -198,7 +198,7 @@ export function AchievementsScreen() {
                         style={styles.rowDetail}
                       >
                         {badge.unlocked_at
-                          ? t('achievements.unlocked', { v1: formatUnlockDate(badge.unlocked_at) })
+                          ? t('achievements.unlocked', { date: formatUnlockDate(badge.unlocked_at) })
                           : `${badge.description}${badge.xp_reward ? ` +${badge.xp_reward} XP` : ''}`}
                       </Txt>
                     </View>
