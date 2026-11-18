@@ -4,6 +4,8 @@
 // a picture of the card through the system share sheet.
 
 import * as Clipboard from 'expo-clipboard';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -43,7 +45,7 @@ import { colors, mix, radius, softShadow, spacing, themed } from '../../theme/to
 import { useTheme } from '../../theme/useTheme';
 import { inviteLink, inviteMessage } from '../friends/logic';
 
-const NO_CODE = 'Your invite code is still being set up. Try again in a moment.';
+const noCode = (): string => i18n.t('shareProfile.noCode');
 
 interface Target {
   key: string;
@@ -56,6 +58,7 @@ interface Target {
 
 export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   useTheme();
+  const { t } = useTranslation();
   // Messages show inside the sheet: app-wide toasts sit under the modal.
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -83,7 +86,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
   const shareImage = async (key: string, dialogTitle: string) => {
     if (!cardRef.current) return;
     if (Platform.OS === 'web' || !(await Sharing.isAvailableAsync())) {
-      setNotice('Sharing a picture works in the phone app, not in the browser.');
+      setNotice(t('shareProfile.webOnly'));
       return;
     }
     setBusy(key);
@@ -91,7 +94,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
       const uri = await captureRef(cardRef, { format: 'png', quality: 1, width: 1080, result: 'tmpfile' });
       await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle });
     } catch {
-      setNotice('Could not create the picture. Try again.');
+      setNotice(t('shareProfile.pictureFailed'));
     } finally {
       setBusy(null);
     }
@@ -99,16 +102,16 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
 
   const copyLink = async () => {
     if (!code) {
-      setNotice(NO_CODE);
+      setNotice(noCode());
       return;
     }
     await Clipboard.setStringAsync(inviteLink(code));
-    setNotice('Invite link copied.');
+    setNotice(t('shareProfile.copied'));
   };
 
   const whatsApp = async () => {
     if (!code) {
-      setNotice(NO_CODE);
+      setNotice(noCode());
       return;
     }
     const text = encodeURIComponent(inviteMessage(code));
@@ -118,25 +121,25 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
     } catch {
       // No WhatsApp app (or the web build): WhatsApp's web link still works.
       await Linking.openURL(`https://wa.me/?text=${text}`).catch(() =>
-        setNotice('WhatsApp is not available on this device.'),
+        setNotice(t('shareProfile.noWhatsApp')),
       );
     }
   };
 
   const more = async () => {
     if (!code) {
-      setNotice(NO_CODE);
+      setNotice(noCode());
       return;
     }
     try {
       await Share.share({ message: inviteMessage(code) });
     } catch {
-      setNotice('Sharing is not available on this device.');
+      setNotice(t('shareProfile.noSharing'));
     }
   };
 
   const targets: Target[] = [
-    { key: 'copy', label: 'Copy link', Icon: LinkGlyph, background: colors.paperAlt, iconColor: colors.ink, run: copyLink },
+    { key: 'copy', label: t('shareProfile.copyLink'), Icon: LinkGlyph, background: colors.paperAlt, iconColor: colors.ink, run: copyLink },
     { key: 'whatsapp', label: 'WhatsApp', Icon: ChatPhoneGlyph, background: '#25D366', iconColor: '#FFFFFF', run: whatsApp },
     {
       key: 'instagram',
@@ -144,17 +147,17 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
       Icon: CameraGlyph,
       background: '#D6336C',
       iconColor: '#FFFFFF',
-      run: () => shareImage('instagram', 'Share to Instagram'),
+      run: () => shareImage('instagram', t('shareProfile.toInstagram')),
     },
     {
       key: 'stories',
-      label: 'Stories',
+      label: t('shareProfile.stories'),
       Icon: StoryGlyph,
       background: '#7B4BC4',
       iconColor: '#FFFFFF',
-      run: () => shareImage('stories', 'Share to your story'),
+      run: () => shareImage('stories', t('shareProfile.toStory')),
     },
-    { key: 'more', label: 'More', Icon: MoreGlyph, background: colors.paperAlt, iconColor: colors.ink, run: more },
+    { key: 'more', label: t('shareProfile.more'), Icon: MoreGlyph, background: colors.paperAlt, iconColor: colors.ink, run: more },
   ];
 
   return (
@@ -163,14 +166,14 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
         <View style={styles.header}>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common.close')}
             onPress={onClose}
             hitSlop={8}
             style={styles.close}
           >
             <CloseGlyph />
           </PressableScale>
-          <Txt variant="heading">Share profile</Txt>
+          <Txt variant="heading">{t('shareProfile.title')}</Txt>
           <View style={styles.close} />
         </View>
 
@@ -205,7 +208,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
             <View style={styles.cardFooter}>
               <View style={styles.identity}>
                 <Txt variant="title" numberOfLines={1} color="#2A2622" style={styles.name}>
-                  {profile?.first_name ?? 'Me'}
+                  {profile?.first_name ?? t('story.me')}
                 </Txt>
                 {profile?.username ? (
                   <Txt variant="caption" numberOfLines={1} color="#6E655C">
@@ -213,7 +216,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
                   </Txt>
                 ) : null}
                 <Txt variant="caption" numberOfLines={2} color="#9A9086" style={styles.addMe}>
-                  {`Level ${level} · ${titleForLevel(level)}\nScan to add me on GROW`}
+                  {t('shareProfile.cardLine', { level, title: titleForLevel(level) })}
                 </Txt>
               </View>
               <View style={[styles.qrTile, { width: qrSize + 12, height: qrSize + 12 }]}>
@@ -221,7 +224,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
                   <QrCode value={inviteLink(code)} size={qrSize} color="#2A2622" background="#FFF6D6" />
                 ) : (
                   <Txt variant="caption" color="#6E655C" align="center">
-                    Code soon
+                    {t('shareProfile.codeSoon')}
                   </Txt>
                 )}
               </View>
@@ -229,7 +232,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
           </View>
 
           <Txt variant="label" style={styles.shareTitle}>
-            Share your profile
+            {t('shareProfile.shareYour')}
           </Txt>
           <View style={styles.targets}>
             {targets.map(({ key, label, Icon, background, iconColor, run }) => (
@@ -257,7 +260,7 @@ export function ShareProfileSheet({ visible, onClose }: { visible: boolean; onCl
             style={styles.hint}
             accessibilityLiveRegion="polite"
           >
-            {notice ?? 'Friends who scan the code or open your link land on your invite in the app.'}
+            {notice ?? t('shareProfile.hint')}
           </Txt>
         </ScrollView>
       </SafeAreaView>

@@ -193,6 +193,27 @@ tier. When a prompt is trimmed, the function logs `coach prompt trimmed`.
 Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 `FAL_BASE_URL` can point the functions at a mock server for offline tests.
 
+## Languages (English, French, Arabic)
+
+The app follows the phone's language on first launch, and Profile →
+Preferences → Language switches it instantly. The pick is saved on the
+device and in `profiles.language` (migration `0040_profile_language.sql`,
+run `npx supabase db push`), so it follows the account to a new phone.
+
+- Strings live in `mobile/src/i18n/locales/{en,fr,ar}.json`. `en.json` is
+  the source of truth: `tsc` fails on a key that is not in it, and
+  `src/i18n/__tests__/locales.test.ts` fails when French or Arabic misses a
+  key or uses a variable English does not pass.
+- Arabic is right to left. Layout flips at once (the root view sets
+  `direction: 'rtl'`); Android's own RTL flag (`I18nManager.forceRTL`)
+  takes effect after the app is closed and reopened, which mostly affects
+  system parts such as the keyboard and back gesture. Arabic text uses the
+  Cairo font, because Anton, Inter and JetBrains Mono have no Arabic letters.
+- Use `marginStart`/`marginEnd` (not Left/Right) in new styles so they flip.
+- Text written by the server stays in English for now: coach replies,
+  generated and predefined quests, push notifications, weekly insights and
+  badge names.
+
 ## Security
 
 RLS on every table (privacy matrix proven in `tests/e2e.ps1`), no secrets in

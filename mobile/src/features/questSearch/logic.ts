@@ -1,5 +1,6 @@
 // Pure helpers for semantic quest search (no React, no network): easy to test.
 import { PILLARS, type Pillar } from '../../theme/tokens';
+import i18n from '../../i18n';
 
 export const MIN_QUERY_LENGTH = 3;
 export const MAX_QUERY_LENGTH = 200;
@@ -83,5 +84,5 @@ export function relevanceBand(relevance: number): RelevanceBand {
 }
 
 export function relevanceLabel(relevance: number): string {
-  return `${Math.round(relevance)}% relevant`;
+  return i18n.t('questSearch.relevant', { v1: Math.round(relevance) });
 }

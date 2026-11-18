@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import i18n from '../../i18n';
 import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Txt from '../../components/Txt';
@@ -12,7 +13,7 @@ import { useTheme } from '../../theme/useTheme';
 import { useOfflineSync } from './useOfflineSync';
 
 function actions(n: number): string {
-  return `${n} ${n === 1 ? 'action' : 'actions'}`;
+  return i18n.t('offline.actions', { count: n });
 }
 
 export interface BannerContent {
@@ -32,30 +33,30 @@ export function bannerContent(s: {
   const m = s.machine;
   if (m.state === 'Error') {
     return m.errorKind === 'conflict'
-      ? { tone: 'warning', title: 'Sync conflict', detail: m.errorMessage, action: 'dismiss' }
-      : { tone: 'warning', title: 'Sync failed', detail: m.errorMessage, action: 'retry' };
+      ? { tone: 'warning', title: i18n.t('offline.syncConflict'), detail: m.errorMessage, action: 'dismiss' }
+      : { tone: 'warning', title: i18n.t('offline.syncFailed'), detail: m.errorMessage, action: 'retry' };
   }
   if (!s.online) {
     return {
       tone: 'offline',
-      title: 'You are offline. Quests will sync when you reconnect',
-      detail: s.pending > 0 ? `${actions(s.pending)} waiting on this device.` : null,
+      title: i18n.t('offline.youAreOfflineQuests'),
+      detail: s.pending > 0 ? i18n.t('offline.waitingOnThisDevice', { actions: actions(s.pending) }) : null,
       action: 'recheck',
     };
   }
   if (m.state === 'Syncing' && s.pending > 0) {
-    return { tone: 'syncing', title: `Syncing ${actions(s.pending)}...`, detail: null, action: null };
+    return { tone: 'syncing', title: i18n.t('offline.syncing', { actions: actions(s.pending) }), detail: null, action: null };
   }
   if (m.state === 'Synced') {
-    return { tone: 'done', title: 'All synced', detail: null, action: null };
+    return { tone: 'done', title: i18n.t('offline.allSynced'), detail: null, action: null };
   }
   return null;
 }
 
 const ACTION_LABEL: Record<NonNullable<BannerContent['action']>, { text: string; a11y: string }> = {
-  recheck: { text: 'Retry', a11y: 'Check the connection again' },
-  retry: { text: 'Retry', a11y: 'Retry syncing your quests' },
-  dismiss: { text: 'OK', a11y: 'Dismiss the sync notice' },
+  recheck: { get text() { return i18n.t('offline.retry'); }, get a11y() { return i18n.t('offline.checkTheConnectionAgain'); } },
+  retry: { get text() { return i18n.t('offline.retry'); }, get a11y() { return i18n.t('offline.retrySyncingYourQuests'); } },
+  dismiss: { get text() { return i18n.t('common.ok'); }, get a11y() { return i18n.t('offline.dismissTheSyncNotice'); } },
 };
 
 /** Top-of-screen indicator for the global sync state. */
@@ -192,19 +193,19 @@ const styles = themed(() =>
       minHeight: 44,
     },
     spinner: {
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
     },
     dot: {
       width: 10,
       height: 10,
       borderRadius: 5,
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
     },
     text: {
       flex: 1,
     },
     action: {
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       minWidth: 44,
       minHeight: 44,
       alignItems: 'center',

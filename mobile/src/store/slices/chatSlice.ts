@@ -1,3 +1,4 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
   describeFunctionError,
@@ -73,8 +74,9 @@ const LOCAL_PREFIX = 'local-';
 /** Warn once this many messages are left (15 of 20 used). */
 export const LOW_MESSAGES_WARNING = 5;
 
-const RATE_LIMIT_MESSAGE =
-  'That is all for today — your coach rests at midnight. 20 messages per day.';
+function rateLimitMessage(): string {
+  return i18n.t('chatErrors.rateLimit');
+}
 
 export function remainingMessages(state: ChatState): number {
   return Math.max(0, DAILY_MESSAGE_LIMIT - state.messagesSentToday);
@@ -168,7 +170,7 @@ export const fetchChatHistory = createAsyncThunk<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('chatErrors.notSignedIn'));
 
     const conversationId = await getOrCreateConversation(user.id);
     // Newest 50, then flip to chronological (ascending + limit returned the
@@ -191,7 +193,7 @@ export const fetchChatHistory = createAsyncThunk<
     };
   } catch (e) {
     return rejectWithValue(
-      e instanceof Error ? e.message : 'Could not load the conversation.',
+      e instanceof Error ? e.message : i18n.t('chatErrors.loadConversation'),
     );
   }
 });
@@ -205,7 +207,7 @@ export const refreshCoachQuota = createAsyncThunk<
   try {
     return await fetchCoachQuota();
   } catch {
-    return rejectWithValue('Could not refresh the daily count.');
+    return rejectWithValue(i18n.t('chatErrors.couldNotRefreshThe'));
   }
 });
 
@@ -224,7 +226,7 @@ export const startNewChat = createAsyncThunk<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('chatErrors.notSignedIn'));
     const { data, error } = await supabase
       .from('conversations')
       .insert({ user_id: user.id })
@@ -233,7 +235,7 @@ export const startNewChat = createAsyncThunk<
     if (error) throw error;
     return { conversationId: data.id as string };
   } catch {
-    return rejectWithValue('Could not start a new chat. Try again.');
+    return rejectWithValue(i18n.t('chatErrors.newChatFailed'));
   }
 });
 
@@ -256,34 +258,34 @@ export function coachFailure(failure: FunctionFailure): CoachSendFailure {
     conversationGone: false,
   });
   if (failure.kind === 'network') {
-    return result('No connection. Check your internet and tap retry.');
+    return result(i18n.t('chatErrors.offline'));
   }
   if (failure.status === 429) {
-    return { ...result(RATE_LIMIT_MESSAGE), rateLimited: true };
+    return { ...result(rateLimitMessage()), rateLimited: true };
   }
   if (failure.status === 401) {
-    return result('Your session has expired. Sign out and back in, then retry.');
+    return result(i18n.t('chatErrors.sessionExpired'));
   }
   if (failure.code === 'conversation_not_found') {
     return {
-      ...result('That chat is no longer available. Tap retry to continue in your latest chat.'),
+      ...result(i18n.t('chatErrors.chatGone')),
       conversationGone: true,
     };
   }
   if (isNotDeployed(failure, ['conversation_not_found'])) {
     return result(
-      'The AI coach is not set up on the server yet (the "coach" function is not deployed).',
+      i18n.t('chatErrors.notDeployed'),
     );
   }
   if (failure.status === 503 && failure.code === 'not_configured') {
     return result(
-      'The AI coach is not switched on yet: the server is missing its GROQ_API_KEY.',
+      i18n.t('chatErrors.notConfigured'),
     );
   }
   if (failure.code === 'message_too_long') {
-    return result(`That message is too long. Keep it under ${MESSAGE_MAX_LENGTH} characters.`);
+    return result(i18n.t('chatErrors.tooLong', { max: MESSAGE_MAX_LENGTH }));
   }
-  return result('Your future self lost the thread for a second. Tap retry.');
+  return result(i18n.t('chatErrors.generic'));
 }
 
 function streamedToMessage(
@@ -482,7 +484,7 @@ export const sendChatMessage = createAsyncThunk<
   return rejectWithValue({
     message: signal.aborted
       ? ''
-      : 'The connection dropped before the reply arrived. Tap retry to ask again.',
+      : i18n.t('chatErrors.theConnectionDroppedBefore'),
     rateLimited: false,
     conversationGone: false,
     stopped: signal.aborted,
@@ -500,7 +502,7 @@ export const setMessageFeedback = createAsyncThunk<
     .update({ feedback })
     .eq('id', messageId);
   if (error) {
-    return rejectWithValue('Could not save that rating.');
+    return rejectWithValue(i18n.t('chatErrors.ratingFailed'));
   }
   return { messageId, feedback };
 });
@@ -560,7 +562,7 @@ export const chatSlice = createSlice({
       })
       .addCase(fetchChatHistory.rejected, (state, action) => {
         state.loadingHistory = false;
-        state.error = action.payload ?? 'Could not load the conversation.';
+        state.error = action.payload ?? i18n.t('chatErrors.loadConversation');
       })
       .addCase(startNewChat.pending, (state) => {
         state.startingNewChat = true;
@@ -576,7 +578,7 @@ export const chatSlice = createSlice({
       })
       .addCase(startNewChat.rejected, (state, action) => {
         state.startingNewChat = false;
-        state.error = action.payload ?? 'Could not start a new chat. Try again.';
+        state.error = action.payload ?? i18n.t('chatErrors.newChatFailed');
       })
       .addCase(sendChatMessage.pending, (state, action) => {
         state.sending = true;
@@ -626,7 +628,7 @@ export const chatSlice = createSlice({
           state.rateLimitedMessage = failure.message;
           state.messagesSentToday = DAILY_MESSAGE_LIMIT;
         } else {
-          state.error = failure?.message ?? 'Could not send that message.';
+          state.error = failure?.message ?? i18n.t('chatErrors.sendFailed');
           state.failedText = action.meta.arg;
           // Retry then goes to the newest chat on the server.
           if (failure?.conversationGone) state.conversationId = null;

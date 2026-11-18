@@ -8,6 +8,7 @@
 // Each layout shares one shimmer sweep (SkeletonGroup).
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { radius, spacing, themed, colors } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -74,9 +75,10 @@ function QuestRowSkeleton() {
 }
 
 export function TodaySkeleton() {
+  const { t } = useTranslation();
   useTheme();
   return (
-    <SkeletonGroup style={styles.wrap} accessibilityLabel="Loading your day">
+    <SkeletonGroup style={styles.wrap} accessibilityLabel={t('skeletons.loadingYourDay')}>
       <Skeleton width={120} height={12} style={styles.headerLine} />
       <Skeleton width={230} height={26} style={styles.headerTitle} />
       <Skeleton width={200} height={14} style={styles.center} />
@@ -94,9 +96,10 @@ export function TodaySkeleton() {
 const BAR_HEIGHTS = [0.45, 0.7, 0.55, 0.9, 0.35, 0.8, 0.6];
 
 export function InsightsSkeleton() {
+  const { t } = useTranslation();
   useTheme();
   return (
-    <SkeletonGroup accessibilityLabel="Loading your insights">
+    <SkeletonGroup accessibilityLabel={t('skeletons.loadingYourInsights')}>
       {/* Headline: big number and a sentence */}
       <View style={styles.card}>
         <Skeleton height={34} width={110} />
@@ -132,9 +135,10 @@ export function InsightsSkeleton() {
 }
 
 export function ChatSkeleton() {
+  const { t } = useTranslation();
   useTheme();
   return (
-    <SkeletonGroup style={styles.chat} accessibilityLabel="Loading your conversation">
+    <SkeletonGroup style={styles.chat} accessibilityLabel={t('skeletons.loadingYourConversation')}>
       <View style={styles.coachRow}>
         <SkeletonCircle size={32} />
         <Skeleton height={64} width="70%" borderRadius={radius.lg} style={styles.bubbleLeft} />
@@ -180,7 +184,7 @@ const styles = themed(() =>
     cardTitle: { marginBottom: spacing.md },
     cardBody: { marginTop: spacing.md },
     pillarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-    pillarBar: { marginLeft: spacing.md, flexShrink: 1 },
+    pillarBar: { marginStart: spacing.md, flexShrink: 1 },
     bars: {
       flexDirection: 'row',
       alignItems: 'flex-end',
@@ -190,7 +194,7 @@ const styles = themed(() =>
     axis: { marginTop: spacing.xs },
     chat: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
     coachRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: spacing.md },
-    bubbleLeft: { marginLeft: spacing.sm, borderBottomLeftRadius: 6 },
-    bubbleRight: { alignSelf: 'flex-end', marginBottom: spacing.md, borderBottomRightRadius: 6 },
+    bubbleLeft: { marginStart: spacing.sm, borderBottomStartRadius: 6 },
+    bubbleRight: { alignSelf: 'flex-end', marginBottom: spacing.md, borderBottomEndRadius: 6 },
   }),
 );

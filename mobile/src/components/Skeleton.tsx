@@ -7,6 +7,7 @@
 // like one surface instead of flickering separately.
 
 import React, { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -57,12 +58,13 @@ const ShimmerContext = React.createContext<SharedValue<number> | null>(null);
 export function SkeletonGroup({
   children,
   style,
-  accessibilityLabel = 'Loading',
+  accessibilityLabel,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   accessibilityLabel?: string;
 }) {
+  const { t } = useTranslation();
   const clock = useShimmerClock();
   return (
     <ShimmerContext.Provider value={clock}>
@@ -70,7 +72,7 @@ export function SkeletonGroup({
         style={style}
         accessible
         accessibilityRole="progressbar"
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={accessibilityLabel ?? t('common.loading')}
         accessibilityState={{ busy: true }}
       >
         {children}

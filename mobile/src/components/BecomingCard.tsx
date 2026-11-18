@@ -2,6 +2,7 @@
 // Future You exists it invites making one.
 
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import AvatarView from '../avatar/AvatarView';
 import { VALID_OPTION_IDS } from '../avatar/options';
@@ -23,27 +24,28 @@ const FIGURE = 190;
 
 export function BecomingCard({ avatarConfig, onEdit }: BecomingCardProps) {
   useTheme();
+  const { t } = useTranslation();
   const doc = useMemo(() => readAvatarDoc(avatarConfig, VALID_OPTION_IDS), [avatarConfig]);
   return (
     <Card style={styles.card}>
-      <Txt variant="label" color={colors.inkSoft}>Who are you becoming?</Txt>
+      <Txt variant="label" color={colors.inkSoft}>{t('becoming.question')}</Txt>
       <View style={styles.row}>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="Current you. Edit the avatar of who you are today."
+          accessibilityLabel={t('becoming.currentA11y')}
           onPress={() => onEdit('current')}
           style={styles.figure}
         >
           <AvatarView config={doc.current} size={FIGURE} mood="neutral" mode="full-body" bare animated={false} />
-          <Txt variant="bodySemi">Current you</Txt>
-          <Txt variant="caption" color={colors.inkSoft}>Today</Txt>
+          <Txt variant="bodySemi">{t('becoming.current')}</Txt>
+          <Txt variant="caption" color={colors.inkSoft}>{t('becoming.today')}</Txt>
         </PressableScale>
         <View style={styles.arrow}>
           <ArrowRightGlyph color={colors.accent} />
         </View>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={doc.future ? 'Future you. Edit the avatar of who you are becoming.' : 'Create your Future You avatar'}
+          accessibilityLabel={doc.future ? t('becoming.futureA11y') : t('becoming.createFutureA11y')}
           onPress={() => onEdit('future')}
           style={styles.figure}
         >
@@ -52,11 +54,11 @@ export function BecomingCard({ avatarConfig, onEdit }: BecomingCardProps) {
           ) : (
             <View style={styles.empty}>
               <Txt variant="title" color={colors.accent}>+</Txt>
-              <Txt variant="caption" color={colors.inkSoft} style={styles.center}>Create your Future You</Txt>
+              <Txt variant="caption" color={colors.inkSoft} style={styles.center}>{t('becoming.createFuture')}</Txt>
             </View>
           )}
-          <Txt variant="bodySemi">Future you</Txt>
-          <Txt variant="caption" color={colors.inkSoft}>Becoming</Txt>
+          <Txt variant="bodySemi">{t('becoming.future')}</Txt>
+          <Txt variant="caption" color={colors.inkSoft}>{t('becoming.becoming')}</Txt>
         </PressableScale>
       </View>
     </Card>

@@ -3,6 +3,7 @@
 // the result with the choice to keep it as the profile picture.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AvatarConfig } from '../avatar/types';
@@ -22,13 +23,14 @@ interface Props {
   onClose: () => void;
 }
 
-const VIEWS: { id: PhotoView; label: string }[] = [
-  { id: 'portrait', label: 'Portrait' },
-  { id: 'full', label: 'Full body' },
+const VIEWS: { id: PhotoView; labelKey: 'photoreal.portrait' | 'photoreal.fullBody' }[] = [
+  { id: 'portrait', labelKey: 'photoreal.portrait' },
+  { id: 'full', labelKey: 'photoreal.fullBody' },
 ];
 
 export default function PhotorealSheet({ visible, config, onClose }: Props) {
   useTheme();
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const profile = useAppSelector((state) => state.user.profile);
   const [view, setView] = useState<PhotoView>('portrait');
@@ -58,9 +60,9 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
       if (!alive.current) return;
       setFresh((f) => ({ ...f, [view]: result.url }));
       dispatch(fetchProfile());
-      setMessage(result.remainingToday > 0 ? `${result.remainingToday} more today.` : 'That was the last one for today.');
+      setMessage(result.remainingToday > 0 ? t('photoreal.remaining', { count: result.remainingToday }) : t('photoreal.lastOne'));
     } catch (e) {
-      if (alive.current) setMessage(e instanceof AiAvatarError ? e.message : 'We could not make the photo this time. Try again.');
+      if (alive.current) setMessage(e instanceof AiAvatarError ? e.message : t('photoreal.makeFailed'));
     } finally {
       if (alive.current) setBusy(false);
     }
@@ -74,7 +76,7 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
       dispatch(fetchProfile());
       if (alive.current) setKept(true);
     } catch (e) {
-      if (alive.current) setMessage(e instanceof AiAvatarError ? e.message : 'We could not save that. Try again.');
+      if (alive.current) setMessage(e instanceof AiAvatarError ? e.message : t('photoreal.saveFailed'));
     } finally {
       if (alive.current) setBusy(false);
     }
@@ -84,20 +86,20 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
       <SafeAreaView style={styles.screen}>
         <View style={styles.header}>
-          <Txt variant="title">Make a photo</Txt>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.close}>
-            <Txt variant="bodySemi">Done</Txt>
+          <Txt variant="title">{t('photoreal.title')}</Txt>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={onClose} style={styles.close}>
+            <Txt variant="bodySemi">{t('common.done')}</Txt>
           </Pressable>
         </View>
         <Txt variant="caption" color={colors.inkSoft} style={styles.intro}>
-          Turns the avatar you are building into a photograph of that same person. It uses one of today&apos;s five.
+          {t('photoreal.intro')}
         </Txt>
         <View style={styles.views} accessibilityRole="tablist">
           {VIEWS.map((v) => (
             <Pressable
               key={v.id}
               accessibilityRole="tab"
-              accessibilityLabel={v.label}
+              accessibilityLabel={t(v.labelKey)}
               accessibilityState={{ selected: view === v.id }}
               onPress={() => {
                 setView(v.id);
@@ -106,21 +108,21 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
               }}
               style={[styles.view, view === v.id && styles.viewOn]}
             >
-              <Txt variant="caption" color={view === v.id ? colors.onAccent : colors.ink}>{v.label}</Txt>
+              <Txt variant="caption" color={view === v.id ? colors.onAccent : colors.ink}>{t(v.labelKey)}</Txt>
             </Pressable>
           ))}
         </View>
         <View style={[styles.frame, view === 'full' ? styles.frameTall : styles.frameSquare]}>
           {url && !busy ? (
-            <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel="Photo of your avatar" />
+            <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={t('photoreal.photoA11y')} />
           ) : busy ? (
             <View style={styles.center}>
-              <LoadingDots color={colors.accent} accessibilityLabel="Making your photo" />
-              <Txt variant="caption" color={colors.inkSoft}>Making your photo. This takes about 20 seconds.</Txt>
+              <LoadingDots color={colors.accent} accessibilityLabel={t('photoreal.makingA11y')} />
+              <Txt variant="caption" color={colors.inkSoft}>{t('photoreal.making')}</Txt>
             </View>
           ) : (
             <View style={styles.center}>
-              <Txt variant="caption" color={colors.inkSoft}>No photo yet.</Txt>
+              <Txt variant="caption" color={colors.inkSoft}>{t('photoreal.none')}</Txt>
             </View>
           )}
         </View>
@@ -128,22 +130,22 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
         <View style={styles.actions}>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={url ? 'Make another photo' : 'Make the photo'}
+            accessibilityLabel={url ? t('photoreal.makeAnotherA11y') : t('photoreal.make')}
             onPress={make}
             disabled={busy || !config}
             style={[styles.primary, (busy || !config) && styles.dim]}
           >
-            <Txt variant="bodySemi" color={colors.onAccent}>{url ? 'Make another' : 'Make the photo'}</Txt>
+            <Txt variant="bodySemi" color={colors.onAccent}>{url ? t('photoreal.makeAnother') : t('photoreal.make')}</Txt>
           </PressableScale>
           {url && view === 'portrait' ? (
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Use this photo as my profile picture"
+              accessibilityLabel={t('photoreal.useA11y')}
               onPress={keep}
               disabled={busy || kept}
               style={[styles.secondary, (busy || kept) && styles.dim]}
             >
-              <Txt variant="bodySemi">{kept ? 'Your profile picture' : 'Use as my profile picture'}</Txt>
+              <Txt variant="bodySemi">{kept ? t('photoreal.isProfile') : t('photoreal.use')}</Txt>
             </PressableScale>
           ) : null}
         </View>

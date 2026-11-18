@@ -8,6 +8,7 @@
 // - Pure helpers for the Time-of-Day Histogram.
 
 import { useQuery } from '@tanstack/react-query';
+import i18n from '../../i18n';
 import { supabase } from '../../lib/supabase';
 import { describeFunctionError } from '../../lib/functionErrors';
 import type { Pillar } from '../../theme/tokens';
@@ -106,9 +107,9 @@ export interface TimeBin {
 }
 
 const BIN_META: { key: TimeOfDay; label: string; range: string }[] = [
-  { key: 'morning', label: 'Morning', range: '5 AM – noon' },
-  { key: 'afternoon', label: 'Afternoon', range: 'noon – 5 PM' },
-  { key: 'evening', label: 'Evening', range: '5 PM – 5 AM' },
+  { key: 'morning', get label() { return i18n.t('insights.morning'); }, get range() { return i18n.t('insights.n5AmNoon'); } },
+  { key: 'afternoon', get label() { return i18n.t('insights.afternoon'); }, get range() { return i18n.t('insights.noon5Pm'); } },
+  { key: 'evening', get label() { return i18n.t('insights.evening'); }, get range() { return i18n.t('insights.n5Pm5Am'); } },
 ];
 
 /** Largest-remainder rounding so shares always sum to exactly 100. */

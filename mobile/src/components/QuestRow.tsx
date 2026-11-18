@@ -1,5 +1,7 @@
 import React, { memo, useEffect, useRef } from 'react';
+import i18n from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { Quest } from '../api/types';
 import {
   blockTiles,
@@ -28,10 +30,16 @@ export interface QuestRowProps {
   showPillarLabel?: boolean;
 }
 
-const DIFFICULTY_LABELS: Record<Quest['difficulty'], string> = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
+export const DIFFICULTY_LABELS: Readonly<Record<Quest['difficulty'], string>> = {
+  get easy() {
+    return i18n.t('difficulty.easy');
+  },
+  get medium() {
+    return i18n.t('difficulty.medium');
+  },
+  get hard() {
+    return i18n.t('difficulty.hard');
+  },
 };
 
 export function QuestRow({
@@ -41,6 +49,7 @@ export function QuestRow({
   showPillarLabel = false,
 }: QuestRowProps) {
   useTheme();
+  const { t } = useTranslation();
   const pillarColor = colors.pillar[quest.pillar];
   const pastel = pillarPastels(quest.pillar);
   const dimmed = quest.skipped === true;
@@ -69,7 +78,7 @@ export function QuestRow({
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: false }}
-          accessibilityLabel={`Complete ${quest.title}`}
+          accessibilityLabel={t('questRow.complete', { title: quest.title })}
           onPress={(e) => {
             playHaptic('questComplete');
             // XP particles start where the finger was.
@@ -124,7 +133,7 @@ export function QuestRow({
             {showPillarLabel
               ? `${PILLAR_LABELS[quest.pillar]} · ${DIFFICULTY_LABELS[quest.difficulty]}`
               : DIFFICULTY_LABELS[quest.difficulty]}
-            {quest.time_estimate_minutes ? ` · ${quest.time_estimate_minutes} min` : ''}
+            {quest.time_estimate_minutes ? ` · ${t('questRow.minutes', { count: quest.time_estimate_minutes })}` : ''}
           </Txt>
           {quest.is_ai_generated ? (
             <View style={[styles.coachTag, block && { backgroundColor: withAlpha(tileInk, 0.12) }]}>
@@ -134,13 +143,13 @@ export function QuestRow({
                 color={block ? tileInk : colors.accent}
                 style={styles.coachText}
               >
-                Coach pick
+                {t('questRow.coachPick')}
               </Txt>
             </View>
           ) : null}
           {dimmed ? (
             <Txt variant="caption" color={block ? tileInk : colors.inkFaint} style={styles.metaText}>
-              {' · Skipped'}
+              {` · ${t('questRow.skipped')}`}
             </Txt>
           ) : null}
         </View>
@@ -148,7 +157,7 @@ export function QuestRow({
       <View style={[styles.xpPill, block && { backgroundColor: tileInk }]}>
         <StarGlyph size={13} />
         <Txt variant="bodySemi" color={block ? colors.ink : colors.ink} style={styles.xp}>
-          {`+${quest.xp_reward} XP`}
+          {t('common.xpPlus', { count: quest.xp_reward })}
         </Txt>
       </View>
     </PressableScale>
@@ -177,7 +186,7 @@ const styles = themed(() =>
       borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
       backgroundColor: colors.card,
     },
     checkDone: {
@@ -200,7 +209,7 @@ const styles = themed(() =>
     coachTag: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       paddingHorizontal: spacing.sm - 1,
       paddingVertical: 1,
       borderRadius: radius.pill,
@@ -209,19 +218,19 @@ const styles = themed(() =>
     coachText: {
       fontSize: 12,
       lineHeight: 16,
-      marginLeft: 4,
+      marginStart: 4,
     },
     xpPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       paddingHorizontal: spacing.sm + 2,
       paddingVertical: 5,
       borderRadius: radius.pill,
       backgroundColor: colors.paper,
     },
     xp: {
-      marginLeft: 4,
+      marginStart: 4,
       fontSize: 13,
       lineHeight: 17,
     },

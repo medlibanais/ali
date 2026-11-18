@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Easing, Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { colors, radius, softShadow, spacing, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -38,6 +39,7 @@ export function Button({
   icon: Icon,
   winTitle,
 }: ButtonProps) {
+  const { t } = useTranslation();
   useTheme();
   const isDisabled = disabled || loading;
   const [engaged, setEngaged] = useState(false);
@@ -134,7 +136,7 @@ export function Button({
       {loading ? (
         <LoadingDots
           color={variant === 'primary' ? colors.onAccent : colors.accent}
-          accessibilityLabel={`${title}, loading`}
+          accessibilityLabel={t('common.loading2', { title })}
         />
       ) : (
         <View style={styles.content}>
@@ -230,7 +232,7 @@ const styles = themed(() =>
       fontSize: 15,
     },
     icon: {
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
     },
   }),
 );
