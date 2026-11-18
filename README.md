@@ -161,7 +161,7 @@ something is missing:
 ### "Make it look like me" (selfie to avatar)
 
 The editor's face button takes a selfie, uploads it to the private `selfies`
-bucket and queues a row in `avatar_generation_jobs` (migration 0021). The
+bucket and queues a row in `avatar_generation_jobs` (migration 0030). The
 insert calls `generate-avatar-config` through a database webhook made in SQL.
 It reads the selfie with Groq's vision model (`GROQ_API_KEY`, the coach's
 key), then fal.ai (`FAL_KEY`) if Groq fails, and falls back to a random look.

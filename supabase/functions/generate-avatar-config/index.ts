@@ -1,6 +1,6 @@
 // generate-avatar-config: "Make it look like me".
 // Called by the database webhook on avatar_generation_jobs (migration
-// 0021), or by the app for its own job if no webhook call arrived. Reads
+// 0030), or by the app for its own job if no webhook call arrived. Reads
 // the selfie from the private `selfies` bucket, asks a vision model which
 // avatar options resemble the person, and writes result_config. If the AI
 // is missing, rate-limited, slow or unsure, the job still completes with a
