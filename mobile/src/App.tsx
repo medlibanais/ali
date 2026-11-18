@@ -24,6 +24,11 @@ import { hydrateTheme, syncThemeWithProfile } from './store/slices/themeSlice';
 import ThemeTransition from './components/ThemeTransition';
 import { usePushNotifications } from './features/notifications/usePushNotifications';
 import OfflineBanner from './features/offline/OfflineBanner';
+import { holdSplash } from './lib/bootSplash';
+
+// Keep the native splash up until the first real screen has been drawn
+// (see lib/bootSplash.ts). Runs before the first render.
+holdSplash();
 
 const navigationRef = createNavigationContainerRef<RootParamList>();
 

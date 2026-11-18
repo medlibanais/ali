@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { FlatList } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import Hairline from '../components/Hairline';
 import Screen from '../components/Screen';
 import Txt from '../components/Txt';
@@ -108,9 +108,12 @@ export function TimezonePickerScreen() {
           {`Detected on this device: ${detected}`}
         </Txt>
       </View>
-      <FlatList
+      {/* ~400 zones: FlashList draws only the rows on screen. */}
+      <FlashList
         data={zones}
         keyExtractor={(z) => z}
+        estimatedItemSize={57}
+        extraData={saving ? `${current}:saving` : current}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {
           const selected = item === current;

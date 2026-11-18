@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import TypingDots from '../components/TypingDots';
 import {
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -201,7 +201,7 @@ function ThumbButton({
   );
 }
 
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   message,
   onFeedback,
   onRegenerate,
@@ -280,7 +280,7 @@ function MessageBubble({
       </View>
     </View>
   );
-}
+});
 
 function HistorySkeleton() {
   return (
@@ -292,6 +292,12 @@ function HistorySkeleton() {
   );
 }
 
+const messageKey = (m: ChatMessage): string => m.id;
+// User and coach bubbles have different layouts; recycle them separately.
+const messageType = (m: ChatMessage): ChatMessage['role'] => m.role;
+/** Typical bubble height incl. its feedback row, for FlashList's first layout. */
+const ESTIMATED_BUBBLE = 96;
+
 export function CoachScreen() {
   useTheme();
   const dispatch = useAppDispatch();
@@ -301,7 +307,7 @@ export function CoachScreen() {
   const [draft, setDraft] = useState('');
   // The running send; aborting it stops generating.
   const inFlight = useRef<{ abort: () => void } | null>(null);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlashList<ChatMessage>>(null);
   // What was typed before the mic was tapped; dictation is added after it.
   const voiceBase = useRef('');
   const voice = useVoiceInput({
@@ -397,6 +403,29 @@ export function CoachScreen() {
 
   const orderedMessages = [...chat.messages].reverse();
 
+  // Stable callbacks, so a new message only renders its own bubble and
+  // FlashList's recycled rows are not all redrawn.
+  const regenerateRef = useRef(regenerate);
+  regenerateRef.current = regenerate;
+  const onRegenerate = useCallback(() => regenerateRef.current(), []);
+  const onFeedback = useCallback(
+    (id: string, feedback: -1 | 0 | 1) =>
+      dispatch(setMessageFeedback({ messageId: id, feedback })),
+    [dispatch],
+  );
+  const canRegenerateLast = Boolean(lastUserMessage);
+  const renderMessage = useCallback(
+    ({ item }: ListRenderItemInfo<ChatMessage>) => (
+      <MessageBubble
+        message={item}
+        onFeedback={onFeedback}
+        onRegenerate={onRegenerate}
+        canRegenerate={item.id === lastAssistantId && canRegenerateLast}
+      />
+    ),
+    [onFeedback, onRegenerate, lastAssistantId, canRegenerateLast],
+  );
+
   const subtitle = chat.rateLimitedMessage || remaining <= 0
     ? 'Resting until midnight'
     : remaining <= LOW_REMAINING
@@ -449,51 +478,50 @@ export function CoachScreen() {
       {chat.loadingHistory ? (
         <HistorySkeleton />
       ) : (
-        <FlatList
-          ref={listRef}
-          data={orderedMessages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              onFeedback={(id, feedback) =>
-                dispatch(setMessageFeedback({ messageId: id, feedback }))
-              }
-              onRegenerate={regenerate}
-              canRegenerate={item.id === lastAssistantId && Boolean(lastUserMessage)}
+        !hasMessages && !chat.streaming ? (
+          <View style={[styles.list, styles.emptyWrap]}>
+            <EmptyState
+              title={chat.conversationId ? 'Fresh page' : 'No messages yet'}
+              body="Ask your future self about today's quests, your streak, or the week ahead."
             />
-          )}
-          inverted
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.emptyFlip}>
-              <EmptyState
-                title={chat.conversationId ? 'Fresh page' : 'No messages yet'}
-                body="Ask your future self about today's quests, your streak, or the week ahead."
-              />
-            </View>
-          }
-          // Inverted list: the footer renders at the top, above the oldest message.
-          ListFooterComponent={
-            hasMessages ? (
-              <Txt
-                variant="caption"
-                color={colors.inkFaint}
-                align="center"
-                style={styles.dayLabel}
-              >
-                {contextLine ? `Today · ${contextLine}` : 'Today'}
-              </Txt>
-            ) : null
-          }
-          ListHeaderComponent={
-            chat.streaming ? (
-              <StreamingBubble text={chat.streaming.text} phase={chat.streaming.phase} />
-            ) : null
-          }
-        />
+          </View>
+        ) : (
+          // FlashList recycles bubble views as a long chat scrolls instead
+          // of keeping one mounted per message. Inverted: newest at the
+          // bottom, and the list starts there.
+          <View style={styles.list}>
+            <FlashList
+              ref={listRef}
+              data={orderedMessages}
+              keyExtractor={messageKey}
+              getItemType={messageType}
+              estimatedItemSize={ESTIMATED_BUBBLE}
+              renderItem={renderMessage}
+              extraData={lastAssistantId}
+              inverted
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+              // Inverted list: the footer renders at the top, above the oldest message.
+              ListFooterComponent={
+                hasMessages ? (
+                  <Txt
+                    variant="caption"
+                    color={colors.inkFaint}
+                    align="center"
+                    style={styles.dayLabel}
+                  >
+                    {contextLine ? `Today · ${contextLine}` : 'Today'}
+                  </Txt>
+                ) : null
+              }
+              ListHeaderComponent={
+                chat.streaming ? (
+                  <StreamingBubble text={chat.streaming.text} phase={chat.streaming.phase} />
+                ) : null
+              }
+            />
+          </View>
+        )
       )}
 
       {chat.degradedReply && !chat.error ? (
@@ -695,12 +723,10 @@ const styles = themed(() =>
     listContent: {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
-      flexGrow: 1,
     },
-    emptyFlip: {
-      transform: [{ scaleY: -1 }],
-      flex: 1,
+    emptyWrap: {
       justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
     },
     dayLabel: {
       marginBottom: spacing.md,

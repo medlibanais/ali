@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import { runAfterInteractionsOrTimeout } from '../../lib/afterInteractions';
 import * as Notifications from 'expo-notifications';
 import type { NavigationContainerRefWithCurrent } from '@react-navigation/native';
 import { registerDeviceForPush } from '../../lib/notifications';
@@ -87,10 +88,17 @@ export function usePushNotifications(
   // Token: refresh device_tokens on every login, and when it rotates.
   useEffect(() => {
     if (Platform.OS === 'web' || !userId || !appReady) return undefined;
-    registerDeviceForPush().catch(() => undefined);
+    // Asking the OS for a token and writing it to Supabase waits until the
+    // first screen and its entry animations are done (startup speed).
+    const task = runAfterInteractionsOrTimeout(() => {
+      registerDeviceForPush().catch(() => undefined);
+    });
     const sub = Notifications.addPushTokenListener(() => {
       registerDeviceForPush().catch(() => undefined);
     });
-    return () => sub.remove();
+    return () => {
+      task.cancel();
+      sub.remove();
+    };
   }, [userId, appReady]);
 }
