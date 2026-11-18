@@ -3,6 +3,7 @@
 // on the UI thread; a level-up runs it to the end and restarts from zero.
 
 import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -20,6 +21,7 @@ import { useTheme } from '../../theme/useTheme';
 import { registerXpBar } from './anchors';
 
 export const XpBar = memo(function XpBar() {
+  const { t } = useTranslation();
   useTheme();
   const totalXp = useAppSelector((state) => state.gamification.totalXp);
   const level = useAppSelector((state) => state.gamification.level);
@@ -88,7 +90,7 @@ export const XpBar = memo(function XpBar() {
       style={styles.wrap}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={`Level ${level}, ${title}`}
+      accessibilityLabel={t('celebrations.level4', { level, title })}
       accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
     >
       <View style={styles.labels}>
@@ -96,7 +98,7 @@ export const XpBar = memo(function XpBar() {
           {`Lv ${level} · ${title}`}
         </Txt>
         <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
-          {atMax ? 'Max level' : `${into.toLocaleString()} / ${span.toLocaleString()} XP`}
+          {atMax ? t('celebrations.maxLevel') : `${into.toLocaleString()} / ${span.toLocaleString()} XP`}
         </Txt>
       </View>
       <View ref={trackRef} style={styles.track} collapsable={false}>
@@ -121,7 +123,7 @@ const styles = themed(() =>
     level: {
       fontFamily: fonts.bodySemi,
       flexShrink: 1,
-      marginRight: spacing.sm,
+      marginEnd: spacing.sm,
     },
     track: {
       height: 8,

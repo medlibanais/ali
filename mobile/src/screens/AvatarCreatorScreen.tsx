@@ -10,6 +10,8 @@
 // profiles.avatar_config.
 
 import React, { useMemo, useRef, useState } from 'react';
+import i18n, { labelFor } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import {
   PanResponder,
   Pressable,
@@ -108,10 +110,24 @@ const TOP_BAR = 64;
 const YAW_STEP = Math.PI / 12;
 const FRONT = 0.3;
 const VIEWS: EditorView[] = ['full-body', 'head', 'face'];
-const VIEW_LABEL: Record<EditorView, string> = { 'full-body': 'full body', head: 'head and shoulders', face: 'face close-up' };
+/** Avatar data labels are stored in English; this shows them in the app language. */
+const L = (label: string): string => labelFor('avatarText', label);
+
+const VIEW_LABEL: Readonly<Record<EditorView, string>> = {
+  get 'full-body'() {
+    return i18n.t('avatarCreator.fullBody');
+  },
+  get head() {
+    return i18n.t('avatarCreator.headAndShoulders');
+  },
+  get face() {
+    return i18n.t('avatarCreator.faceCloseUp');
+  },
+};
 const FACE_ZOOM = 1.7;
 
 export function AvatarCreatorScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -209,7 +225,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
 
   const pickOption = (key: AvatarChoiceKey, option: OptionItem) => {
     if (optionLocked(option, level)) {
-      toast.showToast({ message: `${option.label} unlocks at level ${option.minLevel}. Keep going.` });
+      toast.showToast({ message: t('avatarCreator.unlocksAtLevelKeep', { label: L(option.label), minLevel: option.minLevel }) });
       return;
     }
     setCustomFor(null);
@@ -239,14 +255,14 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const saveLook = () => {
     if (!config) return;
     if (looks.length >= MAX_LOOKS) {
-      toast.showToast({ message: `You can keep ${MAX_LOOKS} looks. Remove one first.` });
+      toast.showToast({ message: t('avatarCreator.youCanKeepLooks', { MAX_LOOKS }) });
       return;
     }
     const used = new Set(looks.map((l) => l.name));
     let n = looks.length + 1;
-    while (used.has(`Look ${n}`)) n++;
-    setLooks([...looks, { name: `Look ${n}`, config }]);
-    toast.showToast({ message: `Saved as Look ${n}. Tap Save to keep it.` });
+    while (used.has(t('avatarCreator.look', { n }))) n++;
+    setLooks([...looks, { name: t('avatarCreator.look', { n }), config }]);
+    toast.showToast({ message: t('avatarCreator.savedAsLookTap', { n }) });
   };
 
   const save = async () => {
@@ -257,11 +273,11 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
       if (fromOnboarding) {
         dispatch(onboardingCompletedLocally());
       } else {
-        toast.showToast({ message: 'Your avatar is saved.' });
+        toast.showToast({ message: t('avatarCreator.yourAvatarIsSaved') });
         navigation.goBack();
       }
     } else {
-      toast.showToast({ message: result.payload ?? 'Could not save your avatar.' });
+      toast.showToast({ message: result.payload ?? t('avatarCreator.couldNotSaveYour') });
     }
   };
 
@@ -331,7 +347,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
           </View>
           <View style={styles.topBar} pointerEvents="box-none">
             {navigation.canGoBack() ? (
-              <RoundButton label="Close without saving" onPress={() => navigation.goBack()}>
+              <RoundButton label={t('avatarCreator.closeWithoutSaving')} onPress={() => navigation.goBack()}>
                 <CloseGlyph />
               </RoundButton>
             ) : (
@@ -344,7 +360,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                   <Pressable
                     key={w}
                     accessibilityRole="tab"
-                    accessibilityLabel={w === 'current' ? 'Current you: the person you are today' : 'Future you: the person you are becoming'}
+                    accessibilityLabel={w === 'current' ? t('avatarCreator.currentYouThePerson') : t('avatarCreator.futureYouThePerson')}
                     accessibilityState={{ selected: on }}
                     onPress={() => {
                       setWho(w);
@@ -353,7 +369,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                     style={[styles.whoTab, on && styles.whoTabOn]}
                   >
                     <Txt variant="caption" color={on ? colors.onAccent : colors.ink} style={styles.whoText}>
-                      {w === 'current' ? 'Current you' : 'Future you'}
+                      {w === 'current' ? t('avatarCreator.currentYou') : t('avatarCreator.futureYou')}
                     </Txt>
                   </Pressable>
                 );
@@ -361,31 +377,31 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
             </View>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel={fromOnboarding ? 'Save and continue' : 'Save avatar'}
+              accessibilityLabel={fromOnboarding ? t('avatarCreator.saveAndContinue') : t('avatarCreator.saveAvatar')}
               onPress={save}
               disabled={saving}
               style={[styles.savePill, saving && styles.dim]}
             >
               <Txt variant="bodySemi" color={colors.onAccent}>
-                {saving ? 'Saving…' : fromOnboarding ? 'Continue' : 'Save'}
+                {saving ? t('avatarCreator.saving') : fromOnboarding ? t('avatarCreator.continue') : t('avatarCreator.save')}
               </Txt>
             </PressableScale>
           </View>
           {comparing ? (
             <View style={styles.compareTag} pointerEvents="none">
-              <Txt variant="caption" color={colors.onAccent}>Before</Txt>
+              <Txt variant="caption" color={colors.onAccent}>{t('avatarCreator.before')}</Txt>
             </View>
           ) : null}
           <View style={styles.bottomBar} pointerEvents="box-none">
             <View style={styles.row}>
-              <RoundButton label="Undo" onPress={undo} disabled={!canUndo}>
+              <RoundButton label={t('avatarCreator.undo')} onPress={undo} disabled={!canUndo}>
                 <UndoGlyph color={canUndo ? colors.ink : colors.inkFaint} />
               </RoundButton>
-              <RoundButton label="Redo" onPress={redo} disabled={!canRedo}>
+              <RoundButton label={t('avatarCreator.redo')} onPress={redo} disabled={!canRedo}>
                 <RedoGlyph color={canRedo ? colors.ink : colors.inkFaint} />
               </RoundButton>
               <RoundButton
-                label="Hold to see how it looked before your changes"
+                label={t('avatarCreator.holdToSeeHow')}
                 onPress={() => undefined}
                 onPressIn={() => setComparing(true)}
                 onPressOut={() => setComparing(false)}
@@ -394,25 +410,25 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               >
                 <CompareGlyph color={comparing ? colors.onAccent : colors.ink} />
               </RoundButton>
-              <RoundButton label="Make it look like me: build the avatar from a selfie" onPress={() => setSelfieOpen(true)} disabled={!config}>
+              <RoundButton label={t('avatarCreator.makeItLookLike')} onPress={() => setSelfieOpen(true)} disabled={!config}>
                 <FaceGlyph />
               </RoundButton>
             </View>
             <View style={[styles.row, styles.rowEnd]}>
               <RoundButton
-                label="Surprise me: a whole new random avatar"
+                label={t('avatarCreator.surpriseMeAWhole')}
                 onPress={() => config && commit(randomAvatarConfig(level))}
                 disabled={!config}
               >
                 <DiceGlyph />
               </RoundButton>
-              <RoundButton label="Turn the avatar. You can also drag it." onPress={() => setYawSteps(yawSteps + 3)}>
+              <RoundButton label={t('avatarCreator.turnTheAvatarYou')} onPress={() => setYawSteps(yawSteps + 3)}>
                 <RotateGlyph />
               </RoundButton>
-              <RoundButton label={`Zoom: now ${VIEW_LABEL[view]}, next ${VIEW_LABEL[nextView]}`} onPress={() => setView(nextView)}>
+              <RoundButton label={t('avatarCreator.zoomNowNext', { now: VIEW_LABEL[view], next: VIEW_LABEL[nextView] })} onPress={() => setView(nextView)}>
                 <ZoomGlyph />
               </RoundButton>
-              <RoundButton label="Make a photo of this avatar" onPress={() => setPhotoOpen(true)} disabled={!config}>
+              <RoundButton label={t('avatarCreator.makeAPhotoOf')} onPress={() => setPhotoOpen(true)} disabled={!config}>
                 <CameraGlyph color={colors.ink} size={20} />
               </RoundButton>
             </View>
@@ -428,19 +444,19 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
           style={styles.tabsBar}
         >
           <View style={styles.tabPills} accessibilityRole="tablist">
-            {EDITOR_TABS.map((t) => {
-              const selected = t.key === tab.key;
+            {EDITOR_TABS.map((editorTab) => {
+              const selected = editorTab.key === tab.key;
               return (
                 <Pressable
-                  key={t.key}
+                  key={editorTab.key}
                   accessibilityRole="tab"
-                  accessibilityLabel={t.label}
+                  accessibilityLabel={L(editorTab.label)}
                   accessibilityState={{ selected }}
-                  onPress={() => selectTab(t)}
+                  onPress={() => selectTab(editorTab)}
                   style={[styles.tab, selected && styles.tabOn]}
                 >
                   <Txt variant="caption" color={selected ? colors.onAccent : colors.ink} numberOfLines={1} style={styles.tabLabel}>
-                    {t.label}
+                    {L(editorTab.label)}
                   </Txt>
                 </Pressable>
               );
@@ -462,30 +478,30 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                   <Pressable
                     key={d ? 'detailed' : 'basic'}
                     accessibilityRole="tab"
-                    accessibilityLabel={d ? 'Detailed edit mode: every slider' : 'Basic edit mode: presets only'}
+                    accessibilityLabel={d ? t('avatarCreator.detailedEditModeEvery') : t('avatarCreator.basicEditModePresets')}
                     accessibilityState={{ selected: detailed === d }}
                     onPress={() => setDetailed(d)}
                     style={[styles.mode, detailed === d && styles.modeOn]}
                   >
-                    <Txt variant="caption" color={colors.ink} style={styles.whoText}>{d ? 'Detailed edit' : 'Basic edit'}</Txt>
+                    <Txt variant="caption" color={colors.ink} style={styles.whoText}>{d ? t('avatarCreator.detailedEdit') : t('avatarCreator.basicEdit')}</Txt>
                   </Pressable>
                 ))}
               </View>
             ) : null}
             <View style={styles.tabHead}>
               <Txt variant="label" color={colors.inkSoft} style={styles.sheetTitle}>
-                {`${who === 'future' ? 'Future you' : 'Current you'} · ${tab.label}`}
+                {`${who === 'future' ? t('becoming.future') : t('becoming.current')} · ${L(tab.label)}`}
               </Txt>
               <View style={styles.row}>
                 <TextButton
-                  label={`Randomize ${tab.label}`}
-                  text="Randomize"
+                  label={t('avatarCreator.randomize', { label: L(tab.label) })}
+                  text={t('avatarCreator.randomize2')}
                   onPress={() => commit(randomizeTab(config, tab, level))}
                   icon={<DiceGlyph size={16} color={colors.accent} />}
                 />
                 <TextButton
-                  label={`Reset ${tab.label}`}
-                  text="Reset"
+                  label={t('avatarCreator.reset', { label: L(tab.label) })}
+                  text={t('avatarCreator.reset2')}
                   onPress={() => commit(resetTab(config, tab, { ...DEFAULT_AVATAR, sliders: {} }))}
                   icon={<ResetGlyph size={16} color={colors.accent} />}
                 />
@@ -513,13 +529,13 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
 
             {tab.key === 'style' ? (
               <View style={styles.section}>
-                <Txt variant="label" style={styles.sectionTitle}>Saved looks</Txt>
+                <Txt variant="label" style={styles.sectionTitle}>{t('avatarCreator.savedLooks')}</Txt>
                 <View style={styles.chips}>
                   {looks.map((look, i) => (
                     <View key={look.name} style={styles.lookChip}>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Wear ${look.name}`}
+                        accessibilityLabel={t('avatarCreator.wear', { name: look.name })}
                         onPress={() => commit(look.config)}
                         style={styles.lookMain}
                       >
@@ -527,7 +543,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Remove ${look.name}`}
+                        accessibilityLabel={t('avatarCreator.remove', { name: look.name })}
                         onPress={() => setLooks(looks.filter((_, j) => j !== i))}
                         style={styles.lookRemove}
                       >
@@ -537,11 +553,11 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
                   ))}
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Save this look to wear again later"
+                    accessibilityLabel={t('avatarCreator.saveThisLookTo')}
                     onPress={saveLook}
                     style={[styles.chip, styles.chipDashed]}
                   >
-                    <Txt variant="caption" color={colors.accent}>Save this look</Txt>
+                    <Txt variant="caption" color={colors.accent}>{t('avatarCreator.saveThisLook')}</Txt>
                   </Pressable>
                 </View>
               </View>
@@ -550,26 +566,25 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
         ) : (
           <ScrollView style={styles.flex} contentContainerStyle={styles.futureIntro}>
             <BackdropGlyph size={28} color={colors.accent} />
-            <Txt variant="heading" style={styles.center}>Who are you becoming?</Txt>
+            <Txt variant="heading" style={styles.center}>{t('avatarCreator.whoAreYouBecoming')}</Txt>
             <Txt variant="body" color={colors.inkSoft} style={styles.center}>
-              Future You is a second avatar: the person you are working toward. Shape how they stand, look and dress, and
-              keep them next to who you are today.
+              {t('avatarCreator.futureYouIsA')}
             </Txt>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Create Future You with a suggested start"
+              accessibilityLabel={t('avatarCreator.createFutureYouWith')}
               onPress={() => startFuture(true)}
               style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
             >
-              <Txt variant="bodySemi" color={colors.onAccent}>Suggest a Future Me</Txt>
+              <Txt variant="bodySemi" color={colors.onAccent}>{t('avatarCreator.suggestAFutureMe')}</Txt>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Create Future You as a copy of your current avatar"
+              accessibilityLabel={t('avatarCreator.createFutureYouAs')}
               onPress={() => startFuture(false)}
               style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
             >
-              <Txt variant="bodySemi" color={colors.ink}>Start from my current avatar</Txt>
+              <Txt variant="bodySemi" color={colors.ink}>{t('avatarCreator.startFromMyCurrent')}</Txt>
             </Pressable>
           </ScrollView>
         )}
@@ -583,7 +598,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
         onApply={(next, note) => {
           setSelfieOpen(false);
           commit(next);
-          toast.showToast({ message: `${note} Tap Save to keep it.` });
+          toast.showToast({ message: t('avatarCreator.tapSaveToKeep', { note }) });
         }}
       />
     </View>
@@ -638,11 +653,12 @@ function Thumb({ config, shape, cell, label, text, selected, locked = false, cha
 }
 
 function Section({ section, config, level, colorCell, thumbCell, detailed, onLook, customOpen, onToggleCustom, onOption, onColor, onPreset, onSlider }: SectionProps) {
+  const { t } = useTranslation();
   useTheme();
   if (section.kind === 'looks') {
     return (
       <View style={styles.section}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         <View style={styles.thumbs}>
           {LOOKS.filter((l) => l.config.sex === config.sex).map((l) => (
             <Thumb
@@ -650,8 +666,8 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
               config={{ ...l.config, expression: 'neutral', pose: 'relaxed', bg: config.bg }}
               shape="head"
               cell={thumbCell}
-              label={`Start from the look ${l.label}`}
-              text={l.label}
+              label={t('avatarCreator.startFromTheLook', { label: L(l.label) })}
+              text={L(l.label)}
               selected={false}
               channel={`thumb:look:${l.id}`}
               onPress={() => onLook(l.config)}
@@ -664,7 +680,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
   if (section.kind === 'note') {
     return (
       <View style={styles.note}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         <Txt variant="caption" color={colors.inkSoft}>{section.text}</Txt>
       </View>
     );
@@ -673,13 +689,13 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
     const current = matchingPreset(section.presets, section.owns, config.sliders);
     return (
       <View style={styles.section}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         <View style={styles.chips}>
           {section.presets.map((preset) => (
             <Chip
               key={preset.id}
-              label={`${section.title}: ${preset.label}`}
-              text={preset.label}
+              label={`${L(section.title)}: ${L(preset.label)}`}
+              text={L(preset.label)}
               selected={current === preset.id}
               onPress={() => onPreset(section.owns, preset)}
             />
@@ -692,17 +708,17 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
     if ((section.detail && !detailed) || (section.only && section.only !== config.sex)) return null;
     return (
       <View style={styles.section}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         {section.sliders.map((id) => {
           const def = sliderDef(id);
           return (
             <Slider
               key={id}
-              label={def.label}
+              label={L(def.label)}
               min={def.min}
               max={1}
-              low={def.low}
-              high={def.high}
+              low={L(def.low)}
+              high={L(def.high)}
               value={sv(config.sliders, id)}
               onChange={(v) => onSlider(id, v, true)}
               onCommit={(v) => onSlider(id, v, false)}
@@ -723,7 +739,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
     const shape = section.thumbs;
     return (
       <View style={styles.section}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         <View style={styles.thumbs}>
           {options.map((option) => {
             const locked = optionLocked(option, level);
@@ -733,8 +749,8 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
                 config={{ ...config, [section.category]: option.id, expression: 'neutral', pose: 'relaxed' } as AvatarConfig}
                 shape={shape}
                 cell={thumbCell}
-                label={`${section.title}: ${option.label}${locked ? `, unlocks at level ${option.minLevel}` : ''}`}
-                text={option.label}
+                label={`${L(section.title)}: ${L(option.label)}${locked ? t('avatarCreator.unlocksAtLevelSuffix', { level: option.minLevel }) : ''}`}
+                text={L(option.label)}
                 selected={value === option.id}
                 locked={locked}
                 channel={`thumb:${section.category}:${option.id}`}
@@ -749,15 +765,15 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
   if (section.kind === 'choice') {
     return (
       <View style={styles.section}>
-        <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
         <View style={styles.chips}>
           {options.map((option) => {
             const locked = optionLocked(option, level);
             return (
               <Chip
                 key={option.id}
-                label={`${section.title}: ${option.label}${locked ? `, unlocks at level ${option.minLevel}` : ''}`}
-                text={option.label}
+                label={`${L(section.title)}: ${L(option.label)}${locked ? t('avatarCreator.unlocksAtLevelSuffix', { level: option.minLevel }) : ''}`}
+                text={L(option.label)}
                 selected={value === option.id}
                 locked={locked}
                 onPress={() => onOption(section.category, option)}
@@ -771,7 +787,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
   const custom = isHex(value);
   return (
     <View style={styles.section}>
-      <Txt variant="label" style={styles.sectionTitle}>{section.title}</Txt>
+      <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
       <View style={styles.swatches}>
         {category.options.map((option) => {
           const selected = value === option.id;
@@ -779,7 +795,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
             <Pressable
               key={option.id}
               accessibilityRole="button"
-              accessibilityLabel={`${section.title}: ${option.label}`}
+              accessibilityLabel={`${L(section.title)}: ${L(option.label)}`}
               accessibilityState={{ selected }}
               onPress={() => onOption(section.category, option)}
               style={[
@@ -800,7 +816,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
         {section.custom ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${section.title}: pick a custom color`}
+            accessibilityLabel={t('avatarCreator.pickACustomColor', { title: L(section.title) })}
             accessibilityState={{ selected: custom, expanded: customOpen }}
             onPress={() => onToggleCustom(section.category)}
             style={[
@@ -824,7 +840,7 @@ function Section({ section, config, level, colorCell, thumbCell, detailed, onLoo
       </View>
       {customOpen ? (
         <ColorPicker
-          title={section.title}
+          title={L(section.title)}
           value={custom ? value : category.options.find((o) => o.id === value)?.swatch ?? '#808080'}
           onChange={(hex) => onColor(section.category, hex, true)}
           onCommit={(hex) => onColor(section.category, hex)}
@@ -969,7 +985,7 @@ const styles = themed(() =>
       rowGap: spacing.sm,
     },
     rowEnd: {
-      marginLeft: 'auto',
+      marginStart: 'auto',
     },
     row: {
       flexDirection: 'row',
@@ -1154,8 +1170,8 @@ const styles = themed(() =>
     },
     lookMain: {
       minHeight: 44,
-      paddingLeft: spacing.md,
-      paddingRight: spacing.xs,
+      paddingStart: spacing.md,
+      paddingEnd: spacing.xs,
       justifyContent: 'center',
     },
     lookRemove: {

@@ -21,6 +21,7 @@
 // server (the source of truth) and drops the optimistic XP of what synced.
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import i18n from '../i18n';
 import { supabase } from '../lib/supabase';
 import {
   isMissingSyncRpc,
@@ -53,9 +54,9 @@ export function setFlushPaceForTests(ms: number): void {
   flushPaceMs = ms;
 }
 
-export const COMPLETED_ELSEWHERE =
-  'This quest was already completed on another device, your XP was not doubled.';
-export const UNDONE_ELSEWHERE = 'This quest was already undone on another device.';
+// Functions, so the text follows the language at the time of the sync.
+export const completedElsewhere = (): string => i18n.t('offline.thisQuestWasAlready');
+export const undoneElsewhere = (): string => i18n.t('offline.thisQuestWasAlready2');
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -144,12 +145,12 @@ export async function syncOne(item: QueuedAction): Promise<Outcome> {
         // nothing to resend and the XP is not counted twice.
         return item.afterOnlineAttempt
           ? { kind: 'ok', duplicate: true }
-          : { kind: 'conflict', reason: COMPLETED_ELSEWHERE };
+          : { kind: 'conflict', reason: completedElsewhere() };
       }
       return classifyFailure(old.error, old.thrown) ?? { kind: 'ok', duplicate: false };
     }
     const outcome =
-      classifyFailure(res.error, res.thrown) ?? outcomeOf(res.data, COMPLETED_ELSEWHERE);
+      classifyFailure(res.error, res.thrown) ?? outcomeOf(res.data, completedElsewhere());
     // Our own earlier online call got through: same device, no conflict.
     if (outcome.kind === 'conflict' && item.afterOnlineAttempt) {
       return { kind: 'ok', duplicate: true };
@@ -164,13 +165,13 @@ export async function syncOne(item: QueuedAction): Promise<Outcome> {
   if (!res.thrown && isMissingSyncRpc(res.error)) {
     const old = await callRpc('undo_quest_completion', { p_quest_id: item.questId });
     if (!old.thrown && old.error?.message?.includes('not_completed')) {
-      return { kind: 'conflict', reason: UNDONE_ELSEWHERE };
+      return { kind: 'conflict', reason: undoneElsewhere() };
     }
     return classifyFailure(old.error, old.thrown) ?? { kind: 'ok', duplicate: false };
   }
   return (
     classifyFailure(res.error, res.thrown) ??
-    outcomeOf(res.data, UNDONE_ELSEWHERE)
+    outcomeOf(res.data, undoneElsewhere())
   );
 }
 

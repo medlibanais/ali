@@ -12,6 +12,7 @@
 //   dashed grid, all colors from theme tokens.
 
 import React, { memo, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AccessibilityInfo,
   Animated,
@@ -163,6 +164,7 @@ const Bar = memo(function Bar({ bin, width, height, progress, dimmed, selected }
 });
 
 export function TimeOfDayHistogram({ bins }: TimeOfDayHistogramProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<TimeOfDay | null>(null);
@@ -237,7 +239,8 @@ export function TimeOfDayHistogram({ bins }: TimeOfDayHistogramProps) {
   const gridValues = [top, top / 2, 0];
 
   return (
-    <View onLayout={onLayout} style={styles.root}>
+    // Charts keep left-to-right drawing in Arabic, like the other charts.
+    <View onLayout={onLayout} style={[styles.root, { direction: 'ltr' }]}>
       {width > 0 ? (
         <>
           {/* Grid + axis labels */}
@@ -280,7 +283,7 @@ export function TimeOfDayHistogram({ bins }: TimeOfDayHistogramProps) {
                 <Pressable
                   key={b.key}
                   accessibilityRole="button"
-                  accessibilityLabel={`${b.label}, ${b.range}: ${b.count} quests completed, ${b.share} percent${b.isPeak ? ', your peak time' : ''}. Tap for details.`}
+                  accessibilityLabel={t('insights.questsCompletedPercentTap', { label: b.label, range: b.range, count: b.count, share: b.share, peak: b.isPeak ? t('insights.yourPeakTime') : '' })}
                   accessibilityState={{ selected: isSel }}
                   onPress={() => setSelected((prev) => (prev === b.key ? null : b.key))}
                   style={[styles.slot, { width: slotW }]}
@@ -355,7 +358,7 @@ export function TimeOfDayHistogram({ bins }: TimeOfDayHistogramProps) {
                 {`${sel.count} ${sel.count === 1 ? 'quest' : 'quests'} · ${sel.share}%`}
               </Txt>
               <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
-                {sel.count > 0 ? `About ${sel.perDay} a day` : 'Nothing finished here yet'}
+                {sel.count > 0 ? t('insights.aboutADay', { perDay: sel.perDay }) : t('insights.nothingFinishedHereYet')}
               </Txt>
             </View>
           ) : null}
@@ -363,7 +366,7 @@ export function TimeOfDayHistogram({ bins }: TimeOfDayHistogramProps) {
           {total === 0 ? (
             <View pointerEvents="none" style={[styles.empty, { left: AXIS_W }]}>
               <Txt variant="caption" color={colors.inkFaint} align="center">
-                Finish a few quests and your daily rhythm shows up here.
+                {t('insights.finishAFewQuests')}
               </Txt>
             </View>
           ) : null}

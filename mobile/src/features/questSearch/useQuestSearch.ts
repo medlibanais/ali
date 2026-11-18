@@ -2,6 +2,7 @@
 // search-quests edge function (which embeds the query with gte-small and
 // runs the search_quests pgvector RPC). Results are cached per query.
 import { useEffect, useState } from 'react';
+import i18n from '../../i18n';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { describeFunctionError, isNotDeployed } from '../../lib/functionErrors';
@@ -32,13 +33,13 @@ export function questSearchErrorMessage(error: unknown): string {
   const reason = error instanceof QuestSearchError ? error.reason : 'failed';
   switch (reason) {
     case 'offline':
-      return 'You look offline. Search needs a connection.';
+      return i18n.t('questSearch.youLookOfflineSearch');
     case 'not_deployed':
-      return 'Quest search is not switched on yet.';
+      return i18n.t('questSearch.questSearchIsNot');
     case 'unavailable':
-      return 'Search is warming up. Try again in a moment.';
+      return i18n.t('questSearch.searchIsWarmingUp');
     default:
-      return 'Search failed. Try again.';
+      return i18n.t('questSearch.searchFailedTryAgain');
   }
 }
 

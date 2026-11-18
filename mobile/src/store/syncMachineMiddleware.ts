@@ -6,6 +6,7 @@
 // online completion or flushes the queue again.
 
 import type { Middleware, UnknownAction } from '@reduxjs/toolkit';
+import i18n from '../i18n';
 import { createActor } from 'xstate';
 import type { Quest } from '../api/types';
 import { syncMachine, viewOf, type SyncMachineEvent } from './syncMachine';
@@ -40,7 +41,7 @@ export function eventForAction(action: UnknownAction): SyncMachineEvent | null {
       type: 'SERVER_FAILED',
       questId: action.meta.arg.quest_id,
       title: action.meta.arg.title,
-      message: action.payload?.message ?? 'Could not complete this quest.',
+      message: action.payload?.message ?? i18n.t('offline.couldNotCompleteThis'),
     };
   }
   if (action.type === syncOfflineCompletions.pending.type) return { type: 'FLUSH_STARTED' };
@@ -52,15 +53,15 @@ export function eventForAction(action: UnknownAction): SyncMachineEvent | null {
     const lines = [
       ...r.conflicts.map((c) => c.reason),
       ...r.rejected.map(
-        (c) => `${c.title ? `"${c.title}"` : 'A quest'} was not counted: ${c.reason}.`,
+        (c) => i18n.t('offline.wasNotCounted', { quest: c.title ? `"${c.title}"` : i18n.t('offline.aQuest'), reason: c.reason }),
       ),
     ];
     if (lines.length > 0) {
-      const more = lines.length > 1 ? ` (+${lines.length - 1} more)` : '';
+      const more = lines.length > 1 ? i18n.t('offline.more', { count: lines.length - 1 }) : '';
       return { type: 'FLUSH_CONFLICT', message: `${lines[0]}${more}`, remaining: r.remaining };
     }
     if (r.stoppedBy === 'error') {
-      return { type: 'FLUSH_FAILED', message: 'Sync failed. Your quests are still saved.', remaining: r.remaining };
+      return { type: 'FLUSH_FAILED', message: i18n.t('offline.syncFailedYourQuests'), remaining: r.remaining };
     }
     // 'done', or 'offline' (remaining > 0 keeps it in Syncing, waiting).
     return { type: 'FLUSH_SUCCEEDED', remaining: r.remaining };

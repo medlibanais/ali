@@ -6,6 +6,7 @@
 // bar there, so it is loaded lazily and only when the native module exists.
 // On web the package wraps the browser's Web Speech API instead.
 
+import i18n from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
@@ -86,14 +87,22 @@ export type VoiceError =
   | 'needs_build'
   | 'failed';
 
-export const VOICE_ERROR_MESSAGES: Record<VoiceError, string> = {
-  permission: 'Microphone access is needed to use voice input.',
-  offline:
-    'Voice input needs an internet connection on this phone. Type your message instead.',
-  unavailable: 'Voice input is not available on this device.',
-  needs_build:
-    'Voice input needs the installed GROW app (a development or store build). It does not run in Expo Go.',
-  failed: 'Voice input stopped. Tap the mic to try again.',
+export const VOICE_ERROR_MESSAGES: Readonly<Record<VoiceError, string>> = {
+  get permission() {
+    return i18n.t('voice.permission');
+  },
+  get offline() {
+    return i18n.t('voice.offline');
+  },
+  get unavailable() {
+    return i18n.t('voice.unavailable');
+  },
+  get needs_build() {
+    return i18n.t('voice.needsBuild');
+  },
+  get failed() {
+    return i18n.t('voice.failed');
+  },
 };
 
 /**

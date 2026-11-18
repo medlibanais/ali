@@ -3,6 +3,7 @@
 // Pulls its numbers from the store so any screen can open it.
 
 import * as Sharing from 'expo-sharing';
+import { useTranslation } from 'react-i18next';
 import React, { useRef, useState } from 'react';
 import {
   Modal,
@@ -50,6 +51,7 @@ export function ShareStorySheet({
   weekAvg?: number | null;
 }) {
   useTheme();
+  const { t } = useTranslation();
   const toast = useToast();
   const data = useStoryCardData(weekAvg);
   const cardRef = useRef<View>(null);
@@ -63,7 +65,7 @@ export function ShareStorySheet({
     setBusy(true);
     try {
       if (Platform.OS === 'web' || !(await Sharing.isAvailableAsync())) {
-        toast.showToast({ message: 'Sharing works in the phone app, not in the browser.' });
+        toast.showToast({ message: t('shareStory.webOnly') });
         return;
       }
       const uri = await captureRef(cardRef, {
@@ -76,10 +78,10 @@ export function ShareStorySheet({
       await Sharing.shareAsync(uri, {
         mimeType: 'image/png',
         UTI: 'public.png',
-        dialogTitle: 'Share your progress',
+        dialogTitle: t('shareStory.dialog'),
       });
     } catch {
-      toast.showToast({ message: 'Could not create the image. Try again.' });
+      toast.showToast({ message: t('shareStory.failed') });
     } finally {
       setBusy(false);
     }
@@ -89,10 +91,10 @@ export function ShareStorySheet({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.paper }]}>
         <View style={styles.header}>
-          <Txt variant="heading">Share as a story</Txt>
-          <Pressable accessibilityRole="button" onPress={onClose} hitSlop={12}>
+          <Txt variant="heading">{t('shareStory.title')}</Txt>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={onClose} hitSlop={12}>
             <Txt variant="bodySemi" color={colors.accent}>
-              Close
+              {t('common.close')}
             </Txt>
           </Pressable>
         </View>
@@ -103,14 +105,14 @@ export function ShareStorySheet({
         </View>
         <View style={styles.actions}>
           <Button
-            title="Share"
-            winTitle="Post it"
+            title={t('common.share')}
+            winTitle={t('shareStory.postIt')}
             icon={ShareGlyph}
             onPress={share}
             loading={busy}
           />
           <Txt variant="caption" color={colors.inkFaint} align="center" style={styles.hint}>
-            Pick Instagram, WhatsApp or Snapchat, then post it to your story.
+            {t('shareStory.hint')}
           </Txt>
         </View>
       </SafeAreaView>

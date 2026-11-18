@@ -1,5 +1,7 @@
+import './i18n';
 import { Avatar3DHost } from './avatar/Avatar3D';
 import React, { useEffect, useMemo, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import {
   NavigationContainer,
@@ -25,6 +27,8 @@ import ThemeTransition from './components/ThemeTransition';
 import { usePushNotifications } from './features/notifications/usePushNotifications';
 import OfflineBanner from './features/offline/OfflineBanner';
 import { holdSplash } from './lib/bootSplash';
+import { hydrateLanguage } from './store/slices/languageSlice';
+import { isRtlLanguage } from './i18n/languages';
 
 // Keep the native splash up until the first real screen has been drawn
 // (see lib/bootSplash.ts). Runs before the first render.
@@ -50,6 +54,8 @@ function ThemedRoot() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const themeHydrated = useAppSelector((state) => state.theme.hydrated);
+  const languageHydrated = useAppSelector((state) => state.language.hydrated);
+  const language = useAppSelector((state) => state.language.language);
   const userId = useAppSelector((state) => state.auth.userId);
   const appReady = useAppSelector((state) => state.auth.status === 'ready');
   const [navReady, setNavReady] = useState(false);
@@ -62,6 +68,7 @@ function ThemedRoot() {
 
   useEffect(() => {
     dispatch(hydrateTheme());
+    dispatch(hydrateLanguage());
   }, [dispatch]);
 
   // Follow the theme saved on the profile (picked on another device), or
@@ -85,11 +92,22 @@ function ThemedRoot() {
     [theme],
   );
 
-  if (!fontsLoaded || !themeHydrated) {
+  if (!fontsLoaded || !themeHydrated || !languageHydrated) {
     return <SplashScreen />;
   }
 
+  const rtl = isRtlLanguage(language);
+
+  // Setting `direction` on the root flips row layouts, start/end margins and
+  // paddings instantly, without waiting for the Android restart that
+  // I18nManager.forceRTL needs.
   return (
+    <View
+      style={[styles.root, { direction: rtl ? 'rtl' : 'ltr' }]}
+      // react-native-web resolves start/end margins from the `dir` of the
+      // nearest ancestor, not from the `direction` style.
+      {...(Platform.OS === 'web' ? ({ dir: rtl ? 'rtl' : 'ltr' } as object) : null)}
+    >
     <NavigationContainer
       ref={navigationRef}
       linking={linking}
@@ -107,8 +125,13 @@ function ThemedRoot() {
       <CelebrationHost />
       {userId !== null ? <OfflineBanner /> : null}
     </NavigationContainer>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 export default function App() {
   return (

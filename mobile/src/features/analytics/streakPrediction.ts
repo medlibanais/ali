@@ -4,6 +4,7 @@
 // the app only reads it (RLS: own row, or a friend's shared stats).
 
 import { useQuery } from '@tanstack/react-query';
+import i18n from '../../i18n';
 import { supabase } from '../../lib/supabase';
 
 export type StreakBand = 'high_risk' | 'moderate' | 'on_track' | 'no_data';
@@ -42,14 +43,15 @@ export function streakBand(probability: number | null): StreakBand {
   return 'on_track';
 }
 
+// Getters, so the labels follow the current language.
 export const BAND_LABEL: Record<StreakBand, string> = {
-  high_risk: 'High Risk',
-  moderate: 'Moderate',
-  on_track: 'On Track',
-  no_data: 'Not enough data',
+  get high_risk() { return i18n.t('streakOutlook.highRisk'); },
+  get moderate() { return i18n.t('streakOutlook.moderate'); },
+  get on_track() { return i18n.t('streakOutlook.onTrack'); },
+  get no_data() { return i18n.t('streakOutlook.notEnoughData'); },
 };
 
-const WEEKDAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+const WEEKDAYS = (): string[] => [i18n.t('streakOutlook.sundays'), i18n.t('streakOutlook.mondays'), i18n.t('streakOutlook.tuesdays'), i18n.t('streakOutlook.wednesdays'), i18n.t('streakOutlook.thursdays'), i18n.t('streakOutlook.fridays'), i18n.t('streakOutlook.saturdays')];
 
 function isDetail(v: unknown): v is StreakDetail {
   if (typeof v !== 'object' || v === null) return false;
@@ -71,26 +73,32 @@ export function explainPrediction(p: StreakPrediction): string[] {
     const have = d ? Math.min(d.days, MIN_DATA_DAYS) : 0;
     const left = MIN_DATA_DAYS - have;
     return [
-      `We need ${MIN_DATA_DAYS} full days of history to predict tomorrow.`,
+      i18n.t('streakOutlook.weNeedFullDays', { MIN_DATA_DAYS }),
       left > 0
-        ? `${left} more ${left === 1 ? 'day' : 'days'} to go.`
-        : 'Your first prediction arrives within the hour.',
+        ? i18n.t('streakOutlook.moreToGo', { count: left })
+        : i18n.t('streakOutlook.yourFirstPredictionArrives'),
     ];
   }
   if (!d) return [];
-  const lines = [`Active ${d.active7} of the last ${d.window7} days.`];
+  const lines = [i18n.t('streakOutlook.activeOfTheLast', { active7: d.active7, window7: d.window7 })];
   if (d.weekdayTotal > 0) {
-    lines.push(`${WEEKDAYS[d.weekday] ?? 'That weekday'}: ${d.weekdayActive} of ${d.weekdayTotal}.`);
+    lines.push(
+      i18n.t('streakOutlook.weekdayLine', {
+        day: WEEKDAYS()[d.weekday] ?? i18n.t('streakOutlook.thatWeekday'),
+        active: d.weekdayActive,
+        total: d.weekdayTotal,
+      }),
+    );
   }
-  if (d.activeToday) lines.push('Already done something today.');
+  if (d.activeToday) lines.push(i18n.t('streakOutlook.alreadyDoneToday'));
   return lines;
 }
 
 /** Spoken summary for screen readers. */
 export function predictionA11yLabel(p: StreakPrediction): string {
   const band = streakBand(p.probability);
-  if (band === 'no_data') return 'Streak outlook: not enough data yet.';
-  return `Streak outlook: ${p.probability} percent chance you complete a quest tomorrow. ${BAND_LABEL[band]}.`;
+  if (band === 'no_data') return i18n.t('streakOutlook.streakOutlookNotEnough');
+  return i18n.t('streakOutlook.streakOutlookPercentChance', { probability: p.probability, band: BAND_LABEL[band] });
 }
 
 interface Row {

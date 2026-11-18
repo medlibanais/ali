@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -37,12 +39,12 @@ type Props = CompositeScreenProps<
 type Filter = 'all' | Pillar;
 
 const FILTER_OPTIONS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'health', label: 'Health' },
-  { value: 'family', label: 'Family' },
-  { value: 'work', label: 'Work' },
-  { value: 'fun', label: 'Fun' },
-  { value: 'spirituality', label: 'Spirituality' },
+  { value: 'all', get label() { return i18n.t('quests.all'); } },
+  { value: 'health', get label() { return i18n.t('quests.health'); } },
+  { value: 'family', get label() { return i18n.t('quests.family'); } },
+  { value: 'work', get label() { return i18n.t('quests.work'); } },
+  { value: 'fun', get label() { return i18n.t('quests.fun'); } },
+  { value: 'spirituality', get label() { return i18n.t('quests.spirituality'); } },
 ];
 
 function QuestsSkeleton() {
@@ -74,6 +76,7 @@ const rowType = (row: Row): Row['type'] => row.type;
 const ESTIMATED_ROW = 76;
 
 export function QuestsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   // Each pick is its own subscription: undoing a quest elsewhere does not
@@ -152,10 +155,10 @@ export function QuestsScreen({ navigation }: Props) {
             <EmptyState
               title={
                 filter === 'all'
-                  ? 'Nothing left to do today'
-                  : `No ${PILLAR_LABELS[filter as Pillar].toLowerCase()} quests left today`
+                  ? t('quests.nothingLeftToDo')
+                  : t('quests.noQuestsLeftToday', { pillar: PILLAR_LABELS[filter as Pillar].toLowerCase() })
               }
-              body="Everything in this view is either done or skipped. Tomorrow brings a new set."
+              body={t('quests.everythingInThisView')}
             />
           );
         case 'doneHeader':
@@ -163,13 +166,13 @@ export function QuestsScreen({ navigation }: Props) {
             <View style={styles.completedSection}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Completed quests, ${item.count}`}
+                accessibilityLabel={t('quests.completedA11y', { count: item.count })}
                 accessibilityState={{ expanded: completedOpen }}
                 onPress={toggleCompleted}
                 style={({ pressed }) => [styles.completedHeader, pressed && styles.pressed]}
               >
                 <Txt variant="bodySemi" color={colors.inkSoft}>
-                  {`Completed · ${item.count}`}
+                  {t('quests.completed', { length: item.count })}
                 </Txt>
                 <View style={completedOpen ? styles.chevronUp : styles.chevronDown}>
                   <ChevronGlyph />
@@ -179,7 +182,7 @@ export function QuestsScreen({ navigation }: Props) {
           );
       }
     },
-    [openQuest, showPillarLabel, filter, completedOpen, toggleCompleted],
+    [openQuest, showPillarLabel, filter, completedOpen, toggleCompleted, t],
   );
 
   // Fixed above the list, so the search field keeps focus while the body
@@ -187,10 +190,10 @@ export function QuestsScreen({ navigation }: Props) {
   const top = (
     <View style={styles.padded}>
       <Txt variant="caption" color={colors.inkSoft} style={styles.kicker}>
-        {`${summary.doneCount} of ${summary.total} done · ${summary.xpLeft} XP left today`}
+        {t('quests.ofDoneXpLeft', { doneCount: summary.doneCount, length: summary.total, xpLeft: summary.xpLeft })}
       </Txt>
       <Txt variant="title" style={styles.title}>
-        Today&apos;s quests
+        {t('quests.todaySQuests')}
       </Txt>
       <View style={styles.progressTrack}>
         {summary.shares.map(({ pillar, share }) =>

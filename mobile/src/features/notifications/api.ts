@@ -3,6 +3,7 @@
 // friend events, badges, titles, level-ups); the owner reads, marks read
 // and clears them under RLS.
 
+import i18n from '../../i18n';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../components/Toast';
@@ -66,7 +67,7 @@ export function useClearAll() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in.');
+      if (!user) throw new Error(i18n.t('errors.notSignedIn'));
       const { error } = await supabase
         .from('notifications')
         .delete()

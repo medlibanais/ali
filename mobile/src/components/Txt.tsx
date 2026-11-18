@@ -1,5 +1,7 @@
 import React from 'react';
-import { Text, TextProps, TextStyle } from 'react-native';
+import { StyleSheet, Text, TextProps, TextStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { arabicFontFor } from '../theme/fonts';
 import { colors, fonts, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
@@ -82,14 +84,27 @@ export function Txt({
   ...rest
 }: TxtProps) {
   useTheme();
+  const { i18n } = useTranslation();
+  const composed = [
+    variantStyles[variant],
+    color ? { color } : null,
+    align ? { textAlign: align } : null,
+    style,
+  ];
+  // Arabic: swap to Cairo (same weight) and drop letter spacing, which
+  // would break the joins between Arabic letters.
+  const arabic: TextStyle | null =
+    i18n.language === 'ar'
+      ? {
+          fontFamily: arabicFontFor(
+            StyleSheet.flatten(composed).fontFamily,
+          ),
+          letterSpacing: 0,
+        }
+      : null;
   return (
     <Text
-      style={[
-        variantStyles[variant],
-        color ? { color } : null,
-        align ? { textAlign: align } : null,
-        style,
-      ]}
+      style={[...composed, arabic]}
       {...rest}
     >
       {children}

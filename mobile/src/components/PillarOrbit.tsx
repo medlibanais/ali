@@ -13,6 +13,7 @@
 // that survive re-renders and use the native driver on iOS/Android.
 
 import React, { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Ellipse } from 'react-native-svg';
 import AvatarView from '../avatar/AvatarView';
@@ -116,6 +117,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
   // SharedValue never changes identity, so the avatar never re-renders
   // for a score change.
   const lifeScore = useLifeScoreValue();
+  const { t } = useTranslation();
   return (
     <>
       <View style={[styles.avatarClip, { borderRadius: size / 2 }]}>
@@ -124,7 +126,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
             source={{ uri: photoUrl }}
             style={{ width: size, height: size }}
             resizeMode="cover"
-            accessibilityLabel={name ? `Avatar of ${name}` : 'Your avatar'}
+            accessibilityLabel={name ? t('avatar.avatarOf', { name }) : t('avatar.yours')}
           />
         ) : (
           <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} />
@@ -134,7 +136,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
         <View style={styles.levelBadge}>
           <StarGlyph size={13} />
           <Txt variant="label" color={colors.onAccent} style={styles.levelText}>
-            {`Lv ${level}`}
+            {t('common.levelShort', { level })}
           </Txt>
         </View>
       ) : null}
@@ -175,6 +177,7 @@ function PillarOrbitBase({
   onAvatarPress,
 }: PillarOrbitProps) {
   useTheme();
+  const { t } = useTranslation();
   // Profile's avatar starts its flight from here (see components/Hero).
   const heroRef = useHeroSource('avatar');
   const { width } = useWindowDimensions();
@@ -193,7 +196,7 @@ function PillarOrbitBase({
     <View style={styles.outer}>
       <View
         style={{ width: boxW, height: boxH + LABEL_ROOM }}
-        accessibilityLabel="Your avatar with your five pillars guarding it"
+        accessibilityLabel={t('pillarBubble.orbitA11y')}
       >
         <Svg width={boxW} height={boxH} style={StyleSheet.absoluteFill}>
           {/* dashed guard ring */}
@@ -239,7 +242,7 @@ function PillarOrbitBase({
         {onAvatarPress ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open your profile"
+            accessibilityLabel={t('today.openYourProfile')}
             onPress={onAvatarPress}
             style={{
               position: 'absolute',
@@ -308,7 +311,7 @@ const styles = themed(() =>
       borderColor: colors.card,
     },
     levelText: {
-      marginLeft: 4,
+      marginStart: 4,
     },
     orb: {
       position: 'absolute',

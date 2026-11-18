@@ -3,6 +3,8 @@
 // bars. Everything reads real data (daily_scores, gamification, ai_insights).
 
 import React, { useMemo, useState } from 'react';
+import i18n, { appLocale } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
 import Accordion from '../components/Accordion';
@@ -50,58 +52,63 @@ import { useTheme } from '../theme/useTheme';
 
 type Period = 'week' | 'month';
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
-  { value: 'week', label: 'This week' },
-  { value: 'month', label: 'This month' },
+  { value: 'week', get label() { return i18n.t('insights.thisWeek'); } },
+  { value: 'month', get label() { return i18n.t('insights.thisMonth'); } },
 ];
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS = (): string[] => [i18n.t('insights.sunday'), i18n.t('insights.monday'), i18n.t('insights.tuesday'), i18n.t('insights.wednesday'), i18n.t('insights.thursday'), i18n.t('insights.friday'), i18n.t('insights.saturday')];
 
 function shortLabel(iso: string, period: Period): string {
   const d = new Date(`${iso}T12:00:00`);
   return period === 'week'
-    ? d.toLocaleDateString(undefined, { weekday: 'short' })
+    ? d.toLocaleDateString(appLocale(), { weekday: 'short' })
     : `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function verdict(s: PeriodSummary, period: Period): string {
   if (s.activeDays === 0) {
-    return `No quests finished ${period === 'week' ? 'this week' : 'this month'} yet. One small quest today gets things moving.`;
+    return i18n.t('insights.noQuestsFinishedYet', { context: period });
   }
   if (s.prevAvgScore === null) {
-    return 'Your first stretch on the books. Keep showing up and the comparisons appear here.';
+    return i18n.t('insights.yourFirstStretchOn');
   }
   const diff = s.avgScore - s.prevAvgScore;
-  if (diff >= 5) return `Better than last ${period}. Whatever you changed, it is working.`;
-  if (diff <= -5) return `A bit lower than last ${period}. Pick your easiest quest today and build from there.`;
-  return `Steady compared with last ${period}. Consistency is how habits stick.`;
+  if (diff >= 5) return i18n.t('insights.betterThanLastWhatever', { context: period });
+  if (diff <= -5) return i18n.t('insights.aBitLowerThan', { context: period });
+  return i18n.t('insights.steadyComparedWithLast', { context: period });
 }
 
 function takeaways(s: PeriodSummary, period: Period): string[] {
   const out: string[] = [];
   if (s.totalDays > 0) {
-    out.push(`You showed up on ${s.activeDays} of ${s.totalDays} days and finished ${s.completionRate}% of your quests.`);
+    out.push(i18n.t('insights.showedUp', { active: s.activeDays, total: s.totalDays, rate: s.completionRate }));
   }
   if (s.strongest) {
-    out.push(`${PILLAR_LABELS[s.strongest.pillar]} is your strongest pillar (${s.strongest.value}/100).`);
+    out.push(i18n.t('insights.strongest', { pillar: PILLAR_LABELS[s.strongest.pillar], value: s.strongest.value }));
   }
   if (s.weakest) {
     out.push(
-      `${PILLAR_LABELS[s.weakest.pillar]} needs the most love (${s.weakest.value}/100). One ${PILLAR_LABELS[s.weakest.pillar].toLowerCase()} quest tomorrow makes a difference.`,
+      i18n.t('insights.weakest', {
+        pillar: PILLAR_LABELS[s.weakest.pillar],
+        value: s.weakest.value,
+        lower: PILLAR_LABELS[s.weakest.pillar].toLowerCase(),
+      }),
     );
   }
   if (period === 'month' && s.bestWeekday !== null) {
-    out.push(`${WEEKDAYS[s.bestWeekday]} is usually your best day.`);
+    out.push(i18n.t('insights.bestDay', { day: WEEKDAYS()[s.bestWeekday] }));
   }
   return out;
 }
 
 function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
+  const { t } = useTranslation();
   const diff = s.prevAvgScore === null ? null : s.avgScore - s.prevAvgScore;
   const up = diff !== null && diff >= 0;
   return (
     <Card style={styles.card}>
       <Txt variant="label" color={colors.inkSoft}>
-        {period === 'week' ? 'Average score this week' : 'Average score this month'}
+        {period === 'week' ? t('insights.averageScoreThisWeek') : t('insights.averageScoreThisMonth')}
       </Txt>
       <View style={styles.headlineRow}>
         <Txt variant="display" style={styles.bigNumber}>
@@ -115,7 +122,7 @@ function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
             ]}
           >
             <Txt variant="bodySemi" color={up ? colors.accent : colors.danger}>
-              {`${up ? '▲' : '▼'} ${Math.abs(diff)} vs last ${period}`}
+              {t('insights.vsLast', { arrow: up ? '▲' : '▼', diff: Math.abs(diff), context: period })}
             </Txt>
           </View>
         ) : null}
@@ -128,11 +135,12 @@ function Headline({ s, period }: { s: PeriodSummary; period: Period }) {
 }
 
 function Takeaways({ items }: { items: string[] }) {
+  const { t } = useTranslation();
   if (items.length === 0) return null;
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        What stands out
+        {t('insights.whatStandsOut')}
       </Txt>
       {items.map((t, i) => (
         <View key={i} style={styles.bulletRow}>
@@ -147,14 +155,15 @@ function Takeaways({ items }: { items: string[] }) {
 }
 
 function Pillars({ days }: { days: DayScore[] }) {
+  const { t } = useTranslation();
   const avgs = pillarAverages(days.filter((d) => d.assigned > 0)).sort((a, b) => b.value - a.value);
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Your pillars
+        {t('insights.yourPillars')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        Average score per pillar, highest first
+        {t('insights.averageScorePerPillar')}
       </Txt>
       {avgs.map((p) => (
         <PillarBar key={p.pillar} pillar={p.pillar} value={p.value} />
@@ -165,21 +174,22 @@ function Pillars({ days }: { days: DayScore[] }) {
 
 // Predicted chance of completing a quest tomorrow (server, hourly).
 function StreakOutlook() {
+  const { t } = useTranslation();
   const userId = useAppSelector((state) => state.auth.userId);
   const prediction = useStreakPrediction(userId);
   const p = prediction.data;
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Streak outlook
+        {t('insights.streakOutlook')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        Chance you complete at least one quest tomorrow. Updated every hour.
+        {t('insights.chanceYouCompleteAt')}
       </Txt>
       {prediction.isError ? (
         <EmptyState
-          title="Could not load your outlook"
-          body="Check your connection and open Insights again."
+          title={t('insights.couldNotLoadYour2')}
+          body={t('insights.checkYourConnectionAnd')}
         />
       ) : p ? (
         <View accessible accessibilityRole="summary" accessibilityLabel={predictionA11yLabel(p)}>
@@ -217,10 +227,11 @@ function FactPill({ label, value, color }: { label: string; value: string; color
 }
 
 function PatternFacts({ p }: { p: BehavioralPatterns }) {
+  const { t } = useTranslation();
   const facts: { label: string; value: string; color: string }[] = [];
   if (p.skip_weekday_name) {
     facts.push({
-      label: 'Most skipped',
+      label: t('insights.mostSkipped'),
       value: p.skip_top_pillar
         ? `${p.skip_weekday_name} · ${PILLAR_LABELS[p.skip_top_pillar]}`
         : p.skip_weekday_name,
@@ -229,7 +240,7 @@ function PatternFacts({ p }: { p: BehavioralPatterns }) {
   }
   if (p.neglected_pillar) {
     facts.push({
-      label: 'Needs love (14 days)',
+      label: t('insights.needsLove14Days'),
       value: PILLAR_LABELS[p.neglected_pillar],
       color: colors.pillar[p.neglected_pillar],
     });
@@ -270,6 +281,7 @@ function InsightRow({ insight }: { insight: PatternInsight }) {
 // Behavioral patterns: when quests get done, which day slips, which
 // pillar is quiet, plus 2 AI insights. Independent of the week/month switch.
 function Patterns() {
+  const { t } = useTranslation();
   const userId = useAppSelector((state) => state.auth.userId);
   const patterns = usePatterns(userId);
   const insights = usePatternInsights(patterns.data ? userId : null);
@@ -278,15 +290,15 @@ function Patterns() {
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Your patterns
+        {t('insights.yourPatterns')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        When you finish quests, last 8 weeks in your timezone. Tap a bar for details.
+        {t('insights.whenYouFinishQuests')}
       </Txt>
       {patterns.isError ? (
         <EmptyState
-          title="Could not load your patterns"
-          body="Check your connection and open Insights again."
+          title={t('insights.couldNotLoadYour3')}
+          body={t('insights.checkYourConnectionAnd')}
         />
       ) : !p ? (
         <Skeleton height={214} />
@@ -296,7 +308,7 @@ function Patterns() {
           <PatternFacts p={p} />
           <Hairline style={styles.coachRule} />
           <Txt variant="label" color={colors.inkSoft} style={styles.noticedTitle}>
-            What we noticed
+            {t('insights.whatWeNoticed')}
           </Txt>
           {insights.isLoading ? (
             <View>
@@ -309,11 +321,11 @@ function Patterns() {
             insights.data.insights.map((ins) => <InsightRow key={ins.kind} insight={ins} />)
           ) : insights.data?.status === 'not_enough_data' ? (
             <Txt variant="body" color={colors.inkSoft}>
-              A few more days of quests and patterns start to show here.
+              {t('insights.aFewMoreDays')}
             </Txt>
           ) : (
             <Txt variant="body" color={colors.inkSoft}>
-              Insights are not available right now. Your chart above is up to date.
+              {t('insights.insightsAreNotAvailable')}
             </Txt>
           )}
         </>
@@ -324,6 +336,7 @@ function Patterns() {
 
 // The last 365 days of XP. Independent of the week/month switch above.
 function YearOfActivity() {
+  const { t } = useTranslation();
   const userId = useAppSelector((state) => state.auth.userId);
   const timezone = useAppSelector((state) => state.user.profile?.timezone ?? null);
   const today = todayInTimezone(timezone);
@@ -331,15 +344,15 @@ function YearOfActivity() {
   return (
     <Card style={styles.card}>
       <Txt variant="heading" style={styles.cardTitle}>
-        Your year
+        {t('insights.yourYear')}
       </Txt>
       <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-        XP earned each day for the last 365 days. Tap a day for details.
+        {t('insights.xpEarnedEachDay')}
       </Txt>
       {year.isError ? (
         <EmptyState
-          title="Could not load your year"
-          body="Check your connection and open Insights again."
+          title={t('insights.couldNotLoadYour')}
+          body={t('insights.checkYourConnectionAnd')}
         />
       ) : year.data ? (
         <YearHeatmap days={year.data} today={today} />
@@ -351,16 +364,17 @@ function YearOfActivity() {
 }
 
 function Momentum({ streak, best, level }: { streak: number; best: number; level: number }) {
+  const { t } = useTranslation();
   return (
     <Accordion
-      title="Momentum"
-      summary={`${streak}-day streak · best ${best} · level ${level}`}
+      title={t('insights.momentum')}
+      summary={t('insights.dayStreakBestLevel', { streak, best, level })}
       style={styles.card}
     >
       <View style={styles.statsRow}>
-        <Stat value={`${streak}`} label="day streak" color={colors.gold} />
+        <Stat value={`${streak}`} label={t('insights.dayStreak')} color={colors.gold} />
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
-        <Stat value={`${best}`} label="best streak" />
+        <Stat value={`${best}`} label={t('insights.bestStreak')} />
         <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
         <Stat value={`${level}`} label={titleForLevel(level)} />
       </View>
@@ -382,6 +396,7 @@ function Stat({ value, label, color }: { value: string; label: string; color?: s
 }
 
 export function InsightsScreen() {
+  const { t } = useTranslation();
   useTheme();
   const [period, setPeriod] = useState<Period>('week');
   const [shareOpen, setShareOpen] = useState(false);
@@ -420,10 +435,10 @@ export function InsightsScreen() {
   return (
     <Screen scroll>
       <View style={styles.titleRow}>
-        <Txt variant="title">Insights</Txt>
+        <Txt variant="title">{t('insights.insights')}</Txt>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Share your progress as a story"
+          accessibilityLabel={t('insights.shareYourProgressAs')}
           onPress={() => setShareOpen(true)}
           style={({ pressed }) => [
             styles.sharePill,
@@ -431,7 +446,7 @@ export function InsightsScreen() {
           ]}
         >
           <Txt variant="bodySemi" color={colors.accent}>
-            Share
+            {t('insights.share')}
           </Txt>
         </Pressable>
       </View>
@@ -456,17 +471,17 @@ export function InsightsScreen() {
           <YearOfActivity />
 
           <Accordion
-            title="Your score, day by day"
-            summary="Daily scores against your average"
+            title={t('insights.yourScoreDayBy')}
+            summary={t('insights.dailyScoresAgainstYour')}
             style={styles.card}
           >
             <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
-              Tap a point to see the exact score. The dashed line is your average.
+              {t('insights.tapAPointTo')}
             </Txt>
             <LineChart
               data={current.map((d) => ({ label: shortLabel(d.date, period), value: d.overall }))}
               height={170}
-              emptyLabel="No scores yet"
+              emptyLabel={t('insights.noScoresYet')}
             />
           </Accordion>
 
@@ -478,7 +493,7 @@ export function InsightsScreen() {
 
           <Card style={styles.card}>
             <Txt variant="heading" style={styles.cardTitle}>
-              From your coach
+              {t('insights.fromYourCoach')}
             </Txt>
             {coach.length > 0 ? (
               coach.map((insight, i) => (
@@ -495,15 +510,15 @@ export function InsightsScreen() {
               ))
             ) : (
               <EmptyState
-                title="Notes arrive on Sunday"
-                body="Your coach reads the week's data and writes a few plain observations here."
+                title={t('insights.notesArriveOnSunday')}
+                body={t('insights.yourCoachReadsThe')}
               />
             )}
           </Card>
 
           <Button
-            title="Share my progress as a story"
-            winTitle="Show it off"
+            title={t('insights.shareMyProgressAs')}
+            winTitle={t('insights.showItOff')}
             icon={ShareGlyph}
             onPress={() => setShareOpen(true)}
           />
@@ -558,7 +573,7 @@ const styles = StyleSheet.create({
   bigNumber: {
     fontSize: 52,
     lineHeight: 58,
-    marginRight: spacing.md,
+    marginEnd: spacing.md,
   },
   changePill: {
     borderRadius: radius.md,
@@ -575,7 +590,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginTop: 9,
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
   },
   bulletText: {
     flex: 1,
@@ -612,7 +627,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
     marginTop: spacing.xs,
   },
   noticedTitle: {
@@ -629,7 +644,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
   },
   insightText: {
     flex: 1,

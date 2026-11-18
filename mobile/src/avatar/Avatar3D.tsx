@@ -18,6 +18,8 @@
 // again after a quiet spell so its memory goes back to the system.
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 import Skeleton from '../components/Skeleton';
 import { runAfterInteractionsOrTimeout } from '../lib/afterInteractions';
@@ -199,7 +201,7 @@ export function renderOnce(config: AvatarConfig, mood: Mood, mode: Mode, camera:
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       unsubscribe();
-      reject(new Error('The picture took too long to draw.'));
+      reject(new Error(i18n.t('avatar3d.tooSlow')));
     }, 60_000);
     const check = () => {
       const data = images.get(key);
@@ -207,7 +209,7 @@ export function renderOnce(config: AvatarConfig, mood: Mood, mode: Mode, camera:
       clearTimeout(timer);
       unsubscribe();
       if (data) resolve(data);
-      else reject(new Error('The picture could not be drawn.'));
+      else reject(new Error(i18n.t('avatar3d.drawFailed')));
     };
     const unsubscribe = subscribe(check);
     requestRender({ key, mode, command: commandFor(config, mood, mode, true, camera), channel: 'editor' });
@@ -369,6 +371,7 @@ function WebFrame({
   onMessage: (data: string) => void;
   bindSend: (fn: (json: string) => void) => void;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLIFrameElement | null>(null);
   useEffect(() => {
     const handler = (e: MessageEvent) => {
@@ -409,6 +412,7 @@ const NO_CAMERA: Camera = {};
 const BREATH_SCALE: Record<Mode, number> = { head: 0.012, 'full-body': 0.008, 'head-thumb': 0, 'body-thumb': 0, 'head-hd': 0, 'body-hd': 0 };
 
 export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live }: Avatar3DProps) {
+  const { t } = useTranslation();
   const key = renderKey(config, mood, mode, bare, camera);
   const blinkKey = `${key}:blink`;
   // The eyes-shut frame, only when it belongs to the image on screen.
@@ -462,7 +466,7 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
   if (!uri) {
     // Still rendering, or the renderer failed.
     return (
-      <View style={[styles.waiting, head && !bare ? styles.round : null, bare ? null : styles.waitingFill, { width, height }]} accessibilityLabel="Your avatar is loading">
+      <View style={[styles.waiting, head && !bare ? styles.round : null, bare ? null : styles.waitingFill, { width, height }]} accessibilityLabel={t('avatar3d.yourAvatarIsLoading')}>
         {size >= 64 && ready !== '' ? (
           <Skeleton
             width={width}
@@ -475,7 +479,7 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
     );
   }
   return (
-    <View style={[head && !bare ? styles.round : null, { width, height }]} accessibilityLabel="Your avatar">
+    <View style={[head && !bare ? styles.round : null, { width, height }]} accessibilityLabel={t('avatar3d.yourAvatar')}>
       <Animated.View style={[{ width, height }, animated ? breathStyle : null]}>
         <Image source={{ uri }} style={{ width, height }} resizeMode="contain" />
         {animated && blinkUri && ready ? (

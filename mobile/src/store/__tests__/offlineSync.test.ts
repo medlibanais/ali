@@ -8,7 +8,7 @@ import authReducer from '../slices/authSlice';
 import gamificationReducer from '../slices/gamificationSlice';
 import questsReducer, { completeQuest, fetchDailyQuests, undoQuest } from '../slices/questsSlice';
 import syncReducer from '../slices/syncSlice';
-import { COMPLETED_ELSEWHERE, setFlushPaceForTests, syncOfflineCompletions } from '../offlineSync';
+import { completedElsewhere, setFlushPaceForTests, syncOfflineCompletions } from '../offlineSync';
 import { syncMachineMiddleware } from '../syncMachineMiddleware';
 import { QUEUE_KEY, readOfflineQueue } from '../../lib/offlineQueue';
 import { kvStore } from '../../lib/kvStore';
@@ -241,7 +241,7 @@ it('server wins on a conflict: notice, no doubled XP, quest stays as the server 
   expect(res.payload.conflicts).toHaveLength(1);
   const s = store.getState();
   expect(s.sync.machine).toMatchObject({ state: 'Error', errorKind: 'conflict' });
-  expect(s.sync.machine.errorMessage).toBe(COMPLETED_ELSEWHERE);
+  expect(s.sync.machine.errorMessage).toBe(completedElsewhere());
   expect(s.gamification.totalXp).toBe(55); // not 55 + our 55
 });
 
