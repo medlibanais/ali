@@ -1,4 +1,4 @@
--- PrayerLock 0017: predicted chance of keeping the streak tomorrow.
+-- PrayerLock 0021: predicted chance of keeping the streak tomorrow.
 --
 -- The predict-streak Edge Function (hourly, below) fills these columns
 -- with the service role. The app cannot write them: 0013 revoked
