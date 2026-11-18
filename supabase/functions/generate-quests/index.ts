@@ -2,7 +2,7 @@
 // Two entry modes:
 //   - on-demand: authenticated user generates for their own today
 //   - nightly:   cron secret generates tomorrow's quests for all users
-// Before calling Groq it asks calculate_user_difficulty (migration 0020)
+// Before calling Groq it asks calculate_user_difficulty (migration 0026)
 // for the user's adaptive level and puts it in the system prompt. Groq
 // returns 15 quests (3 per pillar) biased to that level; the reply is
 // validated against QUEST_SCHEMA plus the level's Easy/Hard caps before
@@ -149,7 +149,7 @@ async function generateForUser(
   const scores = scoresRes.data ?? [];
   const weakest = weakestPillar(scores);
 
-  // Adaptive difficulty. If the RPC fails (e.g. migration 0020 not
+  // Adaptive difficulty. If the RPC fails (e.g. migration 0026 not
   // applied yet) generation still runs at Beginner and the log says why.
   const { data: diffRow, error: diffError } = await admin
     .rpc('calculate_user_difficulty', { p_user_id: userId })

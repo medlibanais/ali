@@ -1,4 +1,4 @@
--- PrayerLock 0020: adaptive quest difficulty.
+-- PrayerLock 0026: adaptive quest difficulty.
 --
 -- calculate_user_difficulty(user_id) looks at the user's last 14 full days
 -- of assigned quests (in their own timezone, today excluded because it is
