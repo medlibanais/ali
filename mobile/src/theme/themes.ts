@@ -313,3 +313,13 @@ export const DEFAULT_THEME_ID: ThemeId = 'neon';
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && value in THEMES;
 }
+
+/**
+ * Traffic-light colors for risk readouts (streak outlook gauge). Fixed
+ * across themes so red/yellow/green keep their meaning; one set per
+ * background brightness so each passes contrast as text on its card.
+ */
+export const RISK_COLORS = {
+  dark: { high: '#FF6B6B', moderate: '#FFD166', onTrack: '#3DDC84' },
+  light: { high: '#C62828', moderate: '#975A16', onTrack: '#2E7D32' },
+} as const;

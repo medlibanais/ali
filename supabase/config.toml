@@ -402,6 +402,10 @@ verify_jwt = false
 [functions.generate-avatar]
 verify_jwt = false
 
+# Called only by pg_cron, which sends x-cron-secret and no user JWT.
+[functions.predict-streak]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
