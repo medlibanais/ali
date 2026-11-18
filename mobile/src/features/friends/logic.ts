@@ -104,7 +104,7 @@ export function realtimeTopicIds(rows: CircleRow[]): string[] {
     .sort();
 }
 
-/** Same window as public.cheer_cooldown() in migration 0035. */
+/** Same window as public.cheer_cooldown() in migration 0036. */
 export const CHEER_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 
 /** Milliseconds until you may cheer this friend again (0 = now). */

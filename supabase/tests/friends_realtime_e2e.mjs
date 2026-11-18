@@ -1,4 +1,4 @@
-// Realtime friends leaderboard (migration 0035), end to end on a local
+// Realtime friends leaderboard (migration 0036), end to end on a local
 // Supabase: view RLS, private xp:<user> topic joins, live XP events,
 // forged broadcasts, cheers and their rate limits. Creates throwaway users.
 import { createRequire } from 'module';
