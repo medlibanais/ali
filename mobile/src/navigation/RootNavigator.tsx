@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { markFirstScreenPainted } from '../lib/bootSplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -208,12 +210,29 @@ export function RootNavigator() {
     case 'restoring':
       return <SplashScreen />;
     case 'unauthenticated':
-      return <AuthNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <AuthNavigator />
+        </View>
+      );
     case 'needsOnboarding':
-      return <OnboardingNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onOnboardingPainted}>
+          <OnboardingNavigator />
+        </View>
+      );
     case 'ready':
       return <AppNavigator />;
   }
 }
 
 export default RootNavigator;
+
+// Signed-out and onboarding launches hide the native splash once their
+// first screen is laid out; signed-in launches wait for Today instead.
+const onAuthPainted = () => markFirstScreenPainted('auth');
+const onOnboardingPainted = () => markFirstScreenPainted('onboarding');
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});
