@@ -8,6 +8,7 @@ import Screen from '../components/Screen';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import { CheckGlyph, PillarGlyph } from '../components/icons';
+import { playHaptic } from '../lib/haptics';
 import type { AppStackParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -61,21 +62,26 @@ export function QuestDetailScreen({ navigation, route }: Props) {
   const busy = completingId === quest.quest_id;
 
   const markComplete = async () => {
+    playHaptic('questComplete');
     const result = await dispatch(completeQuest(quest));
     if (completeQuest.fulfilled.match(result)) {
       const xp = result.payload.xp_awarded;
       const questId = result.payload.quest_id;
       toast.showToast({
-        message: `+${xp} XP. ${quest.title} is done.`,
+        message: result.payload.offline
+          ? `${quest.title} is done. Saved offline: about +${xp} XP once it syncs.`
+          : `+${xp} XP. ${quest.title} is done.`,
         actionLabel: 'Undo',
         countdownSeconds: 10,
         durationMs: 10000,
         onAction: () => {
+          playHaptic('questUndo');
           dispatch(undoQuest(questId));
         },
       });
       navigation.goBack();
     } else {
+      playHaptic('error');
       toast.showToast({
         message: result.payload?.message ?? 'Could not complete this quest.',
       });

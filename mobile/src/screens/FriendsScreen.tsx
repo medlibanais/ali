@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,10 +22,12 @@ import Skeleton from '../components/Skeleton';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import {
+  cheerErrorText,
   friendErrorText as errorText,
   inviteResultText,
   useBlockedUsers,
   useBlockUser,
+  useCheer,
   useCircle,
   useFriendRequests,
   useRedeemInvite,
@@ -38,7 +41,15 @@ import {
   type SearchHit,
   type UserSearchResult,
 } from '../features/friends/api';
-import { displayName, friendsOnly, inviteMessage, rankLeaderboard } from '../features/friends/logic';
+import FriendsLeaderboard from '../features/friends/FriendsLeaderboard';
+import {
+  displayName,
+  friendsOnly,
+  inviteMessage,
+  rankLeaderboard,
+  type RankedRow,
+} from '../features/friends/logic';
+import { useFriendsXpRealtime } from '../features/friends/useFriendsXpRealtime';
 import { pluralize, streakLabel } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
@@ -89,6 +100,29 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const block = useBlockUser();
   const unblock = useUnblockUser();
   const redeem = useRedeemInvite();
+  const cheer = useCheer();
+  const isFocused = useIsFocused();
+  const [pulse, setPulse] = useState<{ id: string | null; tick: number }>({ id: null, tick: 0 });
+  const [now, setNow] = useState(() => Date.now());
+
+  // Live XP from friends while this screen is on top and the Friends tab
+  // is showing; channels close as soon as you leave.
+  const onXpChange = useCallback((userId: string, delta: number) => {
+    if (delta > 0) setPulse((p) => ({ id: userId, tick: p.tick + 1 }));
+  }, []);
+  useFriendsXpRealtime({
+    rows: circle.data,
+    enabled: isFocused && section === 'friends',
+    onXpChange,
+  });
+
+  // Re-check cheer cooldowns once a minute while visible.
+  useEffect(() => {
+    if (!isFocused) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [isFocused]);
 
   const friends = useMemo(() => friendsOnly(circle.data ?? []), [circle.data]);
   const leaderboard = useMemo(() => rankLeaderboard(circle.data ?? []), [circle.data]);
@@ -161,6 +195,13 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   };
 
   const onError = (e: unknown) => toast.showToast({ message: errorText(e) });
+
+  const cheerOn = (row: RankedRow) =>
+    cheer.mutate(row.id, {
+      onSuccess: () =>
+        toast.showToast({ message: `You cheered on ${displayName(row)}.` }),
+      onError: (e) => toast.showToast({ message: cheerErrorText(e) }),
+    });
 
   const confirmUnfriend = (friend: FriendRow) => {
     Alert.alert('Unfriend', `Remove ${displayName(friend)} from your friends?`, [
@@ -298,28 +339,14 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                     <Txt variant="label">This week, by XP</Txt>
                   </View>
                   <Hairline />
-                  {leaderboard.map((row, index) => (
-                    <View key={row.id}>
-                      {index > 0 ? <Hairline /> : null}
-                      <View style={[styles.row, row.is_me && styles.meRow]}>
-                        <Txt variant="bodySemi" color={colors.gold} style={styles.rank}>
-                          {`${row.rank}`}
-                        </Txt>
-                        <ProfileAvatar profile={userToProfile(row)} size={44} animated={false} />
-                        <View style={styles.rowBody}>
-                          <Txt variant="bodySemi">
-                            {row.is_me ? 'You' : displayName(row)}
-                          </Txt>
-                          <Txt variant="caption" color={colors.inkFaint}>
-                            {`Level ${row.level ?? 1} · ${streakLabel(row.current_streak ?? 0)}`}
-                          </Txt>
-                        </View>
-                        <Txt variant="bodySemi" color={colors.accent}>
-                          {`${row.weekly_xp ?? 0} XP`}
-                        </Txt>
-                      </View>
-                    </View>
-                  ))}
+                  <FriendsLeaderboard
+                    rows={leaderboard}
+                    pulseId={pulse.id}
+                    pulseTick={pulse.tick}
+                    onCheer={cheerOn}
+                    cheeringId={cheer.isPending ? cheer.variables ?? null : null}
+                    now={now}
+                  />
                   {privateCount > 0 ? (
                     <>
                       <Hairline />
@@ -581,18 +608,12 @@ const styles = themed(() =>
       padding: spacing.lg,
       minHeight: 64,
     },
-    rank: {
-      width: 24,
-    },
     rowBody: {
       flex: 1,
       marginLeft: spacing.md,
     },
     rowBodyFlat: {
       flex: 1,
-    },
-    meRow: {
-      backgroundColor: colors.paperAlt,
     },
     requestCard: {
       marginBottom: spacing.md,

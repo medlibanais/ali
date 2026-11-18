@@ -17,6 +17,7 @@ const TYPE_PREF: Record<string, string | null> = {
   friend_request: 'friend_requests',
   friend_accepted: 'friend_requests',
   friend_streak_milestone: 'friend_requests',
+  cheer: 'friend_requests',
   missed_quest: 'quest_reminders',
   streak_risk: 'streak_risk',
   streak_rescue: 'streak_risk',

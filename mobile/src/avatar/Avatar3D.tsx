@@ -18,7 +18,8 @@
 // again after a quiet spell so its memory goes back to the system.
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Image, Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View } from 'react-native';
+import Skeleton from '../components/Skeleton';
 import { runAfterInteractionsOrTimeout } from '../lib/afterInteractions';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useAliveMotion } from './alive';
@@ -462,7 +463,14 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
     // Still rendering, or the renderer failed.
     return (
       <View style={[styles.waiting, head && !bare ? styles.round : null, bare ? null : styles.waitingFill, { width, height }]} accessibilityLabel="Your avatar is loading">
-        {size >= 64 && ready !== '' ? <ActivityIndicator color="#9AA0A8" /> : null}
+        {size >= 64 && ready !== '' ? (
+          <Skeleton
+            width={width}
+            height={height}
+            borderRadius={head && !bare ? width / 2 : 0}
+            style={styles.waitingShimmer}
+          />
+        ) : null}
       </View>
     );
   }
@@ -481,6 +489,7 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
 }
 
 const styles = StyleSheet.create({
+  waitingShimmer: { position: 'absolute', left: 0, top: 0, backgroundColor: 'transparent' },
   host: {
     position: 'absolute',
     left: 0,

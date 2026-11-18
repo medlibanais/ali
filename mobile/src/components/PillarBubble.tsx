@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Txt from './Txt';
 import { PillarGlyph } from './icons';
+import { playHaptic } from '../lib/haptics';
 import { PressableScale } from './Motion';
 import { colors, PILLAR_LABELS, pillarPastels, softShadow, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -55,7 +56,10 @@ export function PillarBubble({
         (hasCount ? `, ${done ?? 0} of ${total} quests done` : '')
       }
       accessibilityState={{ selected: expanded }}
-      onPress={() => onPress(pillar)}
+      onPress={() => {
+        playHaptic('pillar');
+        onPress(pillar);
+      }}
       pressedScale={0.92}
       hitSlop={Math.max(0, (44 - size) / 2)}
       style={[styles.pressable, { width: size, height: size }]}

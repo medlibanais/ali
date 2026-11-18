@@ -34,7 +34,7 @@ import PillarOrbit from '../components/PillarOrbit';
 import type { PillarId } from '../components/PillarBubble';
 import QuestRow from '../components/QuestRow';
 import Screen from '../components/Screen';
-import Skeleton from '../components/Skeleton';
+import { TodaySkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import { BellGlyph, ChevronGlyph, PillarGlyph } from '../components/icons';
@@ -44,6 +44,8 @@ import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
 import { markFirstScreenPainted } from '../lib/bootSplash';
 import { bestStreakLabel, pluralize, streakLabel } from '../lib/format';
+import { playHaptic } from '../lib/haptics';
+import { launchHero } from '../lib/hero';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -61,7 +63,6 @@ import { setPendingInviteCode } from '../store/slices/authSlice';
 import { fetchProfile } from '../store/slices/userSlice';
 import {
   completeQuest,
-  drainCompletionQueue,
   fetchDailyQuests,
   undoQuest,
 } from '../store/slices/questsSlice';
@@ -99,19 +100,6 @@ function dateLine(): string {
     month: 'long',
     day: 'numeric',
   });
-}
-
-function TodaySkeleton() {
-  return (
-    <View style={styles.skeletonWrap}>
-      <Skeleton width={220} height={24} style={styles.skeletonCenter} />
-      <Skeleton width={280} height={280} borderRadius={140} style={styles.skeletonCenter} />
-      <Skeleton height={56} style={styles.skeletonBlock} />
-      <Skeleton height={64} style={styles.skeletonBlock} />
-      <Skeleton height={64} style={styles.skeletonBlock} />
-      <Skeleton height={64} style={styles.skeletonBlock} />
-    </View>
-  );
 }
 
 // ------------------------------------------------------------ sections
@@ -157,9 +145,11 @@ const TodayHeader = memo(function TodayHeader({
 const TodayOrbit = memo(function TodayOrbit({
   expandedPillar,
   onPillarPress,
+  onAvatarPress,
 }: {
   expandedPillar: PillarId | null;
   onPillarPress: (pillar: PillarId) => void;
+  onAvatarPress: () => void;
 }) {
   // Primitive picks: a refetched profile with the same values is a no-op.
   const rawConfig = useAppSelector((state) => state.user.profile?.avatar_config);
@@ -186,6 +176,7 @@ const TodayOrbit = memo(function TodayOrbit({
         mood={mood}
         expandedPillar={expandedPillar}
         onPillarPress={onPillarPress}
+        onAvatarPress={onAvatarPress}
       />
     </FadeInUp>
   );
@@ -424,17 +415,8 @@ export function TodayScreen({ navigation, route }: Props) {
   );
 
   useEffect(() => {
+    // Offline completions sync in the background (OfflineBanner).
     load(false);
-    // Replay any completions queued while offline.
-    dispatch(drainCompletionQueue()).then((result) => {
-      const synced = (result.payload as { synced: number } | undefined)?.synced ?? 0;
-      if (synced > 0) {
-        showToast({
-          message: `Back online — synced ${synced} offline ${synced === 1 ? 'completion' : 'completions'}.`,
-        });
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   // Redeem a pending invite code (deep link / register flow) exactly once.
@@ -523,11 +505,14 @@ export function TodayScreen({ navigation, route }: Props) {
             : null,
         ].filter(Boolean);
         showToast({
-          message: [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
+          message: result.payload.offline
+            ? `${quest.title} is done. Saved offline: about +${xp} XP once it syncs.`
+            : [`+${xp} XP. ${quest.title} is done.`, ...extras].join(' '),
           actionLabel: 'Undo',
           countdownSeconds: 10,
           durationMs: 10000,
           onAction: () => {
+            playHaptic('questUndo');
             dispatch(undoQuest(questId));
           },
         });
@@ -535,6 +520,7 @@ export function TodayScreen({ navigation, route }: Props) {
           dispatch(fetchGamification());
         }
       } else {
+        playHaptic('error');
         showToast({
           message: result.payload?.message ?? 'Could not complete this quest.',
         });
@@ -557,6 +543,12 @@ export function TodayScreen({ navigation, route }: Props) {
     [],
   );
   const clearPillar = useCallback(() => setExpandedPillar(null), []);
+  // The avatar flies from the orbit into the Profile header (Hero).
+  const openProfile = useCallback(() => {
+    playHaptic('tap');
+    // Measure the avatar while it is still on screen, then switch tabs.
+    launchHero('avatar').then(() => navigation.navigate('Profile'));
+  }, [navigation]);
 
   return (
     <Screen
@@ -584,7 +576,11 @@ export function TodayScreen({ navigation, route }: Props) {
             ]}
           />
           <TodayHeader onBellPress={openNotifications} />
-          <TodayOrbit expandedPillar={expandedPillar} onPillarPress={togglePillar} />
+          <TodayOrbit
+            expandedPillar={expandedPillar}
+            onPillarPress={togglePillar}
+            onAvatarPress={openProfile}
+          />
           <QuestSection
             expandedPillar={expandedPillar}
             onClearPillar={clearPillar}
@@ -717,16 +713,6 @@ const styles = themed(() =>
   footerNote: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
-  },
-  skeletonWrap: {
-    paddingTop: spacing.xl,
-  },
-  skeletonCenter: {
-    alignSelf: 'center',
-    marginBottom: spacing.xl,
-  },
-  skeletonBlock: {
-    marginBottom: spacing.md,
   },
   }),
 );

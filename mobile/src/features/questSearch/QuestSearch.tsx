@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import LoadingDots from '../../components/LoadingDots';
 import Txt from '../../components/Txt';
 import { CloseGlyph, PillarGlyph, SearchGlyph } from '../../components/icons';
 import {
@@ -27,7 +28,7 @@ export function QuestSearchBar({ value, onChangeText, searching }: SearchBarProp
     <View style={styles.bar}>
       <View style={styles.leading} pointerEvents="none">
         {searching ? (
-          <ActivityIndicator size="small" color={colors.accent} />
+          <LoadingDots color={colors.accent} size={4} accessibilityLabel="Searching" />
         ) : (
           <SearchGlyph size={20} color={colors.inkSoft} />
         )}

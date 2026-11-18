@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState';
 import { PressableScale } from '../components/Motion';
 import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
+import { ChatSkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import {
@@ -282,16 +283,6 @@ const MessageBubble = memo(function MessageBubble({
   );
 });
 
-function HistorySkeleton() {
-  return (
-    <View style={styles.historySkeleton}>
-      <Skeleton height={56} width="72%" style={styles.historyBlock} />
-      <Skeleton height={40} width="58%" style={styles.historyBlockRight} />
-      <Skeleton height={64} width="80%" style={styles.historyBlock} />
-    </View>
-  );
-}
-
 const messageKey = (m: ChatMessage): string => m.id;
 // User and coach bubbles have different layouts; recycle them separately.
 const messageType = (m: ChatMessage): ChatMessage['role'] => m.role;
@@ -476,7 +467,7 @@ export function CoachScreen() {
       </View>
 
       {chat.loadingHistory ? (
-        <HistorySkeleton />
+        <ChatSkeleton />
       ) : (
         !hasMessages && !chat.streaming ? (
           <View style={[styles.list, styles.emptyWrap]}>
@@ -803,18 +794,6 @@ const styles = themed(() =>
     countdown: {
       marginLeft: spacing.md,
       fontVariant: ['tabular-nums'],
-    },
-    historySkeleton: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xl,
-      flex: 1,
-    },
-    historyBlock: {
-      marginBottom: spacing.md,
-    },
-    historyBlockRight: {
-      marginBottom: spacing.md,
-      alignSelf: 'flex-end',
     },
     pendingRow: {
       opacity: 0.6,

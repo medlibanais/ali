@@ -14,6 +14,7 @@ import {
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { rememberCompletionOrigin } from '../features/celebrations/anchors';
+import { playHaptic } from '../lib/haptics';
 import DrawnCheck from './DrawnCheck';
 import { SparklesGlyph, StarGlyph } from './icons';
 import { PressableScale } from './Motion';
@@ -70,6 +71,7 @@ export function QuestRow({
           accessibilityState={{ checked: false }}
           accessibilityLabel={`Complete ${quest.title}`}
           onPress={(e) => {
+            playHaptic('questComplete');
             // XP particles start where the finger was.
             const { pageX, pageY } = e.nativeEvent;
             if (Number.isFinite(pageX) && Number.isFinite(pageY)) {

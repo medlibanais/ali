@@ -3,7 +3,7 @@
 // the editor gets a random avatar instead, so the person is never stuck.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomAvatarConfig } from '../avatar/options';
 import { applySelfieResult, resultNote } from '../avatar/selfie';
@@ -14,6 +14,7 @@ import { colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
+import LoadingDots from './LoadingDots';
 
 interface Props {
   visible: boolean;
@@ -104,7 +105,7 @@ export default function SelfieAvatarSheet({ visible, config, level, onApply, onC
         <View style={styles.frame}>
           {busy ? (
             <View style={styles.center} accessibilityLiveRegion="polite">
-              <ActivityIndicator color={colors.accent} />
+              <LoadingDots color={colors.accent} accessibilityLabel="Working on your avatar" />
               <Txt variant="bodySemi">{step === 'upload' ? 'Uploading your photo…' : 'Reading your photo…'}</Txt>
               <Txt variant="caption" color={colors.inkSoft}>This usually takes 5 to 15 seconds.</Txt>
             </View>
