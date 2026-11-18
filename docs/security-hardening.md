@@ -1,15 +1,15 @@
-# Security hardening (migration 0030)
+# Security hardening (migration 0031)
 
 Builds on 0012 (friends) and 0013 (anti-cheat). Tests: `supabase/tests/security_hardening_test.sql` (40 pgTAP checks) and `supabase/functions/_shared/__tests__/promptGuard_test.ts` (9 Deno tests).
 
-## What was already in place before 0030
+## What was already in place before 0031
 
 - `gamification`, `quest_completions`, `quests`, `daily_scores`, `achievements`: no INSERT/UPDATE/DELETE for `anon`/`authenticated` (0013), plus a trigger that refuses non-RPC writes (0012).
 - `complete_quest`: SECURITY DEFINER, per-user row lock, 15 completions per local day, 500 XP/day cap, quest must belong to the caller (0013).
 - `messages`/`conversations`: owner-only RLS. `daily_scores`/`gamification`/`achievements`: owner, or accepted friends when `stats_visibility = 'friends'`. `profiles`: self, and people with a pending or accepted friendship (0012).
 - Coach: 500-character input cap and 20 messages/day, enforced in the Edge Function.
 
-## What 0030 adds
+## What 0031 adds
 
 | Area | Change |
 | --- | --- |
@@ -33,5 +33,5 @@ Builds on 0012 (friends) and 0013 (anti-cheat). Tests: `supabase/tests/security_
 
 ## Manual steps
 
-1. `npx supabase db push` (applies 0030).
+1. `npx supabase db push` (applies 0031).
 2. `npx supabase functions deploy coach`.
