@@ -14,6 +14,7 @@ import PillarBar from '../components/PillarBar';
 import Screen from '../components/Screen';
 import SegmentedControl from '../components/SegmentedControl';
 import Skeleton from '../components/Skeleton';
+import { InsightsSkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
 import YearHeatmap from '../components/charts/YearHeatmap';
@@ -308,9 +309,7 @@ export function InsightsScreen() {
 
       {loading ? (
         <View style={styles.section}>
-          <Skeleton height={140} style={styles.card} />
-          <Skeleton height={160} style={styles.card} />
-          <Skeleton height={180} style={styles.card} />
+          <InsightsSkeleton />
         </View>
       ) : (
         <View style={styles.section}>

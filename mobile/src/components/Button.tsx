@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { colors, radius, softShadow, spacing, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { playHaptic } from '../lib/haptics';
 import type { IconProps } from './icons';
+import LoadingDots from './LoadingDots';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -107,7 +109,14 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      onPress={isDisabled ? undefined : onPress}
+      onPress={
+        isDisabled
+          ? undefined
+          : () => {
+              playHaptic('tap');
+              onPress();
+            }
+      }
       onHoverIn={engage}
       onHoverOut={release}
       onPressIn={engage}
@@ -123,7 +132,10 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.onAccent : colors.accent} />
+        <LoadingDots
+          color={variant === 'primary' ? colors.onAccent : colors.accent}
+          accessibilityLabel={`${title}, loading`}
+        />
       ) : (
         <View style={styles.content}>
           <View style={styles.labelBox}>

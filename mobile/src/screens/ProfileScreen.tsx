@@ -17,6 +17,7 @@ import BecomingCard from '../components/BecomingCard';
 import Hairline from '../components/Hairline';
 import { FadeInUp, PressableScale } from '../components/Motion';
 import PillarBubble from '../components/PillarBubble';
+import { HeroTarget } from '../components/Hero';
 import ProfileAvatar from '../components/ProfileAvatar';
 import Screen from '../components/Screen';
 import Skeleton from '../components/Skeleton';
@@ -358,15 +359,17 @@ export function ProfileScreen({ navigation }: Props) {
           </FadeInUp>
 
           <FadeInUp delay={60} style={styles.identity}>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Edit your avatar"
-              onPress={() => navigation.navigate('AvatarCreator')}
-              pressedScale={0.95}
-              style={styles.avatarRim}
-            >
-              <ProfileAvatar profile={profile} size={108} mood="happy" />
-            </PressableScale>
+            <HeroTarget heroKey="avatar">
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Edit your avatar"
+                onPress={() => navigation.navigate('AvatarCreator')}
+                pressedScale={0.95}
+                style={styles.avatarRim}
+              >
+                <ProfileAvatar profile={profile} size={108} mood="happy" />
+              </PressableScale>
+            </HeroTarget>
             <View style={styles.identityText}>
               <Txt variant="title" numberOfLines={1}>
                 {profile?.first_name ?? 'You'}
@@ -715,6 +718,10 @@ const styles = themed(() =>
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: spacing.xl,
+      // Above the cards below, so the avatar flying in from Today
+      // (HeroTarget) passes over them. No background, so no shadow.
+      zIndex: 2,
+      elevation: 12,
     },
     avatarRim: {
       width: 120,

@@ -3,7 +3,7 @@
 // the result with the choice to keep it as the profile picture.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AvatarConfig } from '../avatar/types';
 import { AiAvatarError } from '../lib/aiAvatar';
@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchProfile } from '../store/slices/userSlice';
 import { colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import LoadingDots from './LoadingDots';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -114,7 +115,7 @@ export default function PhotorealSheet({ visible, config, onClose }: Props) {
             <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel="Photo of your avatar" />
           ) : busy ? (
             <View style={styles.center}>
-              <ActivityIndicator color={colors.accent} />
+              <LoadingDots color={colors.accent} accessibilityLabel="Making your photo" />
               <Txt variant="caption" color={colors.inkSoft}>Making your photo. This takes about 20 seconds.</Txt>
             </View>
           ) : (

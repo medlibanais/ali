@@ -52,6 +52,13 @@ const titledOptions = themed(() => ({
   headerBackTitleVisible: false,
 }));
 
+// Pushed screens slide in from the right like game menus (the Android
+// default is a plain fade). Runs natively in react-native-screens.
+const appStackOptions = themed(() => ({
+  ...titledOptions,
+  animation: 'slide_from_right' as const,
+}));
+
 function AuthNavigator() {
   useTheme();
   return (
@@ -112,7 +119,7 @@ function AppNavigator() {
   useTheme();
   useNotificationBanner();
   return (
-    <AppStack.Navigator screenOptions={titledOptions}>
+    <AppStack.Navigator screenOptions={appStackOptions}>
       <AppStack.Screen
         name="MainTabs"
         component={MainTabs}
