@@ -13,7 +13,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { heroOffset, measureView, takeHero } from '../lib/hero';
+import { heroOffset, heroPending, measureView, takeHero } from '../lib/hero';
 
 export { useHeroSource } from './HeroSource';
 
@@ -43,7 +43,9 @@ export function HeroTarget({
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  // Mounting mid-flight (first visit): start hidden so it never flashes
+  // in its final spot before jumping to the start of the flight.
+  const opacity = useSharedValue(heroPending(heroKey) ? 0 : 1);
 
   useFocusEffect(
     useCallback(() => {

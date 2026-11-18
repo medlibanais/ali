@@ -16,28 +16,35 @@ describe('hero hand-off', () => {
 
   it('hands the measured source rect to the target once', async () => {
     registerHeroSource('avatar', () => Promise.resolve(rect));
-    launchHero('avatar');
+    await launchHero('avatar');
     await expect(takeHero('avatar')).resolves.toEqual(rect);
     expect(takeHero('avatar')).toBeNull();
   });
 
   it('ignores a stale launch', () => {
     registerHeroSource('avatar', () => Promise.resolve(rect));
-    launchHero('avatar');
+    void launchHero('avatar');
     jest.setSystemTime(Date.now() + 2000);
     expect(takeHero('avatar')).toBeNull();
   });
 
-  it('does nothing without a registered source', () => {
-    launchHero('avatar');
+  it('does nothing without a registered source', async () => {
+    await expect(launchHero('avatar')).resolves.toBeUndefined();
     expect(takeHero('avatar')).toBeNull();
   });
 
   it('unregisters on cleanup', () => {
     const off = registerHeroSource('avatar', () => Promise.resolve(rect));
     off();
-    launchHero('avatar');
+    void launchHero('avatar');
     expect(takeHero('avatar')).toBeNull();
+  });
+
+  it('lets navigation go ahead when measuring stalls', async () => {
+    registerHeroSource('avatar', () => new Promise(() => undefined));
+    const launched = launchHero('avatar');
+    jest.advanceTimersByTime(150);
+    await expect(launched).resolves.toBeUndefined();
   });
 
   it('computes the offset between centers and the size ratio', () => {

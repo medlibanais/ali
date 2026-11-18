@@ -544,8 +544,8 @@ export function TodayScreen({ navigation, route }: Props) {
   // The avatar flies from the orbit into the Profile header (Hero).
   const openProfile = useCallback(() => {
     playHaptic('tap');
-    launchHero('avatar');
-    navigation.navigate('Profile');
+    // Measure the avatar while it is still on screen, then switch tabs.
+    launchHero('avatar').then(() => navigation.navigate('Profile'));
   }, [navigation]);
 
   return (

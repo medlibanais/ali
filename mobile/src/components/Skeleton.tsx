@@ -84,7 +84,7 @@ function ShimmerBand({ clock, width }: { clock: SharedValue<number>; width: numb
   const animated = useAnimatedStyle(() => ({
     transform: [{ translateX: -band + clock.value * (width + band) }],
   }));
-  const shine = withAlpha(colors.ink, 0.09);
+  const shine = withAlpha(colors.ink, 0.12);
   // useId gives ':r1:'; colons break url(#id) on web.
   const gradientId = `skeleton-shine-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (

@@ -22,8 +22,13 @@ type Measurer = () => Promise<HeroRect | null>;
 
 /** A launched hero older than this is stale and ignored. */
 const MAX_AGE_MS = 900;
-/** Give up on a measurement after this long. */
-const MEASURE_TIMEOUT_MS = 250;
+/**
+ * Give up on a measurement after this long. Generous on purpose: the
+ * measure answer can queue behind the target screen's first render.
+ */
+const MEASURE_TIMEOUT_MS = 1200;
+/** Longest a navigation waits for the source to be measured. */
+const LAUNCH_WAIT_MS = 120;
 
 const sources = new Map<string, Measurer>();
 let pending: { key: string; at: number; rect: Promise<HeroRect | null> } | null = null;
@@ -53,11 +58,21 @@ export function registerHeroSource(key: string, measurer: Measurer): () => void 
   };
 }
 
-/** Call right before navigating: captures the source position. */
-export function launchHero(key: string): void {
+/**
+ * Measure the source, then resolve so the caller can navigate. Navigate
+ * only after this resolves: once the source screen is hidden it measures
+ * as an empty box. Resolves within LAUNCH_WAIT_MS even if measuring stalls,
+ * so a tap never feels late.
+ */
+export function launchHero(key: string): Promise<void> {
   const measurer = sources.get(key);
-  if (!measurer) return;
-  pending = { key, at: Date.now(), rect: measurer() };
+  if (!measurer) return Promise.resolve();
+  const rect = measurer();
+  pending = { key, at: Date.now(), rect };
+  return Promise.race([
+    rect.then(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, LAUNCH_WAIT_MS)),
+  ]);
 }
 
 /**
@@ -70,6 +85,11 @@ export function takeHero(key: string): Promise<HeroRect | null> | null {
   const rect = pending.rect;
   pending = null;
   return fresh ? rect : null;
+}
+
+/** True when a fresh hero is waiting for this key (does not consume it). */
+export function heroPending(key: string): boolean {
+  return pending !== null && pending.key === key && Date.now() - pending.at <= MAX_AGE_MS;
 }
 
 /** Translate and scale that move `to` onto `from`, centers aligned. */

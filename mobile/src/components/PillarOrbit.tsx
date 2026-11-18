@@ -210,8 +210,6 @@ function PillarOrbitBase({
         </Svg>
 
         <Animated.View
-          ref={heroRef}
-          collapsable={false}
           pointerEvents="none"
           style={[
             styles.avatarRing,
@@ -226,6 +224,8 @@ function PillarOrbitBase({
             },
           ]}
         >
+          {/* Measured by the Profile hero flight (plain View: measurable everywhere). */}
+          <View ref={heroRef} collapsable={false} style={StyleSheet.absoluteFill} />
           <OrbitAvatar
             avatarConfig={avatarConfig}
             photoUrl={photoUrl}

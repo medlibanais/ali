@@ -718,6 +718,10 @@ const styles = themed(() =>
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: spacing.xl,
+      // Above the cards below, so the avatar flying in from Today
+      // (HeroTarget) passes over them. No background, so no shadow.
+      zIndex: 2,
+      elevation: 12,
     },
     avatarRim: {
       width: 120,

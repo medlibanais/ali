@@ -72,13 +72,17 @@ export function MainTabs() {
   return (
     <Tab.Navigator
       screenListeners={({ navigation, route }) => ({
-        tabPress: () => {
+        tabPress: (e) => {
           const state = navigation.getState();
           const current = state.routes[state.index]?.name;
           if (current === route.name) return;
           playHaptic('tab');
           // Today -> Profile: the avatar flies across (components/Hero).
-          if (current === 'Today' && route.name === 'Profile') launchHero('avatar');
+          // Hold the switch until Today's avatar is measured (a frame).
+          if (current === 'Today' && route.name === 'Profile') {
+            e.preventDefault();
+            launchHero('avatar').then(() => navigation.navigate('Profile'));
+          }
         },
       })}
       screenOptions={{
