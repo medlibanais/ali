@@ -14,7 +14,7 @@ export type {
   SearchHit,
   UserSearchResult,
 } from './logic';
-export { friendErrorText, inviteResultText } from './logic';
+export { cheerErrorText, friendErrorText, inviteResultText } from './logic';
 
 export interface FriendRequest {
   friendship_id: string;
@@ -63,14 +63,40 @@ export function useUserSearch(query: string) {
   });
 }
 
-// You + accepted friends with level, streak and this week's XP.
+export const CIRCLE_KEY = ['friends', 'circle'] as const;
+
+// You + accepted friends with level, streak and this week's XP, from the
+// friends_weekly_xp view (security_invoker, so RLS decides what you see).
+// Falls back to the friend_leaderboard RPC until migration 0026 is pushed.
 export function useCircle() {
   return useQuery({
-    queryKey: ['friends', 'circle'],
+    queryKey: CIRCLE_KEY,
     queryFn: async (): Promise<CircleRow[]> => {
-      const { data, error } = await supabase.rpc('friend_leaderboard');
+      const { data, error } = await supabase.from('friends_weekly_xp').select('*');
+      if (!error) return (data ?? []) as CircleRow[];
+      const fallback = await supabase.rpc('friend_leaderboard');
+      if (fallback.error) throw fallback.error;
+      return (fallback.data ?? []) as CircleRow[];
+    },
+  });
+}
+
+// Cheer a friend: send_cheer() checks the friendship and rate limits and
+// records it; notify-friend then pushes "<name> cheered you on!".
+export function useCheer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (friendId: string) => {
+      const { data, error } = await supabase.rpc('send_cheer', { p_friend: friendId });
       if (error) throw error;
-      return (data ?? []) as CircleRow[];
+      const row = data as { id: string; created_at: string };
+      notify({ type: 'cheer', cheer_id: row.id });
+      return row;
+    },
+    onSuccess: (row, friendId) => {
+      qc.setQueryData<CircleRow[]>(CIRCLE_KEY, (rows: CircleRow[] | undefined) =>
+        rows?.map((r: CircleRow) => (r.id === friendId ? { ...r, last_cheered_at: row.created_at } : r)),
+      );
     },
   });
 }

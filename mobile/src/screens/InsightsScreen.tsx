@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
 import Accordion from '../components/Accordion';
-import { ShareGlyph } from '../components/icons';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import Hairline from '../components/Hairline';
@@ -19,8 +18,10 @@ import Skeleton from '../components/Skeleton';
 import { InsightsSkeleton } from '../components/ScreenSkeletons';
 import Txt from '../components/Txt';
 import LineChart from '../components/charts/LineChart';
+import TimeOfDayHistogram from '../components/charts/TimeOfDayHistogram';
 import YearHeatmap from '../components/charts/YearHeatmap';
 import StreakGauge from '../components/charts/StreakGauge';
+import { PillarGlyph, ShareGlyph, SparklesGlyph } from '../components/icons';
 import {
   pillarAverages,
   summarizePeriod,
@@ -35,6 +36,13 @@ import {
   predictionA11yLabel,
   useStreakPrediction,
 } from '../features/analytics/streakPrediction';
+import {
+  timeOfDayBins,
+  usePatternInsights,
+  usePatterns,
+  type BehavioralPatterns,
+  type PatternInsight,
+} from '../features/analytics/patterns';
 import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
@@ -201,6 +209,131 @@ function StreakOutlook() {
   );
 }
 
+function FactPill({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <View
+      style={[styles.factPill, { borderColor: withAlpha(color, 0.45), backgroundColor: withAlpha(color, 0.1) }]}
+      accessible
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      <Txt variant="caption" color={colors.inkFaint} numberOfLines={1}>
+        {label}
+      </Txt>
+      <Txt variant="bodySemi" color={color} numberOfLines={1}>
+        {value}
+      </Txt>
+    </View>
+  );
+}
+
+function PatternFacts({ p }: { p: BehavioralPatterns }) {
+  const { t } = useTranslation();
+  const facts: { label: string; value: string; color: string }[] = [];
+  if (p.skip_weekday_name) {
+    facts.push({
+      label: t('insights.mostSkipped'),
+      value: p.skip_top_pillar
+        ? `${p.skip_weekday_name} · ${PILLAR_LABELS[p.skip_top_pillar]}`
+        : p.skip_weekday_name,
+      color: colors.danger,
+    });
+  }
+  if (p.neglected_pillar) {
+    facts.push({
+      label: t('insights.needsLove14Days'),
+      value: PILLAR_LABELS[p.neglected_pillar],
+      color: colors.pillar[p.neglected_pillar],
+    });
+  }
+  if (facts.length === 0) return null;
+  return (
+    <View style={styles.factRow}>
+      {facts.map((f) => (
+        <FactPill key={f.label} {...f} />
+      ))}
+    </View>
+  );
+}
+
+function InsightRow({ insight }: { insight: PatternInsight }) {
+  const pillarMatch = (['health', 'family', 'work', 'fun', 'spirituality'] as const).find((p) =>
+    insight.observation.toLowerCase().includes(p),
+  );
+  return (
+    <View style={styles.insightRow}>
+      <View style={[styles.insightIcon, { backgroundColor: withAlpha(colors.accent, 0.12) }]}>
+        {pillarMatch ? (
+          <PillarGlyph pillar={pillarMatch} size={16} />
+        ) : (
+          <SparklesGlyph size={16} />
+        )}
+      </View>
+      <View style={styles.insightText}>
+        <Txt variant="bodySemi">{insight.observation}</Txt>
+        <Txt variant="body" color={colors.accent} style={styles.insightSuggestion}>
+          {insight.suggestion}
+        </Txt>
+      </View>
+    </View>
+  );
+}
+
+// Behavioral patterns: when quests get done, which day slips, which
+// pillar is quiet, plus 2 AI insights. Independent of the week/month switch.
+function Patterns() {
+  const { t } = useTranslation();
+  const userId = useAppSelector((state) => state.auth.userId);
+  const patterns = usePatterns(userId);
+  const insights = usePatternInsights(patterns.data ? userId : null);
+  const p = patterns.data ?? null;
+
+  return (
+    <Card style={styles.card}>
+      <Txt variant="heading" style={styles.cardTitle}>
+        {t('insights.yourPatterns')}
+      </Txt>
+      <Txt variant="caption" color={colors.inkFaint} style={styles.cardSubtitle}>
+        {t('insights.whenYouFinishQuests')}
+      </Txt>
+      {patterns.isError ? (
+        <EmptyState
+          title={t('insights.couldNotLoadYour3')}
+          body={t('insights.checkYourConnectionAnd')}
+        />
+      ) : !p ? (
+        <Skeleton height={214} />
+      ) : (
+        <>
+          <TimeOfDayHistogram bins={timeOfDayBins(p)} />
+          <PatternFacts p={p} />
+          <Hairline style={styles.coachRule} />
+          <Txt variant="label" color={colors.inkSoft} style={styles.noticedTitle}>
+            {t('insights.whatWeNoticed')}
+          </Txt>
+          {insights.isLoading ? (
+            <View>
+              <Skeleton height={18} style={styles.skelLine} />
+              <Skeleton height={18} width="70%" style={styles.skelLine} />
+              <Skeleton height={18} style={styles.skelLine} />
+              <Skeleton height={18} width="60%" />
+            </View>
+          ) : insights.data && insights.data.insights.length > 0 ? (
+            insights.data.insights.map((ins) => <InsightRow key={ins.kind} insight={ins} />)
+          ) : insights.data?.status === 'not_enough_data' ? (
+            <Txt variant="body" color={colors.inkSoft}>
+              {t('insights.aFewMoreDays')}
+            </Txt>
+          ) : (
+            <Txt variant="body" color={colors.inkSoft}>
+              {t('insights.insightsAreNotAvailable')}
+            </Txt>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 // The last 365 days of XP. Independent of the week/month switch above.
 function YearOfActivity() {
   const { t } = useTranslation();
@@ -330,6 +463,8 @@ export function InsightsScreen() {
           <Takeaways items={items} />
 
           <StreakOutlook />
+
+          <Patterns />
 
           <Pillars days={current} />
 
@@ -481,6 +616,44 @@ const styles = StyleSheet.create({
   },
   coachRule: {
     marginVertical: spacing.md,
+  },
+  factRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: spacing.sm,
+  },
+  factPill: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginEnd: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  noticedTitle: {
+    marginBottom: spacing.xs,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  insightIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginEnd: spacing.sm,
+  },
+  insightText: {
+    flex: 1,
+  },
+  insightSuggestion: {
+    marginTop: 2,
+  },
+  skelLine: {
+    marginBottom: spacing.xs,
   },
 });
 

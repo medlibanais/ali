@@ -2,6 +2,7 @@ import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import {
+  DAILY_XP_CAP,
   cumulativeXpForLevel,
   levelForXp,
   titleForLevel,
@@ -23,6 +24,13 @@ export interface GamificationState {
   currentTitle: string | null;
   loading: boolean;
   error: string | null;
+  /** Server truth from the last fetch; displayed values add pending XP. */
+  serverTotalXp: number;
+  serverXpToday: number;
+  serverLevel: number;
+  /** Optimistic XP of completions still in the offline queue. */
+  pendingXp: number;
+  pendingXpToday: number;
 }
 
 const initialState: GamificationState = {
@@ -37,7 +45,29 @@ const initialState: GamificationState = {
   currentTitle: null,
   loading: false,
   error: null,
+  serverTotalXp: 0,
+  serverXpToday: 0,
+  serverLevel: 1,
+  pendingXp: 0,
+  pendingXpToday: 0,
 };
+
+/**
+ * Displayed XP = server XP + XP still waiting in the offline queue. When
+ * the queue drains, pending drops to 0 and the server's numbers (which
+ * include the real streak bonus, caps and badge XP) take over.
+ */
+function applyDisplay(state: GamificationState): void {
+  state.totalXp = state.serverTotalXp + state.pendingXp;
+  state.xpToday = Math.min(DAILY_XP_CAP, state.serverXpToday + state.pendingXpToday);
+  state.level =
+    state.pendingXp > 0
+      ? Math.max(state.serverLevel, levelForXp(state.totalXp))
+      : state.serverLevel;
+  state.xpToNextLevel = xpToNextLevel(state.totalXp);
+  state.nextLevel = Math.min(100, state.level + 1);
+  state.currentTitle = titleForLevel(state.level);
+}
 
 interface AchievementRow {
   badge_id: string;
@@ -66,6 +96,18 @@ function catalogOf(
   return Array.isArray(c) ? (c[0] ?? null) : c;
 }
 
+/**
+ * Why the progress is being refetched. 'sync' means the offline queue was
+ * just replayed or rolled back: the XP/level change is the server catching
+ * up with something the user already saw, so reward animations must not
+ * fire again. Middleware reads it from action.meta.arg.reason.
+ */
+export type GamificationRefreshReason = 'sync';
+
+export interface FetchGamificationArgs {
+  reason?: GamificationRefreshReason;
+}
+
 export const fetchGamification = createAsyncThunk<
   {
     level: number;
@@ -75,7 +117,7 @@ export const fetchGamification = createAsyncThunk<
     best_streak: number;
     achievements: Achievement[];
   },
-  void,
+  FetchGamificationArgs | void,
   { rejectValue: string }
 >('gamification/fetch', async (_, { rejectWithValue }) => {
   try {
@@ -181,6 +223,14 @@ const gamificationSlice = createSlice({
     clearGamification() {
       return initialState;
     },
+    pendingXpChanged(
+      state,
+      action: PayloadAction<{ total: number; today: number }>,
+    ) {
+      state.pendingXp = Math.max(0, action.payload.total);
+      state.pendingXpToday = Math.max(0, action.payload.today);
+      applyDisplay(state);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -191,15 +241,13 @@ const gamificationSlice = createSlice({
       .addCase(fetchGamification.fulfilled, (state, action) => {
         state.loading = false;
         const d = action.payload;
-        state.level = d.level;
-        state.totalXp = d.total_xp;
-        state.xpToday = d.xp_today;
-        state.xpToNextLevel = xpToNextLevel(d.total_xp);
-        state.nextLevel = Math.min(100, d.level + 1);
+        state.serverLevel = d.level;
+        state.serverTotalXp = d.total_xp;
+        state.serverXpToday = d.xp_today;
         state.currentStreak = d.current_streak;
         state.bestStreak = d.best_streak;
         state.achievements = d.achievements;
-        state.currentTitle = titleForLevel(d.level);
+        applyDisplay(state);
       })
       .addCase(fetchGamification.rejected, (state, action) => {
         state.loading = false;
@@ -208,7 +256,7 @@ const gamificationSlice = createSlice({
   },
 });
 
-export const { clearGamification } = gamificationSlice.actions;
+export const { clearGamification, pendingXpChanged } = gamificationSlice.actions;
 
 // Re-exported for screens that showed progress math locally.
 export { cumulativeXpForLevel, levelForXp, xpToNextLevel };

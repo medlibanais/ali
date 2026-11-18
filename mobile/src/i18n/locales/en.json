@@ -242,7 +242,11 @@
     "ownCode": "That is your own code.",
     "alreadyConnected": "You are already connected.",
     "invalidCode": "That code is not valid.",
-    "inviteMessage": "Become who you want to be with me on GROW. Add me with my code {{code}}: {{link}}"
+    "inviteMessage": "Become who you want to be with me on GROW. Add me with my code {{code}}: {{link}}",
+    "youAlreadyCheeredThem": "You already cheered them recently. Try again later.",
+    "thatIsALot": "That is a lot of cheering for today. Try again tomorrow.",
+    "youCanOnlyCheer": "You can only cheer your friends.",
+    "couldNotSendYour": "Could not send your cheer. Try again."
   },
   "photoErrors": {
     "permission": "Permission denied. Enable access in your device settings to add a photo.",
@@ -480,7 +484,8 @@
     "seeMoreQuests_other": "See {{count}} more quests",
     "backOnlineSyncedOffline_one": "Back online — synced {{count}} offline completion.",
     "backOnlineSyncedOffline_other": "Back online — synced {{count}} offline completions.",
-    "openYourProfile": "Open your profile"
+    "openYourProfile": "Open your profile",
+    "savedOffline": "{{title}} is done. Saved offline: about +{{xp}} XP once it syncs."
   },
   "quests": {
     "all": "All",
@@ -520,7 +525,8 @@
     "claimXp": "Claim +{{xp_reward}} XP",
     "skipThisQuest": "Skip this quest",
     "youHaveOfSkips": "You have {{skipsLeft}} of {{DAILY_SKIP_LIMIT}} skips left today. Skipped quests return tomorrow with no penalty.",
-    "noSkipsLeftToday": "No skips left today. Skips reset at midnight."
+    "noSkipsLeftToday": "No skips left today. Skips reset at midnight.",
+    "savedOffline": "{{title}} is done. Saved offline: about +{{xp}} XP once it syncs."
   },
   "coach": {
     "amIOnTrack": "Am I on track?",
@@ -614,7 +620,26 @@
     "vsLast_month": "{{arrow}} {{diff}} vs last month",
     "streakOutlook": "Streak outlook",
     "chanceYouCompleteAt": "Chance you complete at least one quest tomorrow. Updated every hour.",
-    "couldNotLoadYour2": "Could not load your outlook"
+    "couldNotLoadYour2": "Could not load your outlook",
+    "questsCompletedPercentTap": "{{label}}, {{range}}: {{count}} quests completed, {{share}} percent{{peak}}. Tap for details.",
+    "aboutADay": "About {{perDay}} a day",
+    "nothingFinishedHereYet": "Nothing finished here yet",
+    "finishAFewQuests": "Finish a few quests and your daily rhythm shows up here.",
+    "morning": "Morning",
+    "n5AmNoon": "5 AM – noon",
+    "afternoon": "Afternoon",
+    "noon5Pm": "noon – 5 PM",
+    "evening": "Evening",
+    "n5Pm5Am": "5 PM – 5 AM",
+    "mostSkipped": "Most skipped",
+    "needsLove14Days": "Needs love (14 days)",
+    "yourPatterns": "Your patterns",
+    "whenYouFinishQuests": "When you finish quests, last 8 weeks in your timezone. Tap a bar for details.",
+    "couldNotLoadYour3": "Could not load your patterns",
+    "whatWeNoticed": "What we noticed",
+    "aFewMoreDays": "A few more days of quests and patterns start to show here.",
+    "insightsAreNotAvailable": "Insights are not available right now. Your chart above is up to date.",
+    "yourPeakTime": ", your peak time"
   },
   "profile": {
     "yourExportIsReady": "Your export is ready. Sharing is not available on this device.",
@@ -744,7 +769,14 @@
     "blocked": "Blocked ({{length}})",
     "unblock": "Unblock",
     "keepStatsPrivate_one": "{{count}} friend keeps stats private",
-    "keepStatsPrivate_other": "{{count}} friends keep stats private"
+    "keepStatsPrivate_other": "{{count}} friends keep stats private",
+    "thisWeekSLeaderboard": "This week's leaderboard",
+    "rankXpThisWeek": "Rank {{rank}}, {{name}}, {{xp}} XP this week",
+    "youCheeredRecently": "You cheered {{name}} recently",
+    "cheerOn": "Cheer on {{name}}",
+    "cheered": "Cheered",
+    "cheer": "Cheer",
+    "youCheeredOn": "You cheered on {{name}}."
   },
   "achievements": {
     "common": "Common",
@@ -1672,5 +1704,36 @@
     "loadingYourDay": "Loading your day",
     "loadingYourInsights": "Loading your insights",
     "loadingYourConversation": "Loading your conversation"
+  },
+  "offline": {
+    "syncConflict": "Sync conflict",
+    "syncFailed": "Sync failed",
+    "youAreOfflineQuests": "You are offline. Quests will sync when you reconnect",
+    "waitingOnThisDevice": "{{actions}} waiting on this device.",
+    "syncing": "Syncing {{actions}}...",
+    "allSynced": "All synced",
+    "retry": "Retry",
+    "checkTheConnectionAgain": "Check the connection again",
+    "retrySyncingYourQuests": "Retry syncing your quests",
+    "dismissTheSyncNotice": "Dismiss the sync notice",
+    "theUndoReachedThe": "the undo reached the server too late, so the completion stays",
+    "theUndoWasSaved": "the undo was saved more than 24 hours ago, so the completion stays",
+    "theDailyLimitOf": "the daily limit of 15 quests was already reached",
+    "theQuestBelongsTo": "the quest belongs to another day",
+    "itWasSavedMore": "it was saved more than 24 hours ago",
+    "theQuestNoLonger": "the quest no longer exists",
+    "theQuestWasSkipped": "the quest was skipped",
+    "itBelongsToAnother": "it belongs to another account",
+    "theSavedDataWas": "the saved data was incomplete",
+    "thisQuestWasAlready": "This quest was already completed on another device, your XP was not doubled.",
+    "thisQuestWasAlready2": "This quest was already undone on another device.",
+    "couldNotCompleteThis": "Could not complete this quest.",
+    "wasNotCounted": "{{quest}} was not counted: {{reason}}.",
+    "syncFailedYourQuests": "Sync failed. Your quests are still saved.",
+    "more_one": " (+{{count}} more)",
+    "more_other": " (+{{count}} more)",
+    "aQuest": "A quest",
+    "actions_one": "{{count}} action",
+    "actions_other": "{{count}} actions"
   }
 }

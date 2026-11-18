@@ -25,6 +25,7 @@ import { useAppDispatch, useAppSelector } from './store/hooks';
 import { hydrateTheme, syncThemeWithProfile } from './store/slices/themeSlice';
 import ThemeTransition from './components/ThemeTransition';
 import { usePushNotifications } from './features/notifications/usePushNotifications';
+import OfflineBanner from './features/offline/OfflineBanner';
 import { holdSplash } from './lib/bootSplash';
 import { hydrateLanguage } from './store/slices/languageSlice';
 import { isRtlLanguage } from './i18n/languages';
@@ -121,6 +122,7 @@ function ThemedRoot() {
         <Avatar3DHost />
       </ThemeTransition>
       <CelebrationHost />
+      {userId !== null ? <OfflineBanner /> : null}
     </NavigationContainer>
     </View>
   );

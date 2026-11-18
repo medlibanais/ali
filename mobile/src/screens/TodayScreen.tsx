@@ -59,7 +59,6 @@ import { setPendingInviteCode } from '../store/slices/authSlice';
 import { fetchProfile } from '../store/slices/userSlice';
 import {
   completeQuest,
-  drainCompletionQueue,
   fetchDailyQuests,
   undoQuest,
 } from '../store/slices/questsSlice';
@@ -416,17 +415,8 @@ export function TodayScreen({ navigation, route }: Props) {
   );
 
   useEffect(() => {
+    // Offline completions sync in the background (OfflineBanner).
     load(false);
-    // Replay any completions queued while offline.
-    dispatch(drainCompletionQueue()).then((result) => {
-      const synced = (result.payload as { synced: number } | undefined)?.synced ?? 0;
-      if (synced > 0) {
-        showToast({
-          message: t('today.backOnlineSyncedOffline', { count: synced }),
-        });
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   // Redeem a pending invite code (deep link / register flow) exactly once.
@@ -515,7 +505,9 @@ export function TodayScreen({ navigation, route }: Props) {
             : null,
         ].filter(Boolean);
         showToast({
-          message: [t('today.xpIsDone', { xp, title: quest.title }), ...extras].join(' '),
+          message: result.payload.offline
+            ? t('today.savedOffline', { xp, title: quest.title })
+            : [t('today.xpIsDone', { xp, title: quest.title }), ...extras].join(' '),
           actionLabel: t('today.undo'),
           countdownSeconds: 10,
           durationMs: 10000,

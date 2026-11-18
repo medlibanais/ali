@@ -247,7 +247,11 @@
     "ownCode": "C'est ton propre code.",
     "alreadyConnected": "Vous êtes déjà connectés.",
     "invalidCode": "Ce code n'est pas valide.",
-    "inviteMessage": "Deviens qui tu veux être avec moi sur GROW. Ajoute-moi avec mon code {{code}} : {{link}}"
+    "inviteMessage": "Deviens qui tu veux être avec moi sur GROW. Ajoute-moi avec mon code {{code}} : {{link}}",
+    "youAlreadyCheeredThem": "Tu l'as déjà encouragé récemment. Réessaie plus tard.",
+    "thatIsALot": "Ça fait beaucoup d'encouragements pour aujourd'hui. Réessaie demain.",
+    "youCanOnlyCheer": "Tu ne peux encourager que tes amis.",
+    "couldNotSendYour": "Impossible d'envoyer ton encouragement. Réessaie."
   },
   "photoErrors": {
     "permission": "Accès refusé. Autorise l'accès dans les réglages de ton appareil pour ajouter une photo.",
@@ -489,7 +493,8 @@
     "more_many": "{{count}} quêtes de plus",
     "seeMoreQuests_many": "Voir {{count}} quêtes de plus",
     "backOnlineSyncedOffline_many": "De retour en ligne : {{count}} quêtes hors ligne synchronisées.",
-    "openYourProfile": "Ouvrir ton profil"
+    "openYourProfile": "Ouvrir ton profil",
+    "savedOffline": "{{title}} est faite. Enregistrée hors ligne : environ +{{xp}} XP une fois synchronisée."
   },
   "quests": {
     "all": "Toutes",
@@ -529,7 +534,8 @@
     "claimXp": "Réclamer +{{xp_reward}} XP",
     "skipThisQuest": "Passer cette quête",
     "youHaveOfSkips": "Il te reste {{skipsLeft}} passes sur {{DAILY_SKIP_LIMIT}} aujourd'hui. Les quêtes passées reviennent demain sans pénalité.",
-    "noSkipsLeftToday": "Plus de passes aujourd'hui. Elles se réinitialisent à minuit."
+    "noSkipsLeftToday": "Plus de passes aujourd'hui. Elles se réinitialisent à minuit.",
+    "savedOffline": "{{title}} est faite. Enregistrée hors ligne : environ +{{xp}} XP une fois synchronisée."
   },
   "coach": {
     "amIOnTrack": "Suis-je sur la bonne voie ?",
@@ -625,7 +631,26 @@
     "vsLast_month": "{{arrow}} {{diff}} par rapport au mois dernier",
     "streakOutlook": "Prévision de série",
     "chanceYouCompleteAt": "Probabilité que tu termines au moins une quête demain. Mise à jour toutes les heures.",
-    "couldNotLoadYour2": "Impossible de charger ta prévision"
+    "couldNotLoadYour2": "Impossible de charger ta prévision",
+    "questsCompletedPercentTap": "{{label}}, {{range}} : {{count}} quêtes terminées, {{share}} pour cent{{peak}}. Touche pour les détails.",
+    "aboutADay": "Environ {{perDay}} par jour",
+    "nothingFinishedHereYet": "Rien de terminé ici pour l'instant",
+    "finishAFewQuests": "Termine quelques quêtes et ton rythme quotidien apparaîtra ici.",
+    "morning": "Matin",
+    "n5AmNoon": "5 h – midi",
+    "afternoon": "Après-midi",
+    "noon5Pm": "midi – 17 h",
+    "evening": "Soir",
+    "n5Pm5Am": "17 h – 5 h",
+    "mostSkipped": "Le plus sauté",
+    "needsLove14Days": "À soigner (14 jours)",
+    "yourPatterns": "Tes habitudes",
+    "whenYouFinishQuests": "Quand tu termines tes quêtes, sur les 8 dernières semaines dans ton fuseau horaire. Touche une barre pour les détails.",
+    "couldNotLoadYour3": "Impossible de charger tes habitudes",
+    "whatWeNoticed": "Ce que nous avons remarqué",
+    "aFewMoreDays": "Encore quelques jours de quêtes et tes habitudes apparaîtront ici.",
+    "insightsAreNotAvailable": "Les analyses ne sont pas disponibles pour le moment. Ton graphique ci-dessus est à jour.",
+    "yourPeakTime": ", ton moment fort"
   },
   "profile": {
     "yourExportIsReady": "Ton export est prêt. Le partage n'est pas disponible sur cet appareil.",
@@ -756,7 +781,14 @@
     "unblock": "Débloquer",
     "keepStatsPrivate_one": "{{count}} ami garde ses stats privées",
     "keepStatsPrivate_other": "{{count}} amis gardent leurs stats privées",
-    "keepStatsPrivate_many": "{{count}} amis gardent leurs stats privées"
+    "keepStatsPrivate_many": "{{count}} amis gardent leurs stats privées",
+    "thisWeekSLeaderboard": "Classement de la semaine",
+    "rankXpThisWeek": "Rang {{rank}}, {{name}}, {{xp}} XP cette semaine",
+    "youCheeredRecently": "Tu as encouragé {{name}} récemment",
+    "cheerOn": "Encourager {{name}}",
+    "cheered": "Encouragé",
+    "cheer": "Encourager",
+    "youCheeredOn": "Tu as encouragé {{name}}."
   },
   "achievements": {
     "common": "Commun",
@@ -1675,5 +1707,38 @@
     "loadingYourDay": "Chargement de ta journée",
     "loadingYourInsights": "Chargement de tes statistiques",
     "loadingYourConversation": "Chargement de ta conversation"
+  },
+  "offline": {
+    "syncConflict": "Conflit de synchronisation",
+    "syncFailed": "Échec de la synchronisation",
+    "youAreOfflineQuests": "Tu es hors ligne. Les quêtes se synchroniseront à ta reconnexion",
+    "waitingOnThisDevice": "{{actions}} en attente sur cet appareil.",
+    "syncing": "Synchronisation de {{actions}}...",
+    "allSynced": "Tout est synchronisé",
+    "retry": "Réessayer",
+    "checkTheConnectionAgain": "Vérifier à nouveau la connexion",
+    "retrySyncingYourQuests": "Relancer la synchronisation de tes quêtes",
+    "dismissTheSyncNotice": "Fermer l'avis de synchronisation",
+    "theUndoReachedThe": "l'annulation est arrivée trop tard au serveur, la quête reste validée",
+    "theUndoWasSaved": "l'annulation a été enregistrée il y a plus de 24 heures, la quête reste validée",
+    "theDailyLimitOf": "la limite de 15 quêtes par jour était déjà atteinte",
+    "theQuestBelongsTo": "la quête appartient à un autre jour",
+    "itWasSavedMore": "elle a été enregistrée il y a plus de 24 heures",
+    "theQuestNoLonger": "la quête n'existe plus",
+    "theQuestWasSkipped": "la quête a été sautée",
+    "itBelongsToAnother": "elle appartient à un autre compte",
+    "theSavedDataWas": "les données enregistrées étaient incomplètes",
+    "thisQuestWasAlready": "Cette quête a déjà été validée sur un autre appareil, tes XP n'ont pas été doublés.",
+    "thisQuestWasAlready2": "Cette quête a déjà été annulée sur un autre appareil.",
+    "couldNotCompleteThis": "Impossible de valider cette quête.",
+    "wasNotCounted": "{{quest}} n'a pas été comptée : {{reason}}.",
+    "syncFailedYourQuests": "Échec de la synchronisation. Tes quêtes sont toujours enregistrées.",
+    "more_one": " (+{{count}} autre)",
+    "more_many": " (+{{count}} autres)",
+    "more_other": " (+{{count}} autres)",
+    "aQuest": "Une quête",
+    "actions_one": "{{count}} action",
+    "actions_many": "{{count}} actions",
+    "actions_other": "{{count}} actions"
   }
 }

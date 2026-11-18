@@ -23,7 +23,10 @@
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@supabase/.*|@tanstack/.*|@reduxjs/.*|immer|redux|react-redux|reselect)"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@react-native-community/netinfo$": "@react-native-community/netinfo/jest/netinfo-mock.js"
+    }
   },
   "dependencies": {
     "@expo-google-fonts/anton": "^0.2.3",
@@ -32,6 +35,7 @@
     "@expo-google-fonts/jetbrains-mono": "^0.2.3",
     "@expo/metro-runtime": "~3.2.3",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/netinfo": "11.3.1",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
@@ -41,6 +45,7 @@
     "@tanstack/react-query": "^5.104.1",
     "expo": "~51.0.39",
     "expo-asset": "~10.0.10",
+    "expo-background-fetch": "~12.0.1",
     "expo-blur": "~13.0.2",
     "expo-clipboard": "~6.0.3",
     "expo-constants": "~16.0.2",
@@ -56,6 +61,7 @@
     "expo-speech-recognition": "^0.3.2",
     "expo-splash-screen": "~0.27.7",
     "expo-status-bar": "~1.12.1",
+    "expo-task-manager": "~11.8.2",
     "i18next": "^23.16.8",
     "intl-pluralrules": "^2.0.1",
     "qrcode": "^1.5.4",
@@ -63,6 +69,7 @@
     "react-dom": "18.2.0",
     "react-i18next": "^15.1.4",
     "react-native": "0.74.5",
+    "react-native-mmkv": "2.12.2",
     "react-native-reanimated": "~3.10.1",
     "react-native-safe-area-context": "4.10.5",
     "react-native-screens": "3.31.1",
@@ -72,7 +79,8 @@
     "react-native-view-shot": "3.8.0",
     "react-native-web": "~0.19.10",
     "react-native-webview": "13.8.6",
-    "react-redux": "^9.1.2"
+    "react-redux": "^9.1.2",
+    "xstate": "5.29.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

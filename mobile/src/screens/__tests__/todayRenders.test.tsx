@@ -156,6 +156,7 @@ function complete(store: ReturnType<typeof setup>, q: Quest) {
           best_streak: 1,
           new_badges: [],
           completedAt: Date.now(),
+          offline: false,
         },
         'req',
         q,

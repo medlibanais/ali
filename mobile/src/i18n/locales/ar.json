@@ -262,7 +262,11 @@
     "ownCode": "هذا رمزك أنت.",
     "alreadyConnected": "أنتما متصلان بالفعل.",
     "invalidCode": "هذا الرمز غير صالح.",
-    "inviteMessage": "كن من تريد أن تكون معي على GROW. أضفني برمزي {{code}}: {{link}}"
+    "inviteMessage": "كن من تريد أن تكون معي على GROW. أضفني برمزي {{code}}: {{link}}",
+    "youAlreadyCheeredThem": "شجّعته مؤخرًا بالفعل. حاول لاحقًا.",
+    "thatIsALot": "هذا كثير من التشجيع اليوم. حاول مجددًا غدًا.",
+    "youCanOnlyCheer": "يمكنك تشجيع أصدقائك فقط.",
+    "couldNotSendYour": "تعذّر إرسال تشجيعك. حاول مجددًا."
   },
   "photoErrors": {
     "permission": "تم رفض الإذن. فعّل الوصول من إعدادات جهازك لإضافة صورة.",
@@ -516,7 +520,8 @@
     "backOnlineSyncedOffline_two": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
     "backOnlineSyncedOffline_few": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
     "backOnlineSyncedOffline_many": "عدت متصلًا، تمت مزامنة {{count}} مهام منجزة دون اتصال.",
-    "openYourProfile": "افتح ملفك الشخصي"
+    "openYourProfile": "افتح ملفك الشخصي",
+    "savedOffline": "أُنجزت {{title}}. حُفظت دون اتصال: حوالي +{{xp}} نقطة خبرة عند المزامنة."
   },
   "quests": {
     "all": "الكل",
@@ -556,7 +561,8 @@
     "claimXp": "احصل على +{{xp_reward}} XP",
     "skipThisQuest": "تخطي هذه المهمة",
     "youHaveOfSkips": "بقي لك {{skipsLeft}} من {{DAILY_SKIP_LIMIT}} مرات تخطٍّ اليوم. المهام المتخطاة تعود غدًا دون عقوبة.",
-    "noSkipsLeftToday": "لم يبق تخطٍّ اليوم. يُعاد ضبطه عند منتصف الليل."
+    "noSkipsLeftToday": "لم يبق تخطٍّ اليوم. يُعاد ضبطه عند منتصف الليل.",
+    "savedOffline": "أُنجزت {{title}}. حُفظت دون اتصال: حوالي +{{xp}} نقطة خبرة عند المزامنة."
   },
   "coach": {
     "amIOnTrack": "هل أنا على الطريق الصحيح؟",
@@ -658,7 +664,26 @@
     "vsLast_month": "{{arrow}} {{diff}} مقارنة بالشهر الماضي",
     "streakOutlook": "توقّع السلسلة",
     "chanceYouCompleteAt": "احتمال أن تُكمل مهمة واحدة على الأقل غدًا. يُحدَّث كل ساعة.",
-    "couldNotLoadYour2": "تعذّر تحميل التوقّع"
+    "couldNotLoadYour2": "تعذّر تحميل التوقّع",
+    "questsCompletedPercentTap": "{{label}}، {{range}}: {{count}} مهام مكتملة، {{share}} بالمئة{{peak}}. اضغط للتفاصيل.",
+    "aboutADay": "حوالي {{perDay}} يوميًا",
+    "nothingFinishedHereYet": "لا شيء مكتمل هنا بعد",
+    "finishAFewQuests": "أكمل بعض المهام وسيظهر إيقاع يومك هنا.",
+    "morning": "الصباح",
+    "n5AmNoon": "5 صباحًا – الظهر",
+    "afternoon": "بعد الظهر",
+    "noon5Pm": "الظهر – 5 مساءً",
+    "evening": "المساء",
+    "n5Pm5Am": "5 مساءً – 5 صباحًا",
+    "mostSkipped": "الأكثر تخطيًا",
+    "needsLove14Days": "تحتاج اهتمامًا (14 يومًا)",
+    "yourPatterns": "أنماطك",
+    "whenYouFinishQuests": "متى تُكمل مهامك، خلال آخر 8 أسابيع بتوقيتك. اضغط على عمود للتفاصيل.",
+    "couldNotLoadYour3": "تعذّر تحميل أنماطك",
+    "whatWeNoticed": "ما لاحظناه",
+    "aFewMoreDays": "بضعة أيام أخرى من المهام وستبدأ الأنماط بالظهور هنا.",
+    "insightsAreNotAvailable": "الإحصاءات غير متاحة الآن. الرسم البياني أعلاه محدّث.",
+    "yourPeakTime": "، وقت ذروتك"
   },
   "profile": {
     "yourExportIsReady": "ملف التصدير جاهز. المشاركة غير متاحة على هذا الجهاز.",
@@ -792,7 +817,14 @@
     "keepStatsPrivate_zero": "{{count}} أصدقاء يُبقون إحصاءاتهم خاصة",
     "keepStatsPrivate_two": "{{count}} أصدقاء يُبقون إحصاءاتهم خاصة",
     "keepStatsPrivate_few": "{{count}} أصدقاء يُبقون إحصاءاتهم خاصة",
-    "keepStatsPrivate_many": "{{count}} أصدقاء يُبقون إحصاءاتهم خاصة"
+    "keepStatsPrivate_many": "{{count}} أصدقاء يُبقون إحصاءاتهم خاصة",
+    "thisWeekSLeaderboard": "ترتيب هذا الأسبوع",
+    "rankXpThisWeek": "المرتبة {{rank}}، {{name}}، {{xp}} نقطة خبرة هذا الأسبوع",
+    "youCheeredRecently": "شجّعت {{name}} مؤخرًا",
+    "cheerOn": "شجّع {{name}}",
+    "cheered": "تم التشجيع",
+    "cheer": "شجّع",
+    "youCheeredOn": "شجّعت {{name}}."
   },
   "achievements": {
     "common": "عادية",
@@ -1732,5 +1764,44 @@
     "loadingYourDay": "جارٍ تحميل يومك",
     "loadingYourInsights": "جارٍ تحميل إحصاءاتك",
     "loadingYourConversation": "جارٍ تحميل محادثتك"
+  },
+  "offline": {
+    "syncConflict": "تعارض في المزامنة",
+    "syncFailed": "فشلت المزامنة",
+    "youAreOfflineQuests": "أنت غير متصل. ستتم مزامنة المهام عند عودة الاتصال",
+    "waitingOnThisDevice": "{{actions}} بانتظار المزامنة على هذا الجهاز.",
+    "syncing": "جارٍ مزامنة {{actions}}...",
+    "allSynced": "تمت مزامنة الكل",
+    "retry": "إعادة المحاولة",
+    "checkTheConnectionAgain": "تحقق من الاتصال مجددًا",
+    "retrySyncingYourQuests": "أعد مزامنة مهامك",
+    "dismissTheSyncNotice": "إغلاق إشعار المزامنة",
+    "theUndoReachedThe": "وصل التراجع إلى الخادم متأخرًا، فيبقى الإنجاز محسوبًا",
+    "theUndoWasSaved": "حُفظ التراجع قبل أكثر من 24 ساعة، فيبقى الإنجاز محسوبًا",
+    "theDailyLimitOf": "تم بلوغ الحد اليومي البالغ 15 مهمة",
+    "theQuestBelongsTo": "المهمة تخص يومًا آخر",
+    "itWasSavedMore": "حُفظت قبل أكثر من 24 ساعة",
+    "theQuestNoLonger": "المهمة لم تعد موجودة",
+    "theQuestWasSkipped": "تم تخطي المهمة",
+    "itBelongsToAnother": "تخص حسابًا آخر",
+    "theSavedDataWas": "البيانات المحفوظة غير مكتملة",
+    "thisQuestWasAlready": "أُنجزت هذه المهمة على جهاز آخر بالفعل، ولم تتضاعف نقاط خبرتك.",
+    "thisQuestWasAlready2": "تم التراجع عن هذه المهمة على جهاز آخر بالفعل.",
+    "couldNotCompleteThis": "تعذّر إكمال هذه المهمة.",
+    "wasNotCounted": "لم تُحتسب {{quest}}: {{reason}}.",
+    "syncFailedYourQuests": "فشلت المزامنة. ما زالت مهامك محفوظة.",
+    "more_zero": "",
+    "more_one": " (+{{count}} أخرى)",
+    "more_two": " (+{{count}} أخريان)",
+    "more_few": " (+{{count}} أخرى)",
+    "more_many": " (+{{count}} أخرى)",
+    "more_other": " (+{{count}} أخرى)",
+    "aQuest": "مهمة",
+    "actions_zero": "لا إجراءات",
+    "actions_one": "إجراء واحد",
+    "actions_two": "إجراءان",
+    "actions_few": "{{count}} إجراءات",
+    "actions_many": "{{count}} إجراءً",
+    "actions_other": "{{count}} إجراء"
   }
 }

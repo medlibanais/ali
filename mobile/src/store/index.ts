@@ -7,6 +7,8 @@ import chatReducer from './slices/chatSlice';
 import analyticsReducer from './slices/analyticsSlice';
 import themeReducer from './slices/themeSlice';
 import languageReducer from './slices/languageSlice';
+import syncReducer from './slices/syncSlice';
+import { syncMachineMiddleware } from './syncMachineMiddleware';
 import celebrationsReducer from './slices/celebrationsSlice';
 import { celebrationMiddleware } from './celebrationMiddleware';
 import { THEMES } from '../theme/themes';
@@ -22,10 +24,11 @@ export const store = configureStore({
     analytics: analyticsReducer,
     theme: themeReducer,
     language: languageReducer,
+    sync: syncReducer,
     celebrations: celebrationsReducer,
   },
   middleware: (getDefault) =>
-    getDefault().prepend(celebrationMiddleware.middleware),
+    getDefault().prepend(celebrationMiddleware.middleware).concat(syncMachineMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
