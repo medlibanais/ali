@@ -374,7 +374,7 @@ export function permanentSyncReason(message: string | undefined): string | null 
   return code ? PERMANENT_SYNC_ERRORS[code] : null;
 }
 
-/** True when the database does not have the sync RPCs yet (0015 not pushed). */
+/** True when the database does not have the sync RPCs yet (0022 not pushed). */
 export function isMissingSyncRpc(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   const msg = error.message ?? '';

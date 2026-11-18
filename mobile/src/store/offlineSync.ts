@@ -1,7 +1,7 @@
 // Background flush of the offline queue.
 //
 // Replays queued quest actions one at a time, in the exact order they
-// happened, through the RPCs from migration 0015:
+// happened, through the RPCs from migration 0022:
 //   complete -> sync_quest_completion(quest, client id, time it happened)
 //   undo     -> sync_quest_undo(quest, time it happened)
 //
@@ -136,7 +136,7 @@ export async function syncOne(item: QueuedAction): Promise<Outcome> {
       p_completed_at: item.at,
     });
     if (!res.thrown && isMissingSyncRpc(res.error)) {
-      // Migration 0015 is not on this database yet: fall back to the
+      // Migration 0022 is not on this database yet: fall back to the
       // online RPC (counts on the sync day, still never twice).
       const old = await callRpc('complete_quest', { p_quest_id: item.questId });
       return classifyFailure(old.error, old.thrown) ?? { kind: 'ok', duplicate: false };

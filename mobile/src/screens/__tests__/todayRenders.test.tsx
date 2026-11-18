@@ -26,7 +26,6 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 jest.mock('../../lib/offlineQueue', () => ({}));
-jest.mock('../../lib/notifications', () => ({ registerDeviceForPush: () => Promise.resolve() }));
 jest.mock('../../features/friends/api', () => ({ useRedeemInvite: () => ({}) }));
 jest.mock('../../features/notifications/api', () => ({ useUnreadCount: () => 0 }));
 jest.mock('../../components/Screen', () => ({ __esModule: true, default: () => null }));
