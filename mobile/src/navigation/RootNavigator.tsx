@@ -32,6 +32,7 @@ import PartyQuestScreen from '../screens/PartyQuestScreen';
 import PartyInviteScreen from '../screens/PartyInviteScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
+import AppLockGate from '../features/appLock/AppLockGate';
 import MainTabs from './MainTabs';
 import type {
   AppStackParamList,
@@ -246,7 +247,11 @@ export function RootNavigator() {
         </View>
       );
     case 'ready':
-      return <AppNavigator />;
+      return (
+        <AppLockGate>
+          <AppNavigator />
+        </AppLockGate>
+      );
   }
 }
 
