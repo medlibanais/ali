@@ -17,7 +17,7 @@ import React, {
 } from 'react';
 import i18n, { appLocale } from '../i18n';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -77,6 +77,7 @@ import {
   withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { showAlert } from '../lib/alert';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Today'>,
@@ -461,7 +462,7 @@ export function TodayScreen({ navigation, route }: Props) {
   }, [load]);
 
   const confirmFreeze = useCallback(() => {
-    Alert.alert(
+    showAlert(
       t('today.freezeYourStreak'),
       t('today.todayCountsAsProtected'),
       [

@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
-import { Alert, Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
 import ProfileAvatar from '../components/ProfileAvatar';
@@ -23,6 +23,7 @@ import { onboardingCompletedLocally } from '../store/slices/authSlice';
 import { fetchProfile } from '../store/slices/userSlice';
 import { borderWidth, colors, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { showAlert } from '../lib/alert';
 
 type Props = NativeStackScreenProps<
   AppStackParamList & OnboardingStackParamList,
@@ -85,7 +86,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       if (e instanceof PhotoError) {
         if (e.code === 'cancelled') return;
         if (e.code === 'permission') {
-          Alert.alert(t('aiAvatar.permissionNeeded'), e.message, [
+          showAlert(t('aiAvatar.permissionNeeded'), e.message, [
             { text: t('aiAvatar.notNow'), style: 'cancel' },
             { text: t('aiAvatar.openSettings'), onPress: openAppSettings },
           ]);
