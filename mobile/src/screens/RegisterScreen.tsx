@@ -66,7 +66,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding>
+    <Screen scroll keyboardAvoiding testID="register-scroll">
       <AuthHeader
         title={t('register.createAccount')}
         subtitle={t('register.oneAccountForYour')}

@@ -55,7 +55,7 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding>
+    <Screen scroll keyboardAvoiding testID="login-scroll">
       <AuthHeader title={t('login.welcomeBack')} subtitle={t('login.signInToPick')} />
 
       <Card style={styles.form}>

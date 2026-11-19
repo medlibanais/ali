@@ -74,7 +74,8 @@ describe('New user journey', () => {
     await element(by.id('register-email')).replaceText(EMAIL);
     await element(by.id('register-password')).replaceText(PASSWORD);
     closeKeyboard();
-    await element(by.id('register-submit')).tap();
+    // The password hint pushes the button down; scroll it into view first.
+    await tapInScroll('register-submit', 'register-scroll');
 
     // Email confirmation is on, so the app asks the user to check their inbox.
     await waitFor(element(by.id('verify-title'))).toBeVisible().withTimeout(LONG);
@@ -88,7 +89,7 @@ describe('New user journey', () => {
     await element(by.id('login-email')).replaceText(EMAIL);
     await element(by.id('login-password')).replaceText(PASSWORD);
     closeKeyboard();
-    await element(by.id('login-submit')).tap();
+    await tapInScroll('login-submit', 'login-scroll');
 
     await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
   });
