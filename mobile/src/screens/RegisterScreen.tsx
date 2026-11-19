@@ -66,7 +66,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding>
+    <Screen scroll keyboardAvoiding testID="register-scroll">
       <AuthHeader
         title={t('register.createAccount')}
         subtitle={t('register.oneAccountForYour')}
@@ -75,6 +75,7 @@ export function RegisterScreen({ navigation, route }: Props) {
       <Card style={styles.form}>
         <Field
           label={t('register.email')}
+          testID="register-email"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -88,6 +89,7 @@ export function RegisterScreen({ navigation, route }: Props) {
         />
         <Field
           label={t('register.password')}
+          testID="register-password"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -95,6 +97,8 @@ export function RegisterScreen({ navigation, route }: Props) {
           }}
           secureTextEntry
           autoCapitalize="none"
+          returnKeyType="go"
+          onSubmitEditing={submit}
           placeholder={t('register.chooseAPassword')}
         />
 
@@ -131,6 +135,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
         <Button
           title={t('register.createAccount')}
+          testID="register-submit"
           winTitle={t('register.startGrowing')}
           icon={ArrowRightGlyph}
           onPress={submit}

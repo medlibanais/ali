@@ -376,6 +376,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
               })}
             </View>
             <PressableScale
+              testID="avatar-save"
               accessibilityRole="button"
               accessibilityLabel={fromOnboarding ? t('avatarCreator.saveAndContinue') : t('avatarCreator.saveAvatar')}
               onPress={save}
@@ -417,6 +418,7 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
             <View style={[styles.row, styles.rowEnd]}>
               <RoundButton
                 label={t('avatarCreator.surpriseMeAWhole')}
+                testID="avatar-randomize"
                 onPress={() => config && commit(randomAvatarConfig(level))}
                 disabled={!config}
               >
@@ -881,6 +883,7 @@ function RoundButton({
   onPressOut,
   disabled = false,
   selected = false,
+  testID,
   children,
 }: {
   label: string;
@@ -889,10 +892,12 @@ function RoundButton({
   onPressOut?: () => void;
   disabled?: boolean;
   selected?: boolean;
+  testID?: string;
   children: React.ReactNode;
 }) {
   return (
     <PressableScale
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled, selected }}

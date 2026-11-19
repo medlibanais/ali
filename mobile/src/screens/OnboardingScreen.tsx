@@ -303,13 +303,13 @@ export function OnboardingScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding padded={false}>
+    <Screen testID="onboarding-scroll" scroll keyboardAvoiding padded={false}>
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
 
       <View style={styles.content}>
-        <Txt variant="label" color={colors.inkFaint} style={styles.stepLabel}>
+        <Txt testID={`onboarding-step-${step + 1}`} variant="label" color={colors.inkFaint} style={styles.stepLabel}>
           {t('onboarding.stepOf', { step: step + 1, totalSteps })}
         </Txt>
         <Txt variant="title" style={styles.stepTitle}>
@@ -518,6 +518,7 @@ export function OnboardingScreen({ navigation }: Props) {
           <View>
             <Field
               label={t('onboarding.firstName')}
+              testID="onboarding-first-name"
               value={draft.firstName}
               onChangeText={(t) => {
                 update('firstName', t);
@@ -529,6 +530,7 @@ export function OnboardingScreen({ navigation }: Props) {
             />
             <Field
               label={t('onboarding.username')}
+              testID="onboarding-username"
               value={draft.username}
               onChangeText={(t) => {
                 update('username', t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
@@ -583,6 +585,7 @@ export function OnboardingScreen({ navigation }: Props) {
           ) : null}
           <Button
             title={step === totalSteps - 1 ? t('onboarding.startMyJourney') : t('onboarding.continue')}
+            testID="onboarding-continue"
             onPress={goNext}
             disabled={!canContinue}
             loading={submitting}

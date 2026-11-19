@@ -110,7 +110,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <Txt variant="display">{t('verifyEmail.checkYourInbox')}</Txt>
+        <Txt testID="verify-title" variant="display">{t('verifyEmail.checkYourInbox')}</Txt>
         <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
           {email
             ? t('verifyEmail.weSentAVerification', { email })
@@ -166,6 +166,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
 
       <Button
         title={t('verifyEmail.backToSignIn')}
+        testID="verify-back-to-sign-in"
         variant="ghost"
         onPress={() => navigation.navigate('Login')}
         style={styles.backButton}

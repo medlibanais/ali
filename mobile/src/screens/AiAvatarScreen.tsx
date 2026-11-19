@@ -187,6 +187,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
       />
       <Button
         title={t('aiAvatar.designItByHand')}
+        testID="ai-avatar-design-by-hand"
         variant="ghost"
         onPress={designByHand}
         disabled={busy}
