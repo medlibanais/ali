@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
   Pressable,
   Share,
   StyleSheet,
@@ -57,6 +56,7 @@ import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { showAlert } from '../lib/alert';
 
 type Section = 'friends' | 'requests' | 'find';
 
@@ -215,7 +215,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
     });
 
   const confirmUnfriend = (friend: FriendRow) => {
-    Alert.alert(t('friends.unfriend'), t('friends.removeFromYourFriends', { name: displayName(friend) }), [
+    showAlert(t('friends.unfriend'), t('friends.removeFromYourFriends', { name: displayName(friend) }), [
       { text: t('friends.cancel'), style: 'cancel' },
       {
         text: t('friends.unfriend'),
@@ -226,7 +226,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   };
 
   const confirmBlock = (userId: string, name: string) => {
-    Alert.alert(t('friends.blockUser'), t('friends.blockTheyWillNot', { name }), [
+    showAlert(t('friends.blockUser'), t('friends.blockTheyWillNot', { name }), [
       { text: t('friends.cancel'), style: 'cancel' },
       {
         text: t('friends.block'),
@@ -237,7 +237,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   };
 
   const friendOptions = (friend: FriendRow) =>
-    Alert.alert(displayName(friend), `@${friend.username}`, [
+    showAlert(displayName(friend), `@${friend.username}`, [
       { text: t('friends.close'), style: 'cancel' },
       { text: t('friends.unfriend'), style: 'destructive', onPress: () => confirmUnfriend(friend) },
       {

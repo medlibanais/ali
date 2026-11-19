@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n, { appLocale, labelFor } from '../i18n';
 import {
-  Alert,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -73,6 +72,7 @@ import {
 } from '../theme/tokens';
 import { THEME_LIST } from '../theme/themes';
 import { useTheme } from '../theme/useTheme';
+import { showAlert } from '../lib/alert';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Profile'>,
@@ -279,7 +279,7 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   const deleteAccount = () => {
-    Alert.alert(
+    showAlert(
       t('profile.deleteAccount'),
       t('profile.thisPermanentlyRemovesYour'),
       [
@@ -288,7 +288,7 @@ export function ProfileScreen({ navigation }: Props) {
           text: t('profile.continue'),
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
+            showAlert(
               t('profile.areYouCertain'),
               t('profile.everythingTiedToThis'),
               [
@@ -325,7 +325,7 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   const confirmLogout = () => {
-    Alert.alert(t('profile.signOut'), t('profile.youCanSignBack'), [
+    showAlert(t('profile.signOut'), t('profile.youCanSignBack'), [
       { text: t('profile.stay'), style: 'cancel' },
       {
         text: t('profile.signOut'),

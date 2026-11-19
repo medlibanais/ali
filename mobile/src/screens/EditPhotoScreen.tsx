@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -22,6 +22,7 @@ import type { AppStackParamList } from '../navigation/types';
 import { fetchProfile } from '../store/slices/userSlice';
 import { colors, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { showAlert } from '../lib/alert';
 
 type Busy = 'camera' | 'gallery' | 'remove' | 'mode' | null;
 
@@ -42,7 +43,7 @@ export function EditPhotoScreen() {
   const handleError = (error: unknown) => {
     if (error instanceof PhotoError && error.code === 'cancelled') return;
     if (error instanceof PhotoError && error.code === 'permission') {
-      Alert.alert(t('editPhoto.permissionNeeded'), error.message, [
+      showAlert(t('editPhoto.permissionNeeded'), error.message, [
         { text: t('editPhoto.notNow'), style: 'cancel' },
         { text: t('editPhoto.openSettings'), onPress: openAppSettings },
       ]);
@@ -89,7 +90,7 @@ export function EditPhotoScreen() {
   };
 
   const confirmRemove = () => {
-    Alert.alert(
+    showAlert(
       t('editPhoto.removePhoto'),
       t('editPhoto.yourPhotoIsDeleted'),
       [

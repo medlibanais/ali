@@ -152,9 +152,17 @@ export const resendVerification = createAsyncThunk<
 });
 
 export const logout = createAsyncThunk<void, void>('auth/logout', async () => {
-  // Stop this phone getting the signed-out user's pushes.
+  // Stop this phone getting the signed-out user's pushes (never throws).
   await unregisterDeviceForPush();
-  await supabase.auth.signOut();
+  // Signing out must always work, even offline or with an expired token.
+  // A global sign-out that fails keeps the local session, so fall back to
+  // clearing it on this device only.
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  }
 });
 
 const authSlice = createSlice({
@@ -223,6 +231,12 @@ const authSlice = createSlice({
       .addCase(register.rejected, (state, action) => {
         state.busy = false;
         state.error = action.payload ?? i18n.t('authErrors.registerFailed');
+      })
+      .addCase(logout.rejected, (state) => {
+        state.status = 'unauthenticated';
+        state.userId = null;
+        state.email = null;
+        state.busy = false;
       })
       .addCase(logout.fulfilled, (state) => {
         state.status = 'unauthenticated';
