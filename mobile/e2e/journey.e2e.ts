@@ -19,6 +19,12 @@ const LONG = 30000;
 
 /** Taps an element, scrolling its screen until it is on screen first. */
 async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
+  await revealInScroll(id, scrollId, index);
+  await element(by.id(id)).atIndex(index).tap();
+}
+
+/** Scrolls a screen until the element is on screen (at least 75 percent visible). */
+async function revealInScroll(id: string, scrollId: string, index = 0): Promise<void> {
   if (device.getPlatform() === 'android') ensureAppFocus();
   const target = element(by.id(id)).atIndex(index);
   for (let attempt = 0; ; attempt += 1) {
@@ -37,7 +43,6 @@ async function tapInScroll(id: string, scrollId: string, index = 0): Promise<voi
       }
     }
   }
-  await target.tap();
 }
 
 /** Failure diagnostic: which test ids are on screen right now. */
@@ -120,8 +125,9 @@ describe('New user journey', () => {
       await waitFor(element(by.id(`onboarding-step-${step}`))).toExist().withTimeout(LONG);
       await tapInScroll('onboarding-continue', 'onboarding-scroll');
     }
-    await waitFor(element(by.id('onboarding-first-name'))).toBeVisible().withTimeout(LONG);
+    await revealInScroll('onboarding-first-name', 'onboarding-scroll');
     await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
+    await revealInScroll('onboarding-username', 'onboarding-scroll');
     await element(by.id('onboarding-username')).replaceText(USERNAME);
     await element(by.id('onboarding-username')).tapReturnKey();
     await tapInScroll('onboarding-continue', 'onboarding-scroll');
