@@ -56,6 +56,18 @@ export function ensureAppFocus(): void {
   for (let i = 0; i < 3; i += 1) {
     const focus = focusedWindow();
     if (focus.includes(APP_ID) || focus.startsWith('(')) return;
+    if (focus.includes('launcher')) {
+      // The app left the foreground (crash or exit): Back cannot help. Print
+      // why, then let the test fail with a clear message.
+      console.warn(`The app is no longer in the foreground: ${focus}`);
+      try {
+        console.warn(adb(['logcat', '-d', '-b', 'crash', '-t', '60']));
+        console.warn(adb(['shell', 'pidof', APP_ID]) || 'app process is not running');
+      } catch (e) {
+        console.warn(`logcat failed: ${(e as Error).message.split('\n')[0]}`);
+      }
+      return;
+    }
     console.warn(`Another window has focus, pressing Back: ${focus}`);
     try {
       adb(['shell', 'input', 'keyevent', '4']);
@@ -63,23 +75,5 @@ export function ensureAppFocus(): void {
       return;
     }
     execFileSync('sleep', ['1']);
-  }
-}
-
-/**
- * Closes the soft keyboard if it is open. On the small CI screen (320x640)
- * the keyboard covers the submit button, and Detox refuses to tap a view that
- * is less than 75 percent visible. Back closes the keyboard without leaving
- * the screen; when no keyboard is shown nothing is sent.
- */
-export function hideKeyboard(): void {
-  try {
-    const shown = adb(['shell', 'dumpsys', 'input_method']).includes('mInputShown=true');
-    if (shown) {
-      adb(['shell', 'input', 'keyevent', '4']);
-      execFileSync('sleep', ['1']);
-    }
-  } catch {
-    // Best effort: the tap that follows reports the real problem.
   }
 }
