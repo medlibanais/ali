@@ -37,6 +37,9 @@ export function prepareEmulator(): void {
     ['shell', 'pm', 'grant', APP_ID, 'android.permission.POST_NOTIFICATIONS'],
     // The Google "save password?" prompt appears after typing a password.
     ['shell', 'settings', 'put', 'secure', 'autofill_service', 'null'],
+    // Gesture navigation treats a swipe that starts near the bottom edge as
+    // "go home", which sent the app to the launcher in the middle of a scroll.
+    ['shell', 'cmd', 'overlay', 'enable', 'com.android.internal.systemui.navbar.threebutton'],
   ];
   for (const args of attempts) {
     try {

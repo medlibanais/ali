@@ -21,7 +21,7 @@ const LONG = 30000;
 async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
   if (device.getPlatform() === 'android') ensureAppFocus();
   const target = element(by.id(id)).atIndex(index);
-  await waitFor(target).toBeVisible().whileElement(by.id(scrollId)).scroll(250, 'down');
+  await waitFor(target).toBeVisible().whileElement(by.id(scrollId)).scroll(250, 'down', 0.5, 0.5);
   await target.tap();
 }
 
@@ -134,7 +134,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('today-total-xp')))
       .toBeVisible()
       .whileElement(by.id('today-scroll'))
-      .scroll(250, 'down');
+      .scroll(250, 'down', 0.5, 0.5);
     xpBefore = parseXp(await textOf('today-total-xp'));
 
     await element(by.id('today-scroll')).scrollTo('top');
@@ -146,7 +146,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('today-total-xp')))
       .toBeVisible()
       .whileElement(by.id('today-scroll'))
-      .scroll(250, 'down');
+      .scroll(250, 'down', 0.5, 0.5);
     // The XP refreshes once the server confirms the completion.
     let xpAfter = xpBefore;
     const deadline = Date.now() + LONG;
