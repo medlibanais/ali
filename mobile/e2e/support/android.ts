@@ -37,7 +37,6 @@ export function prepareEmulator(): void {
     ['shell', 'pm', 'grant', APP_ID, 'android.permission.POST_NOTIFICATIONS'],
     // The Google "save password?" prompt appears after typing a password.
     ['shell', 'settings', 'put', 'secure', 'autofill_service', 'null'],
-    ['shell', 'settings', 'put', 'secure', 'autofill_service_search_uri', ''],
   ];
   for (const args of attempts) {
     try {
@@ -64,5 +63,23 @@ export function ensureAppFocus(): void {
       return;
     }
     execFileSync('sleep', ['1']);
+  }
+}
+
+/**
+ * Closes the soft keyboard if it is open. On the small CI screen (320x640)
+ * the keyboard covers the submit button, and Detox refuses to tap a view that
+ * is less than 75 percent visible. Back closes the keyboard without leaving
+ * the screen; when no keyboard is shown nothing is sent.
+ */
+export function hideKeyboard(): void {
+  try {
+    const shown = adb(['shell', 'dumpsys', 'input_method']).includes('mInputShown=true');
+    if (shown) {
+      adb(['shell', 'input', 'keyevent', '4']);
+      execFileSync('sleep', ['1']);
+    }
+  } catch {
+    // Best effort: the tap that follows reports the real problem.
   }
 }

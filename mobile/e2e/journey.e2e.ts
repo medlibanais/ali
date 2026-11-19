@@ -5,7 +5,7 @@
 // Runs against the local Supabase (`npm run db:start`); see e2e/README.md.
 import { expect as jestExpect } from '@jest/globals';
 import { by, device, element, expect, waitFor } from 'detox';
-import { ensureAppFocus, prepareEmulator } from './support/android';
+import { ensureAppFocus, hideKeyboard, prepareEmulator } from './support/android';
 import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
 
 const RUN = Date.now().toString(36);
@@ -16,6 +16,11 @@ const USERNAME = `e2e_${RUN}`.slice(0, 20);
 const FIRST_NAME = 'Detox';
 
 const LONG = 30000;
+
+/** Closes the soft keyboard (Android) so it cannot cover the button to tap. */
+function closeKeyboard(): void {
+  if (device.getPlatform() === 'android') hideKeyboard();
+}
 
 /** Taps an element, scrolling its screen until it is on screen first. */
 async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
@@ -68,6 +73,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('register-email'))).toBeVisible().withTimeout(LONG);
     await element(by.id('register-email')).replaceText(EMAIL);
     await element(by.id('register-password')).replaceText(PASSWORD);
+    closeKeyboard();
     await element(by.id('register-submit')).tap();
 
     // Email confirmation is on, so the app asks the user to check their inbox.
@@ -81,6 +87,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('login-email'))).toBeVisible().withTimeout(LONG);
     await element(by.id('login-email')).replaceText(EMAIL);
     await element(by.id('login-password')).replaceText(PASSWORD);
+    closeKeyboard();
     await element(by.id('login-submit')).tap();
 
     await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
@@ -95,6 +102,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('onboarding-first-name'))).toBeVisible().withTimeout(LONG);
     await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
     await element(by.id('onboarding-username')).replaceText(USERNAME);
+    closeKeyboard();
     await tapInScroll('onboarding-continue', 'onboarding-scroll');
 
     // Next stop is the avatar. Skip the photo/AI path and build it by hand.
