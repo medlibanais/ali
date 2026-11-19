@@ -21,8 +21,34 @@ const LONG = 30000;
 async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
   if (device.getPlatform() === 'android') ensureAppFocus();
   const target = element(by.id(id)).atIndex(index);
-  await waitFor(target).toBeVisible().whileElement(by.id(scrollId)).scroll(250, 'down', 0.5, 0.5);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await waitFor(target).toBeVisible().withTimeout(attempt === 0 ? 8000 : 2000);
+      break;
+    } catch (e) {
+      if (attempt >= 8) {
+        await logScreen(`#${id} never became visible`);
+        throw e;
+      }
+      try {
+        await element(by.id(scrollId)).scroll(200, 'down');
+      } catch {
+        // Nothing to scroll (screen fits); the next check decides.
+      }
+    }
+  }
   await target.tap();
+}
+
+/** Failure diagnostic: which test ids are on screen right now. */
+async function logScreen(why: string): Promise<void> {
+  try {
+    const xml = await device.generateViewHierarchyXml();
+    const ids = Array.from(xml.matchAll(/(?:tag|resource-id)="([^"]+)"/g), (m) => m[1]);
+    console.warn(`${why}. On screen: ${Array.from(new Set(ids)).join(', ')}`);
+  } catch (err) {
+    console.warn(`${why}. (view hierarchy unavailable: ${(err as Error).message.split('\n')[0]})`);
+  }
 }
 
 async function textOf(id: string): Promise<string> {
