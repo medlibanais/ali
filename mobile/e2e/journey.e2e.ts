@@ -37,7 +37,10 @@ async function revealInScroll(id: string, scrollId: string, index = 0): Promise<
         throw e;
       }
       try {
-        await element(by.id(scrollId)).scroll(200, 'down');
+        // A new step keeps the old scroll offset, so its content may sit
+        // above the view: start from the top, then work downwards.
+        if (attempt === 0) await element(by.id(scrollId)).scrollTo('top');
+        else await element(by.id(scrollId)).scroll(200, 'down');
       } catch {
         // Nothing to scroll (screen fits); the next check decides.
       }
@@ -49,7 +52,8 @@ async function revealInScroll(id: string, scrollId: string, index = 0): Promise<
 async function logScreen(why: string): Promise<void> {
   try {
     const xml = await device.generateViewHierarchyXml();
-    const ids = Array.from(xml.matchAll(/(?:tag|resource-id)="([^"]+)"/g), (m) => m[1]);
+    const ids = Array.from(xml.matchAll(/(?:tag|resource-id|testid|id)="([^"]+)"/gi), (m) => m[1]);
+    console.warn(xml.slice(0, 1500));
     console.warn(`${why}. On screen: ${Array.from(new Set(ids)).join(', ')}`);
   } catch (err) {
     console.warn(`${why}. (view hierarchy unavailable: ${(err as Error).message.split('\n')[0]})`);
