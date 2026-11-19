@@ -79,4 +79,5 @@ Failing steps save a screenshot and the device log in `e2e/artifacts/`.
   `onboarding-first-name`, `onboarding-username`, `ai-avatar-design-by-hand`,
   `avatar-randomize`, `avatar-save`, `today-scroll`, `quest-complete`,
   `today-total-xp`.
+- On Android the test grants the notification permission, turns off Google autofill, and before each step checks which window has focus (`e2e/support/android.ts`). If a system prompt took it, the test logs which window and presses Back.
 - `npm run typecheck:e2e` typechecks the test files.

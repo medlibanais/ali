@@ -3,9 +3,9 @@
 // complete a quest -> XP went up (on screen and in the database).
 //
 // Runs against the local Supabase (`npm run db:start`); see e2e/README.md.
-import { execFileSync } from 'child_process';
 import { expect as jestExpect } from '@jest/globals';
 import { by, device, element, expect, waitFor } from 'detox';
+import { ensureAppFocus, prepareEmulator } from './support/android';
 import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
 
 const RUN = Date.now().toString(36);
@@ -19,6 +19,7 @@ const LONG = 30000;
 
 /** Taps an element, scrolling its screen until it is on screen first. */
 async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
+  if (device.getPlatform() === 'android') ensureAppFocus();
   const target = element(by.id(id)).atIndex(index);
   await waitFor(target).toBeVisible().whileElement(by.id(scrollId)).scroll(250, 'down');
   await target.tap();
@@ -36,26 +37,19 @@ function parseXp(text: string): number {
   return Number(latin.replace(/[^0-9]/g, ''));
 }
 
-/** Android 13+ asks for notification permission on Today; grant it up front. */
-function grantAndroidNotifications(): void {
-  const adb = process.env.ANDROID_HOME
-    ? `${process.env.ANDROID_HOME}/platform-tools/adb`
-    : 'adb';
-  try {
-    execFileSync(adb, ['-s', device.id, 'shell', 'pm', 'grant', 'com.prayerlock.app',
-      'android.permission.POST_NOTIFICATIONS']);
-  } catch {
-    // Older Android versions have no such permission.
-  }
-}
-
 describe('New user journey', () => {
   let xpBefore = 0;
+
+  // A system window (permission or save-password prompt) can appear at any
+  // point; check before every step.
+  beforeEach(() => {
+    if (device.getPlatform() === 'android') ensureAppFocus();
+  });
 
   beforeAll(async () => {
     await device.uninstallApp();
     await device.installApp();
-    if (device.getPlatform() === 'android') grantAndroidNotifications();
+    if (device.getPlatform() === 'android') prepareEmulator();
     await device.launchApp({
       newInstance: true,
       permissions: { notifications: 'YES' },
