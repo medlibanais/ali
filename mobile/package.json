@@ -98,7 +98,7 @@
   "overrides": {
     "postcss": "^8.5.28",
     "send": "0.19.2",
-    "decode-uri-component": "0.5.0",
+    "decode-uri-component": "0.2.2",
     "tar": "^6.2.1",
     "@xmldom/xmldom": "^0.8.15",
     "brace-expansion": "^2.0.7",

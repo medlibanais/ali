@@ -44,6 +44,7 @@ const linking: LinkingOptions<RootParamList> = {
       ResetPassword: 'reset-password',
       Friends: 'add-friend',
       MainTabs: { screens: { Today: 'today' } },
+      PartyInvite: 'party',
     },
   },
 };

@@ -41,6 +41,9 @@ export type AppStackParamList = {
   AiAvatar: { fromOnboarding?: boolean } | undefined;
   EditPhoto: undefined;
   Friends: { code?: string } | undefined;
+  PartyQuests: undefined;
+  PartyQuest: { id: string };
+  PartyInvite: { code?: string } | undefined;
 };
 
 /** Everything the root NavigationContainer can route to. */

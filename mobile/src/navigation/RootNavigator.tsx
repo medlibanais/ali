@@ -27,6 +27,9 @@ import QuestDetailScreen from '../screens/QuestDetailScreen';
 import TimezonePickerScreen from '../screens/TimezonePickerScreen';
 import EditPhotoScreen from '../screens/EditPhotoScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import PartyQuestsScreen from '../screens/PartyQuestsScreen';
+import PartyQuestScreen from '../screens/PartyQuestScreen';
+import PartyInviteScreen from '../screens/PartyInviteScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
 import MainTabs from './MainTabs';
@@ -185,6 +188,21 @@ function AppNavigator() {
         name="Friends"
         component={FriendsScreen}
         options={{ title: t('nav.friends') }}
+      />
+      <AppStack.Screen
+        name="PartyQuests"
+        component={PartyQuestsScreen}
+        options={{ title: 'Party quests' }}
+      />
+      <AppStack.Screen
+        name="PartyQuest"
+        component={PartyQuestScreen}
+        options={{ title: 'Party' }}
+      />
+      <AppStack.Screen
+        name="PartyInvite"
+        component={PartyInviteScreen}
+        options={{ title: 'Party invite' }}
       />
     </AppStack.Navigator>
   );
