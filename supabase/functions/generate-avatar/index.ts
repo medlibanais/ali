@@ -4,7 +4,7 @@
 // Client sends a small square JPEG (base64). We call fal.ai's synchronous
 // image-edit endpoint (Flux Kontext by default, ~5-10 s), copy the result
 // into Storage, and point profiles.ai_avatar_url at it. Any failure leaves
-// the SVG avatar in place, so the client can always fall back.
+// the 3D avatar in place, so the client can always fall back.
 // Key comes ONLY from Edge Function env (FAL_KEY) — never from the client.
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';

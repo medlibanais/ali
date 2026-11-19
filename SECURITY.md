@@ -65,15 +65,23 @@ assets at build time on the developer machine.
 
 ## Backend
 
-Python dependencies are pinned in `backend/requirements.txt`;
-`pip check` passes (no broken requirements) as of 2026-09-23.
-A `pip-audit` pass is recommended before launch and should be recorded here.
+There is no Python backend any more (the FastAPI service and
+`backend/requirements.txt` described in older versions of this file were
+removed). The backend is Supabase: Postgres with RLS on every table,
+SQL functions for all XP/streak/badge rules, and Deno Edge Functions.
+Edge Function dependencies are pinned by URL (`jsr:` / `npm:` specifiers).
 
-## Application-level security (implemented, per SRS §4.3)
+## Application-level security (current)
 
-- JWT (24 h) + refresh-token rotation, bcrypt cost 12
-- Rate limiting: 100 req/min/IP at the API edge; 20 AI-coach messages/day/user;
-  3 skips/day; 500 XP/day cap
-- CORS allow-list, request validation on all endpoints, no PII in logs
-- Full data-export and account-deletion cascade endpoints (`/v1/users/export`,
-  `/v1/users/account`)
+- Supabase Auth sessions (JWT access token + rotating refresh token), stored
+  in expo-secure-store on device and localStorage on web
+- Password rules (8+ chars, upper, number, special) enforced by the server
+- RLS on every table; friends can only see public stats
+- Rate limits in Postgres and Edge Functions: 20 coach messages/day,
+  quest completion limits, 3 skips/day, 500 XP/day cap (see
+  `docs/security-hardening.md`, migration 0031)
+- AI keys (Groq, fal.ai) only in Supabase function secrets, never in the app
+- Data export from Profile; account deletion through the `delete-account`
+  Edge Function (cascades all rows and Storage files)
+- Known gap: the `profile-photos` Storage bucket is public, so anyone with a
+  file's exact URL can open it (see the note in migration 0031, section 5)

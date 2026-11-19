@@ -1,5 +1,5 @@
 // AI "Future Self" avatar: photo -> generate-avatar Edge Function -> stored
-// image in profiles.ai_avatar_url. The SVG avatar stays as the fallback.
+// image in profiles.ai_avatar_url. The 3D avatar stays as the fallback.
 
 import i18n from '../i18n';
 import { describeFunctionError, type FunctionFailure } from './functionErrors';

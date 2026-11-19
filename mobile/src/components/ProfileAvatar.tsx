@@ -1,5 +1,5 @@
 // ProfileAvatar: shows the AI Future Self image when avatar_mode is 'ai',
-// the user's real photo when it is 'photo', otherwise the layered SVG
+// the user's real photo when it is 'photo', otherwise the 3D
 // avatar (also the fallback when an image is missing). Use everywhere
 // identity is shown.
 

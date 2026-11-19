@@ -1,3 +1,10 @@
+# LEGACY - DOES NOT RUN. Kept for history only.
+# This was the original SRS stack (Postgres + Redis + Ollama/LLaMA 2 +
+# a Python/FastAPI "api" service built from ./backend). The ./backend
+# folder no longer exists; the app now uses Supabase + Groq instead.
+# For local development run `npx supabase start` (see README.md).
+# The passwords below are throwaway local defaults, not real credentials.
+
 services:
   db:
     image: postgres:15-alpine
