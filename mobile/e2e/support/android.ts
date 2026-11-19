@@ -62,6 +62,12 @@ export function ensureAppFocus(): void {
       console.warn(`The app is no longer in the foreground: ${focus}`);
       try {
         console.warn(adb(['logcat', '-d', '-b', 'crash', '-t', '60']));
+        const log = adb(['logcat', '-d', '-t', '3000']);
+        const lines = log
+          .split('\n')
+          .filter((l) => /ActivityTaskManager|ActivityManager|WindowManager|prayerlock|AndroidRuntime/.test(l))
+          .slice(-80);
+        console.warn(lines.join('\n'));
         console.warn(adb(['shell', 'pidof', APP_ID]) || 'app process is not running');
       } catch (e) {
         console.warn(`logcat failed: ${(e as Error).message.split('\n')[0]}`);
