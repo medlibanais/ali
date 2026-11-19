@@ -46,7 +46,11 @@ function run(cmd, args, cwd = MOBILE, attempts = 1) {
     if (attempt >= attempts) {
       throw new Error(`${cmd} ${args.join(' ')} failed (exit ${res.status})`);
     }
-    console.warn(`Failed with exit ${res.status}, trying again.`);
+    // Maven Central answers 429 when many CI jobs share an IP; waiting
+    // (30 s, 60 s, ...) lets the limit reset before the next try.
+    const waitS = 30 * attempt;
+    console.warn(`Failed with exit ${res.status}, trying again in ${waitS}s.`);
+    spawnSync(process.execPath, ['-e', `setTimeout(()=>{}, ${waitS * 1000})`]);
   }
 }
 
@@ -91,7 +95,7 @@ if (platform === 'android') {
     // Gradle first downloads plugins and libraries from Maven Central and
     // Google; one dropped download ("Could not find ...") should not sink a
     // 30 minute build. Gradle's cache keeps what it already fetched.
-  ], path.join(MOBILE, 'android'), 2);
+  ], path.join(MOBILE, 'android'), 4);
   bundle = path.join(
     MOBILE,
     'android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle',
