@@ -68,10 +68,9 @@ describe('New user journey', () => {
     await waitFor(element(by.id('register-email'))).toBeVisible().withTimeout(LONG);
     await element(by.id('register-email')).replaceText(EMAIL);
     await element(by.id('register-password')).replaceText(PASSWORD);
-    // The IME "done" key closes the keyboard (Back could leave the screen).
+    // The keyboard and the password hint push the button off the small CI
+    // screen, so submit with the keyboard's Go key (same as tapping it).
     await element(by.id('register-password')).tapReturnKey();
-    // The password hint pushes the button down; scroll it into view first.
-    await tapInScroll('register-submit', 'register-scroll');
 
     // Email confirmation is on, so the app asks the user to check their inbox.
     await waitFor(element(by.id('verify-title'))).toBeVisible().withTimeout(LONG);
@@ -85,7 +84,6 @@ describe('New user journey', () => {
     await element(by.id('login-email')).replaceText(EMAIL);
     await element(by.id('login-password')).replaceText(PASSWORD);
     await element(by.id('login-password')).tapReturnKey();
-    await tapInScroll('login-submit', 'login-scroll');
 
     await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
   });
@@ -99,6 +97,7 @@ describe('New user journey', () => {
     await waitFor(element(by.id('onboarding-first-name'))).toBeVisible().withTimeout(LONG);
     await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
     await element(by.id('onboarding-username')).replaceText(USERNAME);
+    await element(by.id('onboarding-username')).tapReturnKey();
     await tapInScroll('onboarding-continue', 'onboarding-scroll');
 
     // Next stop is the avatar. Skip the photo/AI path and build it by hand.

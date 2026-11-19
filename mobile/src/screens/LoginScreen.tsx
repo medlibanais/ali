@@ -84,6 +84,8 @@ export function LoginScreen({ navigation }: Props) {
           error={passwordError}
           secureTextEntry
           autoCapitalize="none"
+          returnKeyType="go"
+          onSubmitEditing={submit}
           placeholder={t('login.yourPassword')}
           containerStyle={styles.passwordField}
         />

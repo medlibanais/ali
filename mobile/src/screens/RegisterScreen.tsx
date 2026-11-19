@@ -97,6 +97,8 @@ export function RegisterScreen({ navigation, route }: Props) {
           }}
           secureTextEntry
           autoCapitalize="none"
+          returnKeyType="go"
+          onSubmitEditing={submit}
           placeholder={t('register.chooseAPassword')}
         />
 
