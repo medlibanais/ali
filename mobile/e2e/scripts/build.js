@@ -38,11 +38,15 @@ const env = {
   EXPO_PUBLIC_SUPABASE_ANON_KEY: anonKey,
 };
 
-function run(cmd, args, cwd = MOBILE) {
-  console.log(`\n> ${cmd} ${args.join(' ')}`);
-  const res = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', shell: isWin });
-  if (res.status !== 0) {
-    throw new Error(`${cmd} ${args.join(' ')} failed (exit ${res.status})`);
+function run(cmd, args, cwd = MOBILE, attempts = 1) {
+  for (let attempt = 1; ; attempt += 1) {
+    console.log(`\n> ${cmd} ${args.join(' ')}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+    const res = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', shell: isWin });
+    if (res.status === 0) return;
+    if (attempt >= attempts) {
+      throw new Error(`${cmd} ${args.join(' ')} failed (exit ${res.status})`);
+    }
+    console.warn(`Failed with exit ${res.status}, trying again.`);
   }
 }
 
@@ -84,7 +88,10 @@ if (platform === 'android') {
     'assembleAndroidTest',
     '-DtestBuildType=release',
     '--no-daemon',
-  ], path.join(MOBILE, 'android'));
+    // Gradle first downloads plugins and libraries from Maven Central and
+    // Google; one dropped download ("Could not find ...") should not sink a
+    // 30 minute build. Gradle's cache keeps what it already fetched.
+  ], path.join(MOBILE, 'android'), 2);
   bundle = path.join(
     MOBILE,
     'android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle',
