@@ -119,7 +119,7 @@ export function AiAvatarScreen({ navigation, route }: Props) {
     PROGRESS_LINES()[Math.min(PROGRESS_LINES().length - 1, Math.floor(elapsed / 3))];
 
   return (
-    <Screen scroll>
+    <Screen scroll testID="ai-avatar-scroll">
       <Txt variant="title" style={styles.title}>
         {phase === 'done' ? t('aiAvatar.thisIsYouLevelled') : t('aiAvatar.meetYourFutureSelf')}
       </Txt>

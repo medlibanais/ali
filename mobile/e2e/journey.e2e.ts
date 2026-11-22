@@ -137,7 +137,7 @@ describe('New user journey', () => {
     await tapInScroll('onboarding-continue', 'onboarding-scroll');
 
     // Next stop is the avatar. Skip the photo/AI path and build it by hand.
-    await waitFor(element(by.id('ai-avatar-design-by-hand'))).toBeVisible().withTimeout(LONG);
+    await waitFor(element(by.id('ai-avatar-design-by-hand'))).toExist().withTimeout(LONG);
 
     const client = await signInAs(EMAIL, PASSWORD);
     const profile = await readProfile(client);
@@ -146,7 +146,8 @@ describe('New user journey', () => {
   });
 
   it('3. creates a custom avatar and saves it', async () => {
-    await element(by.id('ai-avatar-design-by-hand')).tap();
+    // The button sits below the fold on the small CI screen.
+    await tapInScroll('ai-avatar-design-by-hand', 'ai-avatar-scroll');
     await waitFor(element(by.id('avatar-randomize'))).toBeVisible().withTimeout(LONG);
 
     // Customize: a few rolls of the dice so the look differs from the default.
