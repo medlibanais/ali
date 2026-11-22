@@ -48,6 +48,27 @@ async function revealInScroll(id: string, scrollId: string, index = 0): Promise<
   }
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Logs the top screen's accessibility label each time it changes. */
+async function traceTopScreen(why: string, seconds: number): Promise<void> {
+  let last = '';
+  for (let i = 0; i < seconds; i += 1) {
+    try {
+      const xml = await device.generateViewHierarchyXml();
+      const m = /ReactRootView[^>]*label="([^"]{0,80})/.exec(xml);
+      const top = m ? m[1] : '(no root label)';
+      if (top !== last) {
+        console.warn(`[trace ${why}] t+${i}s top: ${top}`);
+        last = top;
+      }
+    } catch {
+      // Keep going; the hierarchy can be busy during a transition.
+    }
+    await sleep(1000);
+  }
+}
+
 /** Failure diagnostic: which test ids are on screen right now. */
 async function logScreen(why: string): Promise<void> {
   try {
@@ -154,6 +175,9 @@ describe('New user journey', () => {
       await element(by.id('avatar-randomize')).tap();
     }
     await element(by.id('avatar-save')).tap();
+
+    // Trace which screen is on top for a few seconds after save (diagnostic).
+    await traceTopScreen('after avatar save', 12);
 
     // Saving at the end of onboarding opens the app on Today.
     try {
