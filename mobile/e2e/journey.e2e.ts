@@ -191,9 +191,6 @@ describe('New user journey', () => {
     await element(by.id('avatar-save')).tap();
     await logTop('right after save tap');
 
-    // Trace which screen is on top for a few seconds after save (diagnostic).
-    await traceTopScreen('after avatar save', 12);
-
     // Saving at the end of onboarding opens the app on Today.
     try {
       await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(LONG);

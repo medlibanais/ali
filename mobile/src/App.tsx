@@ -57,10 +57,11 @@ function ThemedRoot() {
   const language = useAppSelector((state) => state.language.language);
   const userId = useAppSelector((state) => state.auth.userId);
   const appReady = useAppSelector((state) => state.auth.status === 'ready');
+  const onboarding = useAppSelector((state) => state.auth.status === 'needsOnboarding');
   const [navReady, setNavReady] = useState(false);
 
   // Streak alerts and other pushes: token on login, tap opens Today.
-  usePushNotifications(navigationRef, userId, appReady, navReady);
+  usePushNotifications(navigationRef, userId, appReady, navReady, onboarding);
 
   const profileLoaded = useAppSelector((state) => state.user.profile !== null);
   const remoteTheme = useAppSelector((state) => state.user.profile?.theme_preference ?? null);

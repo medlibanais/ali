@@ -22,15 +22,26 @@ export function usePushNotifications(
   userId: string | null,
   appReady: boolean,
   navReady: boolean,
+  onboarding: boolean,
 ): void {
   const pending = useRef<PushRoute | null>(null);
   const handled = useRef<Set<string>>(new Set());
   const canNavigate = appReady && navReady;
   const canNavigateRef = useRef(canNavigate);
   canNavigateRef.current = canNavigate;
+  const onboardingRef = useRef(onboarding);
+  onboardingRef.current = onboarding;
+
+  // A tap is only worth acting on once the user has finished setup. While
+  // they are still in onboarding, drop it, so a queued tap cannot pull them
+  // off the setup flow when onboarding completes.
+  useEffect(() => {
+    if (onboarding) pending.current = null;
+  }, [onboarding]);
 
   const go = useCallback(
     (route: PushRoute) => {
+      if (onboardingRef.current) return;
       if (!canNavigateRef.current || !navigationRef.isReady()) {
         pending.current = route;
         return;
