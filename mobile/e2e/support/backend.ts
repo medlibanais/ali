@@ -7,6 +7,16 @@ import { resolveSupabase } from '../scripts/local-supabase';
 
 const { url, anonKey, mailpitUrl } = resolveSupabase();
 
+type RealtimeTransport = NonNullable<
+  NonNullable<Parameters<typeof createClient>[2]>['realtime']
+>['transport'];
+
+class NoRealtime {
+  constructor() {
+    throw new Error('Realtime is not used by the e2e tests');
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -59,6 +69,9 @@ export async function confirmEmail(email: string): Promise<void> {
 export async function signInAs(email: string, password: string): Promise<SupabaseClient> {
   const client = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Node 20 (CI) has no WebSocket, and supabase-js builds a realtime client
+    // on creation. The tests never open a realtime channel, so a stub is enough.
+    realtime: { transport: NoRealtime as unknown as RealtimeTransport },
   });
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`Node sign-in failed: ${error.message}`);

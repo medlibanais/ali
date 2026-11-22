@@ -157,7 +157,12 @@ describe('New user journey', () => {
     await element(by.id('avatar-save')).tap();
 
     // Saving at the end of onboarding opens the app on Today.
-    await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(LONG);
+    try {
+      await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(LONG);
+    } catch (e) {
+      await logScreen('Avatar saved but Today did not show');
+      throw e;
+    }
 
     const client = await signInAs(EMAIL, PASSWORD);
     const profile = await readProfile(client);
