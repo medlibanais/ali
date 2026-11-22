@@ -5,7 +5,7 @@
 // Runs against the local Supabase (`npm run db:start`); see e2e/README.md.
 import { expect as jestExpect } from '@jest/globals';
 import { by, device, element, expect, waitFor } from 'detox';
-import { ensureAppFocus, prepareEmulator } from './support/android';
+import { ensureAppFocus, logJsConsole, prepareEmulator } from './support/android';
 import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
 
 const RUN = Date.now().toString(36);
@@ -227,6 +227,7 @@ describe('New user journey', () => {
       } catch (err) {
         console.warn(`[db after save] unreadable: ${(err as Error).message.split('\n')[0]}`);
       }
+      if (device.getPlatform() === 'android') logJsConsole('after avatar save');
       await logScreen('Avatar saved but Today did not show');
       await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(1000);
     }

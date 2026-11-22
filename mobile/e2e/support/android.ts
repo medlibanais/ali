@@ -86,3 +86,17 @@ export function ensureAppFocus(): void {
     execFileSync('sleep', ['1']);
   }
 }
+
+/** Prints the app's recent JavaScript console and error lines (diagnostic). */
+export function logJsConsole(why: string): void {
+  try {
+    const log = adb(['logcat', '-d', '-t', '4000']);
+    const lines = log
+      .split('\n')
+      .filter((l) => /ReactNativeJS|AndroidRuntime|FATAL|SoftException/.test(l))
+      .slice(-40);
+    console.warn(`[js console ${why}]\n${lines.join('\n') || '(no ReactNativeJS lines)'}`);
+  } catch (e) {
+    console.warn(`logcat failed: ${(e as Error).message.split('\n')[0]}`);
+  }
+}
