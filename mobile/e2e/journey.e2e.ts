@@ -50,6 +50,17 @@ async function revealInScroll(id: string, scrollId: string, index = 0): Promise<
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** One sample of the top screen's accessibility label (diagnostic). */
+async function logTop(why: string): Promise<void> {
+  try {
+    const xml = await device.generateViewHierarchyXml();
+    const m = /ReactRootView[^>]*label="([^"]{0,60})/.exec(xml);
+    console.warn(`[top ${why}] ${m ? m[1] : '(no root label)'}`);
+  } catch {
+    console.warn(`[top ${why}] (hierarchy unavailable)`);
+  }
+}
+
 /** Logs the top screen's accessibility label each time it changes. */
 async function traceTopScreen(why: string, seconds: number): Promise<void> {
   let last = '';
@@ -167,14 +178,18 @@ describe('New user journey', () => {
 
   it('3. creates a custom avatar and saves it', async () => {
     // The button sits below the fold on the small CI screen.
+    await logTop('before design-by-hand');
     await tapInScroll('ai-avatar-design-by-hand', 'ai-avatar-scroll');
     await waitFor(element(by.id('avatar-randomize'))).toBeVisible().withTimeout(LONG);
 
+    await logTop('avatar editor open');
     // Customize: a few rolls of the dice so the look differs from the default.
     for (let i = 0; i < 3; i += 1) {
       await element(by.id('avatar-randomize')).tap();
+      await logTop(`after roll ${i + 1}`);
     }
     await element(by.id('avatar-save')).tap();
+    await logTop('right after save tap');
 
     // Trace which screen is on top for a few seconds after save (diagnostic).
     await traceTopScreen('after avatar save', 12);
