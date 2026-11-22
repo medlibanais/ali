@@ -54,8 +54,11 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 async function logTop(why: string): Promise<void> {
   try {
     const xml = await device.generateViewHierarchyXml();
-    const m = /ReactRootView[^>]*label="([^"]{0,400})/.exec(xml);
-    console.warn(`[top ${why}] ${m ? m[1] : '(no root label)'}`);
+    const m = /ReactRootView[^>]*label="([^"]*)"/.exec(xml);
+    const label = m ? m[1] : '(no root label)';
+    // Start of the label names the screen; the end holds any toast text.
+    const shown = label.length > 360 ? `${label.slice(0, 120)} ... ${label.slice(-220)}` : label;
+    console.warn(`[top ${why}] ${shown}`);
   } catch {
     console.warn(`[top ${why}] (hierarchy unavailable)`);
   }
@@ -200,15 +203,22 @@ describe('New user journey', () => {
       await element(by.id('avatar-randomize')).tap();
       await logTop(`after roll ${i + 1}`);
     }
-    await element(by.id('avatar-save')).tap();
-    await logTop('right after save tap');
-
-    // Saving at the end of onboarding opens the app on Today.
-    try {
-      await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(LONG);
-    } catch (e) {
+    // Saving at the end of onboarding opens the app on Today. If the first
+    // tap does not take, tap again while the editor is still up, and log
+    // what the screen says (the end of the label holds any error toast).
+    let onToday = false;
+    for (let attempt = 0; attempt < 3 && !onToday; attempt += 1) {
+      await element(by.id('avatar-save')).tap();
+      try {
+        await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(12000);
+        onToday = true;
+      } catch {
+        await logTop(`after save tap ${attempt + 1}`);
+      }
+    }
+    if (!onToday) {
       await logScreen('Avatar saved but Today did not show');
-      throw e;
+      await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(1000);
     }
 
     const client = await signInAs(EMAIL, PASSWORD);
