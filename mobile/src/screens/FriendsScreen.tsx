@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
@@ -51,8 +50,8 @@ import {
   type RankedRow,
 } from '../features/friends/logic';
 import { useFriendsXpRealtime } from '../features/friends/useFriendsXpRealtime';
+import { useFriendshipRealtime } from '../features/friends/useFriendshipRealtime';
 import { bestStreakLabel } from '../lib/format';
-import { supabase } from '../lib/supabase';
 import { useAppSelector } from '../store/hooks';
 import { borderWidth, colors, radius, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
@@ -94,12 +93,12 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const { t } = useTranslation();
   useTheme();
   const toast = useToast();
-  const queryClient = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const myProfile = useAppSelector((state) => state.user.profile);
   const [section, setSection] = useState<Section>('friends');
   const [query, setQuery] = useState('');
-  const [inviteCode, setInviteCode] = useState(route?.params?.code ?? '');
+  const myUserId = useAppSelector((state) => state.auth.userId);
+  const [inviteCode, setInviteCode] = useState('');
 
   const circle = useCircle();
   const requests = useFriendRequests();
@@ -143,40 +142,13 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
     (r) => r.direction === 'incoming',
   ).length;
 
-  // Realtime: requests to you and answers to your requests refresh
-  // the lists instantly.
-  useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user || cancelled) return;
-      const refresh = () => queryClient.invalidateQueries({ queryKey: ['friends'] });
-      channel = supabase
-        .channel(`friendships:${data.user.id}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'friendships', filter: `addressee=eq.${data.user.id}` },
-          refresh,
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'friendships', filter: `requester=eq.${data.user.id}` },
-          refresh,
-        )
-        .subscribe();
-    });
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  // Realtime: requests, answers, unfriends and blocks refresh the lists.
+  useFriendshipRealtime(myUserId);
 
-  // Deep-link invite code arrives prefilled.
+  // An invite link opens this screen; useRedeemPendingInvite (app root)
+  // connects you on its own, so show the friends list it lands in.
   useEffect(() => {
-    if (route?.params?.code) {
-      setSection('find');
-      setInviteCode(route.params.code);
-    }
+    if (route?.params?.code) setSection('friends');
   }, [route?.params?.code]);
 
   const shareInvite = async () => {
@@ -315,7 +287,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
           <>
             <Button title={t('friends.inviteFriends')} onPress={shareInvite} style={styles.inviteButton} />
             <Button
-              title="Party quests"
+              title={t('friends.partyQuests')}
               variant="secondary"
               onPress={() => navigation.navigate('PartyQuests')}
               style={styles.inviteButton}
@@ -443,6 +415,13 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
                       onPress={() => answer(request, false)}
                       disabled={isBusy(request.friendship_id)}
                       style={styles.declineButton}
+                    />
+                    <Button
+                      title={t('friends.block')}
+                      variant="ghost"
+                      onPress={() => confirmBlock(request.user.id, displayName(request.user))}
+                      disabled={isBusy(request.friendship_id) || block.isPending}
+                      style={styles.blockButton}
                     />
                   </View>
                 ) : (
@@ -639,6 +618,9 @@ const styles = themed(() =>
     },
     declineButton: {
       flex: 1,
+    },
+    blockButton: {
+      marginStart: spacing.sm,
     },
     cancelRequest: {
       marginTop: spacing.md,

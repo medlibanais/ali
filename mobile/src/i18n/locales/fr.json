@@ -788,7 +788,8 @@
     "cheerOn": "Encourager {{name}}",
     "cheered": "Encouragé",
     "cheer": "Encourager",
-    "youCheeredOn": "Tu as encouragé {{name}}."
+    "youCheeredOn": "Tu as encouragé {{name}}.",
+    "partyQuests": "Quêtes en groupe"
   },
   "achievements": {
     "common": "Commun",

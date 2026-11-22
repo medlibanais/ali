@@ -164,3 +164,32 @@ export function inviteLink(code: string): string {
 export function inviteMessage(code: string): string {
   return i18n.t('friendErrors.inviteMessage', { code, link: inviteLink(code) });
 }
+
+/**
+ * Reads the invite code out of a friend invite link
+ * (prayerlock://add-friend?code=ABC12345). Returns null for any other URL
+ * or a code that cannot be one (codes are 4 to 16 letters and digits).
+ */
+export function inviteCodeFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = /^[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*\/)*add-friend\/?\?([^#]*)/i.exec(url.trim());
+  if (!match) return null;
+  for (const pair of match[1].split('&')) {
+    const [key, value = ''] = pair.split('=');
+    if (key !== 'code') continue;
+    let code: string;
+    try {
+      code = decodeURIComponent(value.replace(/\+/g, ' '));
+    } catch {
+      return null;
+    }
+    code = code.trim().toUpperCase();
+    return /^[A-Z0-9]{4,16}$/.test(code) ? code : null;
+  }
+  return null;
+}
+
+/** Live friendship changes arrive on this private topic (migration 0041). */
+export function friendshipTopic(userId: string): string {
+  return `friends:${userId}`;
+}

@@ -776,7 +776,8 @@
     "cheerOn": "Cheer on {{name}}",
     "cheered": "Cheered",
     "cheer": "Cheer",
-    "youCheeredOn": "You cheered on {{name}}."
+    "youCheeredOn": "You cheered on {{name}}.",
+    "partyQuests": "Party quests"
   },
   "achievements": {
     "common": "Common",
