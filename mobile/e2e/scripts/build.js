@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Builds the Release app Detox tests: `node e2e/scripts/build.js android|ios`.
+// Builds the Release app Detox tests: `node e2e/scripts/build.js android`.
 // Called by `detox build`. Works on Windows, macOS and Linux.
 //
 // 1. Points the bundled app at the test Supabase (local by default).
 // 2. `expo prebuild --clean` with DETOX_E2E=1 so app.config.js adds the
-//    Detox native harness. android/ and ios/ are generated and gitignored.
+//    Detox native harness. android/ is generated and gitignored.
 // 3. Native Release build (+ the androidTest APK on Android).
 // 4. Checks the JS bundle really contains the test Supabase URL, so a stale
 //    cache can never send the tests to the live project.
@@ -14,12 +14,8 @@ const path = require('path');
 const { resolveSupabase, urlForPlatform } = require('./local-supabase');
 
 const platform = process.argv[2];
-if (platform !== 'android' && platform !== 'ios') {
-  console.error('Usage: node e2e/scripts/build.js android|ios');
-  process.exit(1);
-}
-if (platform === 'ios' && process.platform !== 'darwin') {
-  console.error('The iOS app can only be built on macOS (Xcode).');
+if (platform !== 'android') {
+  console.error('Usage: node e2e/scripts/build.js android');
   process.exit(1);
 }
 
@@ -73,7 +69,7 @@ console.log(`E2E app will use Supabase at ${appUrl}`);
 // Metro caches transformed files, including inlined EXPO_PUBLIC_ values.
 fs.rmSync(path.join(MOBILE, 'node_modules', '.cache'), { recursive: true, force: true });
 
-// prebuild rewrites the "android"/"ios" scripts in package.json; put the
+// prebuild rewrites the "android" script in package.json; put the
 // file back afterwards so an E2E build leaves the working tree clean.
 const pkgPath = path.join(MOBILE, 'package.json');
 const pkg = fs.readFileSync(pkgPath, 'utf8');
@@ -99,19 +95,6 @@ if (platform === 'android') {
   bundle = path.join(
     MOBILE,
     'android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle',
-  );
-} else {
-  run('xcodebuild', [
-    '-workspace', 'ios/GROW.xcworkspace',
-    '-scheme', 'GROW',
-    '-configuration', 'Release',
-    '-sdk', 'iphonesimulator',
-    '-derivedDataPath', 'ios/build',
-    '-quiet',
-  ]);
-  bundle = path.join(
-    MOBILE,
-    'ios/build/Build/Products/Release-iphonesimulator/GROW.app/main.jsbundle',
   );
 }
 

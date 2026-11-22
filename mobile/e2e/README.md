@@ -1,7 +1,7 @@
 # End-to-end tests (Detox)
 
 `journey.e2e.ts` walks a brand-new user through the app on a real
-Android emulator or iOS simulator:
+Android emulator:
 
 1. Launch, tap **Create account**, register with a fresh email and a password
    that meets the rules (8+ chars, upper, number, symbol).
@@ -37,9 +37,6 @@ from the repo root clears them.
   The default AVD name is `Pixel_7_API_34`; use yours with
   `set DETOX_AVD=<name>` (Windows) or `export DETOX_AVD=<name>`.
   `emulator -list-avds` lists them. `ANDROID_HOME` must be set.
-- **iOS** (macOS only): Xcode with an iPhone simulator, and
-  `brew tap wix/brew && brew install applesimutils`. Default device is
-  `iPhone 15`; change it with `DETOX_IOS_DEVICE`.
 
 ## Run
 
@@ -49,8 +46,6 @@ From `mobile/`:
 npm run e2e:build:android   # once per app change, ~10 min the first time
 npm run e2e:test:android
 
-npm run e2e:build:ios       # macOS only
-npm run e2e:test:ios
 ```
 
 The build is a **Release** build made just for tests (`e2e/scripts/build.js`):
@@ -60,10 +55,6 @@ builds natively. The Supabase URL and key come from `supabase status`
 (the Android app uses `10.0.2.2`, the emulator's name for your computer).
 The script checks the built bundle contains that URL before it finishes.
 Your normal dev client and EAS builds do not get any Detox code.
-
-iOS can't be built on Windows. To run it without a Mac, use a macOS CI
-runner (for example GitHub Actions `macos-14`) with the same two commands
-after `npm run db:start`.
 
 Failing steps save a screenshot and the device log in `e2e/artifacts/`.
 
