@@ -133,8 +133,6 @@ describe('New user journey', () => {
     await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
     await revealInScroll('onboarding-username', 'onboarding-scroll');
     await element(by.id('onboarding-username')).replaceText(USERNAME);
-    // The keyboard closes once the username is typed; then tap Continue.
-    await tapInScroll('onboarding-continue', 'onboarding-scroll');
     await tapInScroll('onboarding-continue', 'onboarding-scroll');
 
     // Next stop is the avatar. Skip the photo/AI path and build it by hand.
