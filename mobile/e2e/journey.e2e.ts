@@ -217,6 +217,16 @@ describe('New user journey', () => {
       }
     }
     if (!onToday) {
+      // Did the save reach the database? Tells a stuck request from a stuck screen.
+      try {
+        const c = await signInAs(EMAIL, PASSWORD);
+        const p = await readProfile(c);
+        console.warn(
+          `[db after save] onboarding_completed=${String(p.onboarding_completed)} avatar_config_keys=${Object.keys(p.avatar_config ?? {}).length}`,
+        );
+      } catch (err) {
+        console.warn(`[db after save] unreadable: ${(err as Error).message.split('\n')[0]}`);
+      }
       await logScreen('Avatar saved but Today did not show');
       await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(1000);
     }
