@@ -54,7 +54,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 async function logTop(why: string): Promise<void> {
   try {
     const xml = await device.generateViewHierarchyXml();
-    const m = /ReactRootView[^>]*label="([^"]{0,60})/.exec(xml);
+    const m = /ReactRootView[^>]*label="([^"]{0,400})/.exec(xml);
     console.warn(`[top ${why}] ${m ? m[1] : '(no root label)'}`);
   } catch {
     console.warn(`[top ${why}] (hierarchy unavailable)`);
@@ -165,7 +165,19 @@ describe('New user journey', () => {
     await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
     await revealInScroll('onboarding-username', 'onboarding-scroll');
     await element(by.id('onboarding-username')).replaceText(USERNAME);
-    await tapInScroll('onboarding-continue', 'onboarding-scroll');
+    // The last Continue saves the profile. If the first tap does not take
+    // (keyboard, focus), tap again while still on step 7, and log what the
+    // screen says so a failure explains itself.
+    let reachedAvatar = false;
+    for (let attempt = 0; attempt < 3 && !reachedAvatar; attempt += 1) {
+      await tapInScroll('onboarding-continue', 'onboarding-scroll');
+      try {
+        await waitFor(element(by.id('ai-avatar-design-by-hand'))).toExist().withTimeout(15000);
+        reachedAvatar = true;
+      } catch {
+        await logTop(`onboarding Continue attempt ${attempt + 1}`);
+      }
+    }
 
     // Next stop is the avatar. Skip the photo/AI path and build it by hand.
     await waitFor(element(by.id('ai-avatar-design-by-hand'))).toExist().withTimeout(LONG);
