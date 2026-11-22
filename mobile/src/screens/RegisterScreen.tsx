@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,15 +30,23 @@ export function RegisterScreen({ navigation, route }: Props) {
   useTheme();
   const dispatch = useAppDispatch();
   const { busy, error } = useAppSelector((state) => state.auth);
+  // Opened from a friend's invite link: the code is already known.
+  const pendingInvite = useAppSelector((state) => state.auth.pendingInviteCode);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(
-    route.params?.showInvite ?? false,
+    (route.params?.showInvite ?? false) || pendingInvite !== null,
   );
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(pendingInvite ?? '');
+
+  useEffect(() => {
+    if (!pendingInvite) return;
+    setInviteVisible(true);
+    setInviteCode((current) => current || pendingInvite);
+  }, [pendingInvite]);
 
   const allRulesMet = passwordRulesMet(password);
 
@@ -60,6 +68,9 @@ export function RegisterScreen({ navigation, route }: Props) {
       const code = inviteCode.trim().toUpperCase();
       if (code.length >= 4) {
         dispatch(setPendingInviteCode(code));
+      } else if (pendingInvite) {
+        // They cleared the code from the link on purpose.
+        dispatch(setPendingInviteCode(null));
       }
       navigation.navigate('VerifyEmail', { email: email.trim() });
     }

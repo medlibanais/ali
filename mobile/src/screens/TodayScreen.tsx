@@ -36,7 +36,6 @@ import { useToast } from '../components/Toast';
 import { BellGlyph, ChevronGlyph, PillarGlyph } from '../components/icons';
 import type { Quest } from '../api/types';
 import XpBar from '../features/celebrations/XpBar';
-import { useRedeemInvite } from '../features/friends/api';
 import { useUnreadCount } from '../features/notifications/api';
 import { markFirstScreenPainted } from '../lib/bootSplash';
 import { bestStreakLabel, streakLabel } from '../lib/format';
@@ -55,7 +54,6 @@ import {
   selectTodayList,
   type TodayList,
 } from '../store/selectors/today';
-import { setPendingInviteCode } from '../store/slices/authSlice';
 import { fetchProfile } from '../store/slices/userSlice';
 import {
   completeQuest,
@@ -419,32 +417,6 @@ export function TodayScreen({ navigation, route }: Props) {
     // Offline completions sync in the background (OfflineBanner).
     load(false);
   }, [load]);
-
-  // Redeem a pending invite code (deep link / register flow) exactly once.
-  const pendingInvite = useAppSelector((state) => state.auth.pendingInviteCode);
-  const redeemInvite = useRedeemInvite();
-  useEffect(() => {
-    if (!pendingInvite) return;
-    let cancelled = false;
-    redeemInvite
-      .mutateAsync(pendingInvite)
-      .then((result) => {
-        if (cancelled) return;
-        if (result.redeemed) {
-          showToast({
-            message: t('today.inviteAcceptedYouAre'),
-          });
-        }
-        dispatch(setPendingInviteCode(null));
-      })
-      .catch(() => {
-        if (!cancelled) dispatch(setPendingInviteCode(null));
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingInvite]);
 
   // A tapped streak alert opens Today with its weakest pillar expanded.
   const pillarParam = route.params?.pillar;

@@ -29,6 +29,7 @@ import OfflineBanner from './features/offline/OfflineBanner';
 import { holdSplash } from './lib/bootSplash';
 import { hydrateLanguage } from './store/slices/languageSlice';
 import { isRtlLanguage } from './i18n/languages';
+import { useInviteLinkCapture } from './features/friends/useInviteLinks';
 
 // Keep the native splash up until the first real screen has been drawn
 // (see lib/bootSplash.ts). Runs before the first render.
@@ -59,6 +60,9 @@ function ThemedRoot() {
   const userId = useAppSelector((state) => state.auth.userId);
   const appReady = useAppSelector((state) => state.auth.status === 'ready');
   const [navReady, setNavReady] = useState(false);
+
+  // Friend invite links: keep the code until you are signed in.
+  useInviteLinkCapture();
 
   // Streak alerts and other pushes: token on login, tap opens Today.
   usePushNotifications(navigationRef, userId, appReady, navReady);

@@ -32,6 +32,7 @@ import PartyQuestScreen from '../screens/PartyQuestScreen';
 import PartyInviteScreen from '../screens/PartyInviteScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
+import { useRedeemPendingInvite } from '../features/friends/useInviteLinks';
 import MainTabs from './MainTabs';
 import type {
   AppStackParamList,
@@ -126,6 +127,7 @@ function AppNavigator() {
   useTheme();
   useNotificationBanner();
   useLanguageSync();
+  useRedeemPendingInvite();
   const { t } = useTranslation();
   return (
     <AppStack.Navigator screenOptions={appStackOptions}>
