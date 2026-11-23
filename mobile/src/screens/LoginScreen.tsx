@@ -55,12 +55,13 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen scroll keyboardAvoiding>
+    <Screen scroll keyboardAvoiding testID="login-scroll">
       <AuthHeader title={t('login.welcomeBack')} subtitle={t('login.signInToPick')} />
 
       <Card style={styles.form}>
         <Field
           label={t('login.email')}
+          testID="login-email"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -74,6 +75,7 @@ export function LoginScreen({ navigation }: Props) {
         />
         <Field
           label={t('login.password')}
+          testID="login-password"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -82,6 +84,8 @@ export function LoginScreen({ navigation }: Props) {
           error={passwordError}
           secureTextEntry
           autoCapitalize="none"
+          returnKeyType="go"
+          onSubmitEditing={submit}
           placeholder={t('login.yourPassword')}
           containerStyle={styles.passwordField}
         />
@@ -105,6 +109,7 @@ export function LoginScreen({ navigation }: Props) {
 
         <Button
           title={t('login.signIn')}
+          testID="login-submit"
           winTitle={t('login.letSGrow')}
           icon={ArrowRightGlyph}
           onPress={submit}
@@ -123,6 +128,7 @@ export function LoginScreen({ navigation }: Props) {
 
       <Button
         title={t('login.createAccount')}
+        testID="login-create-account"
         variant="secondary"
         onPress={() => navigation.navigate('Register')}
       />

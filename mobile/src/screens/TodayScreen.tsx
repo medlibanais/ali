@@ -342,7 +342,7 @@ const ProgressStrip = memo(function ProgressStrip({
           <Txt variant="caption" color={colors.inkSoft} numberOfLines={1}>
             {currentTitle ?? titleForLevel(level)}
           </Txt>
-          <Txt variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
+          <Txt testID="today-total-xp" variant="bodySemi" style={styles.stripValue} numberOfLines={1}>
             {t('common.xp', { count: totalXp, formatted: totalXp.toLocaleString(appLocale()) })}
           </Txt>
         </View>
@@ -525,6 +525,7 @@ export function TodayScreen({ navigation, route }: Props) {
 
   return (
     <Screen
+      testID="today-scroll"
       scroll
       refreshControl={
         <RefreshControl

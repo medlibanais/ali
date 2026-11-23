@@ -76,6 +76,7 @@ export function QuestRow({
     >
       {onComplete && !quest.completed && !dimmed ? (
         <Pressable
+          testID="quest-complete"
           accessibilityRole="checkbox"
           accessibilityState={{ checked: false }}
           accessibilityLabel={t('questRow.complete', { title: quest.title })}
