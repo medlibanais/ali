@@ -1,6 +1,6 @@
 import './i18n';
 import { Avatar3DHost } from './avatar/Avatar3D';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import {
@@ -62,6 +62,20 @@ function ThemedRoot() {
 
   // Streak alerts and other pushes: token on login, tap opens Today.
   usePushNotifications(navigationRef, userId, appReady, navReady, onboarding);
+
+  // Finishing onboarding swaps the onboarding stack for the app stack.
+  // React Navigation reuses the old stack's state and keeps the routes whose
+  // names exist in both (AiAvatar, AvatarCreator), so a new user would land
+  // back on the avatar editor. Start the app on Today instead.
+  const authStatus = useAppSelector((state) => state.auth.status);
+  const prevAuthStatus = useRef(authStatus);
+  useEffect(() => {
+    const was = prevAuthStatus.current;
+    prevAuthStatus.current = authStatus;
+    if (was === 'needsOnboarding' && authStatus === 'ready' && navigationRef.isReady()) {
+      navigationRef.resetRoot({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  }, [authStatus]);
 
   const profileLoaded = useAppSelector((state) => state.user.profile !== null);
   const remoteTheme = useAppSelector((state) => state.user.profile?.theme_preference ?? null);
