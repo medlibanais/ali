@@ -22,6 +22,7 @@ import type {
   UndoQuestResponse,
 } from '../../api/types';
 import type { Pillar } from '../../theme/tokens';
+import { logout, sessionExpired } from './authSlice';
 import { fetchGamification, type GamificationState } from './gamificationSlice';
 import type { SyncState } from './syncSlice';
 import { refreshPendingCompletions } from '../pendingCompletions';
@@ -42,6 +43,7 @@ export interface QuestsState {
   quests: Quest[];
   loading: boolean;
   refreshing: boolean;
+  dailyRequestId: string | null;
   error: string | null;
   skipsUsed: number;
   undo: UndoState | null;
@@ -56,6 +58,7 @@ const initialState: QuestsState = {
   quests: [],
   loading: false,
   refreshing: false,
+  dailyRequestId: null,
   error: null,
   skipsUsed: 0,
   undo: null,
@@ -148,20 +151,22 @@ function rpcError(error: { message?: string } | null, fallback: string): string 
   return fallback;
 }
 
+const pendingQuestGeneration = new Set<string>();
+
+type FetchDailyArgs = { silent?: boolean; refreshAfterGeneration?: boolean };
+
 export const fetchDailyQuests = createAsyncThunk<
   DailyQuestsResponse,
-  { silent?: boolean } | undefined,
+  FetchDailyArgs | undefined,
   { rejectValue: string; state: QuestThunkState }
 >('quests/fetchDaily', async (args, { dispatch, getState, rejectWithValue }) => {
-  const userId = getState().auth?.userId ?? null;
-  // Actions still waiting in the offline queue stay applied on screen.
-  const withQueued = async (day: DailyQuestsResponse): Promise<DailyQuestsResponse> => {
-    if (!userId) return day;
-    return applyQueuedActions(day, await readOfflineQueue(userId));
-  };
+  const userId = getState().auth.userId;
+  if (!userId) return rejectWithValue(i18n.t('errors.notSignedIn'));
+
+  const date = todayLocal();
+  const withQueued = async (day: DailyQuestsResponse): Promise<DailyQuestsResponse> =>
+    applyQueuedActions(day, await readOfflineQueue(userId));
   try {
-    const date = todayLocal();
-    // Ensure today's quests exist (personalized assignment, no repeats).
     const { error: assignError } = await supabase.rpc('assign_daily_quests', {
       p_date: date,
     });
@@ -171,23 +176,23 @@ export const fetchDailyQuests = createAsyncThunk<
       supabase
         .from('quests')
         .select('*, quest_completions(id, completed_at, undone_at)')
+        .eq('user_id', userId)
         .eq('assigned_date', date)
         .order('pillar')
         .order('priority'),
       supabase
         .from('daily_scores')
-        .select('*')
+        .select('overall, health, family, work, fun, spirituality')
+        .eq('user_id', userId)
         .eq('score_date', date)
         .maybeSingle(),
     ]);
     if (questsRes.error) throw questsRes.error;
+    if (scoreRes.error) throw scoreRes.error;
 
     const quests = ((questsRes.data ?? []) as QuestRow[]).map(rowToQuest);
     const score = scoreRes.data;
-    reportOnline();
-
-    // Fresh copy for offline days.
-    saveQuestsCache({
+    const day: DailyQuestsResponse = {
       date,
       daily_life_score: score?.overall ?? 0,
       pillars: score
@@ -200,39 +205,41 @@ export const fetchDailyQuests = createAsyncThunk<
           }
         : {},
       quests,
-    }).catch(() => undefined);
+    };
+    reportOnline();
+    saveQuestsCache(userId, day);
 
-    // Coach picks arrive a moment later: generate in the background and
-    // refresh silently. Idempotent server-side (one log row per day).
-    if (!quests.some((q) => q.is_ai_generated)) {
-      supabase.functions
-        .invoke('generate-quests', { body: {} })
-        .then(() => {
-          dispatch(fetchDailyQuests({ silent: true }));
+    const generationKey = `${userId}:${date}`;
+    if (
+      !args?.refreshAfterGeneration &&
+      getState().auth.userId === userId &&
+      !quests.some((q) => q.is_ai_generated) &&
+      !pendingQuestGeneration.has(generationKey)
+    ) {
+      pendingQuestGeneration.add(generationKey);
+      void supabase.functions
+        .invoke<{ results?: Record<string, string> }>('generate-quests', { body: {} })
+        .then(async ({ data, error }) => {
+          const result = data?.results?.[userId];
+          if (
+            !error &&
+            (result === 'already_done' || result?.startsWith('ok:')) &&
+            getState().auth.userId === userId &&
+            todayLocal() === date
+          ) {
+            await dispatch(fetchDailyQuests({ silent: true, refreshAfterGeneration: true }));
+          }
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => pendingQuestGeneration.delete(generationKey));
     }
 
-    return withQueued({
-      date,
-      daily_life_score: score?.overall ?? 0,
-      pillars: score
-        ? {
-            health: score.health,
-            family: score.family,
-            work: score.work,
-            fun: score.fun,
-            spirituality: score.spirituality,
-          }
-        : {},
-      quests,
-    });
+    return withQueued(day);
   } catch (error) {
-    if (isOfflineError(error)) reportOffline();
-    // Offline: serve the last cached day so the app still works.
-    const cached = await loadQuestsCache();
-    if (cached && cached.date === todayLocal()) {
-      return withQueued(cached);
+    if (isOfflineError(error)) {
+      reportOffline();
+      const cached = loadQuestsCache(userId);
+      if (cached?.date === date) return withQueued(cached);
     }
     return rejectWithValue(
       rpcError(error as { message?: string }, i18n.t('questErrors.loadFailed')),
@@ -448,15 +455,18 @@ const questsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(sessionExpired, () => initialState)
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(logout.rejected, () => initialState)
       .addCase(fetchDailyQuests.pending, (state, action) => {
+        state.dailyRequestId = action.meta.requestId;
         state.error = null;
-        if (action.meta.arg?.silent) {
-          state.refreshing = true;
-        } else {
-          state.loading = true;
-        }
+        state.refreshing = Boolean(action.meta.arg?.silent) && state.date !== null;
+        state.loading = !state.refreshing;
       })
       .addCase(fetchDailyQuests.fulfilled, (state, action) => {
+        if (state.dailyRequestId !== action.meta.requestId) return;
+        state.dailyRequestId = null;
         state.loading = false;
         state.refreshing = false;
         if (state.date !== null && state.date !== action.payload.date) {
@@ -470,6 +480,8 @@ const questsSlice = createSlice({
         state.quests = action.payload.quests;
       })
       .addCase(fetchDailyQuests.rejected, (state, action) => {
+        if (state.dailyRequestId !== action.meta.requestId) return;
+        state.dailyRequestId = null;
         state.loading = false;
         state.refreshing = false;
         state.error = action.payload ?? i18n.t('questErrors.loadFailed');

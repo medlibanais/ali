@@ -26,7 +26,7 @@ import {
   pillarAverages,
   summarizePeriod,
   useAiInsights,
-  useScoresLastDays,
+  useScoresRange,
   useStreakInfo,
   type DayScore,
   type PeriodSummary,
@@ -43,7 +43,7 @@ import {
   type BehavioralPatterns,
   type PatternInsight,
 } from '../features/analytics/patterns';
-import { todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
+import { addDays, todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
 import { useAppSelector } from '../store/hooks';
@@ -402,34 +402,33 @@ export function InsightsScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const gamification = useAppSelector((state) => state.gamification);
 
-  // Two periods of data each, so we can compare with the previous one.
-  const days14 = useScoresLastDays(14);
-  const days60 = useScoresLastDays(60);
-  const streak = useStreakInfo();
-  const aiInsights = useAiInsights();
+  const userId = useAppSelector((state) => state.auth.userId);
+  const timezone = useAppSelector((state) => state.user.profile?.timezone);
+  const today = todayInTimezone(timezone);
+  const scores = useScoresRange(userId, addDays(today, -59), today);
+  const streak = useStreakInfo(userId);
+  const aiInsights = useAiInsights(userId);
 
   const { current, previous } = useMemo(() => {
     const len = period === 'week' ? 7 : 30;
-    const rows = (period === 'week' ? days14.data : days60.data) ?? [];
-    const today = new Date();
-    const cutoff = new Date(today.getTime() - (len - 1) * 86400000).toISOString().slice(0, 10);
+    const cutoff = addDays(today, 1 - len);
+    const previousStart = addDays(today, 1 - 2 * len);
+    const rows = scores.data ?? [];
     return {
       current: rows.filter((d) => d.date >= cutoff),
-      previous: rows.filter((d) => d.date < cutoff),
+      previous: rows.filter((d) => d.date >= previousStart && d.date < cutoff),
     };
-  }, [period, days14.data, days60.data]);
+  }, [period, scores.data, today]);
 
   const weekSummary = useMemo(() => {
-    const rows = days14.data ?? [];
-    const cutoff = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-    return summarizePeriod(rows.filter((d) => d.date >= cutoff), []);
-  }, [days14.data]);
+    const cutoff = addDays(today, -6);
+    return summarizePeriod((scores.data ?? []).filter((d) => d.date >= cutoff), []);
+  }, [scores.data, today]);
 
   const summary = useMemo(() => summarizePeriod(current, previous), [current, previous]);
   const items = takeaways(summary, period);
   const coach = (aiInsights.data ?? []).slice(0, 2);
 
-  const loading = days14.isLoading || (period === 'month' && days60.isLoading);
   const level = streak.data?.level ?? gamification.level;
 
   return (
@@ -453,9 +452,14 @@ export function InsightsScreen() {
 
       <SegmentedControl<Period> options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
 
-      {loading ? (
+      {scores.isLoading ? (
         <View style={styles.section}>
           <InsightsSkeleton />
+        </View>
+      ) : scores.isLoadingError ? (
+        <View style={styles.section}>
+          <EmptyState title={t('errors.loadProgress')} />
+          <Button title={t('common.retry')} onPress={() => void scores.refetch()} />
         </View>
       ) : (
         <View style={styles.section}>
@@ -486,8 +490,8 @@ export function InsightsScreen() {
           </Accordion>
 
           <Momentum
-            streak={streak.data?.current ?? gamification.currentStreak}
-            best={streak.data?.best ?? 0}
+            streak={streak.data?.current_streak ?? gamification.currentStreak}
+            best={streak.data?.best_streak ?? gamification.bestStreak}
             level={level}
           />
 

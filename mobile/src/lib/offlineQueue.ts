@@ -12,7 +12,7 @@ import { kvStore, readJson, writeJson } from './kvStore';
 import type { DailyQuestsResponse, Quest } from '../api/types';
 import type { Pillar } from '../theme/tokens';
 
-const CACHE_KEY = 'prayerlock.dailyQuests.v1';
+const CACHE_KEY = 'prayerlock.dailyQuests.v2';
 export const QUEUE_KEY = 'prayerlock.offline_queue';
 const LEGACY_QUEUE_KEY = 'prayerlock.completionQueue.v1';
 
@@ -326,12 +326,12 @@ export function pendingXpOf(
 
 // ------------------------------------------------------------- day cache
 
-export async function saveQuestsCache(payload: DailyQuestsResponse): Promise<void> {
-  writeJson(CACHE_KEY, payload);
+export function saveQuestsCache(userId: string, payload: DailyQuestsResponse): void {
+  writeJson(`${CACHE_KEY}.${userId}`, payload);
 }
 
-export async function loadQuestsCache(): Promise<DailyQuestsResponse | null> {
-  return readJson<DailyQuestsResponse>(CACHE_KEY);
+export function loadQuestsCache(userId: string): DailyQuestsResponse | null {
+  return readJson<DailyQuestsResponse>(`${CACHE_KEY}.${userId}`);
 }
 
 // ----------------------------------------------------------------- errors

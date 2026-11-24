@@ -94,6 +94,7 @@ function setup(expandedPillar: Quest['pillar'] | null) {
       theme: themeReducer,
     },
   });
+  store.dispatch(fetchDailyQuests.pending('req', undefined));
   store.dispatch(
     fetchDailyQuests.fulfilled(
       {

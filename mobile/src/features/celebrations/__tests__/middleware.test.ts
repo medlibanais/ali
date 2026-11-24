@@ -141,6 +141,7 @@ it('does not replay after a relaunch (marks are persisted per user)', async () =
 
 it('a completion sends XP particles; an optimistic rollback sends nothing', async () => {
   const store = makeStore();
+  store.dispatch(fetchDailyQuests.pending('req', undefined));
   store.dispatch(fetchDailyQuests.fulfilled(
     { date: DATE, daily_life_score: 0, pillars: {}, quests: [quest('a'), quest('b'), quest('c'), quest('d')] },
     'req',
@@ -163,6 +164,7 @@ it('a completion sends XP particles; an optimistic rollback sends nothing', asyn
 it('Perfect Day shows once, after the last quest, not on a refetch', async () => {
   const store = makeStore();
   const ids = ['a', 'b', 'c'];
+  store.dispatch(fetchDailyQuests.pending('req', undefined));
   store.dispatch(fetchDailyQuests.fulfilled(
     { date: DATE, daily_life_score: 0, pillars: {}, quests: ids.map(quest) },
     'req',
@@ -178,6 +180,7 @@ it('Perfect Day shows once, after the last quest, not on a refetch', async () =>
 
   // A silent refresh with everything done, or another completion event for
   // the same day, does not bring it back.
+  store.dispatch(fetchDailyQuests.pending('refresh', { silent: true }));
   store.dispatch(fetchDailyQuests.fulfilled(
     {
       date: DATE,
@@ -185,7 +188,7 @@ it('Perfect Day shows once, after the last quest, not on a refetch', async () =>
       pillars: {},
       quests: ids.map((id) => ({ ...quest(id), completed: true })),
     },
-    'req',
+    'refresh',
     { silent: true },
   ));
   store.dispatch(done('c'));

@@ -4,13 +4,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { configureStore } from '@reduxjs/toolkit';
 import type { Quest } from '../../api/types';
-import authReducer from '../slices/authSlice';
+import authReducer, { sessionExpired } from '../slices/authSlice';
 import gamificationReducer from '../slices/gamificationSlice';
 import questsReducer, { completeQuest, fetchDailyQuests, undoQuest } from '../slices/questsSlice';
 import syncReducer from '../slices/syncSlice';
 import { completedElsewhere, setFlushPaceForTests, syncOfflineCompletions } from '../offlineSync';
 import { syncMachineMiddleware } from '../syncMachineMiddleware';
-import { QUEUE_KEY, readOfflineQueue } from '../../lib/offlineQueue';
+import { QUEUE_KEY, localDateOf, readOfflineQueue, saveQuestsCache } from '../../lib/offlineQueue';
 import { kvStore } from '../../lib/kvStore';
 import { isOnline, reportOffline, reportOnline, resetConnectivityForTests } from '../../lib/connectivity';
 
@@ -23,6 +23,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 type RpcResult = { data: unknown; error: { message: string; code?: string } | null };
 const mockCalls: { name: string; params: Record<string, unknown> }[] = [];
 let mockRpcImpl: (name: string, params: Record<string, unknown>) => Promise<RpcResult>;
+const mockInvoke = jest.fn<Promise<RpcResult>, []>();
 let mockServerGam = { level: 1, total_xp: 0, xp_today: 0, xp_today_date: null as string | null, current_streak: 0, best_streak: 0 };
 
 function mockBuilder(result: unknown) {
@@ -44,7 +45,7 @@ jest.mock('../../lib/supabase', () => ({
     },
     auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
     from: (table: string) => mockBuilder(table === 'gamification' ? mockServerGam : null),
-    functions: { invoke: () => new Promise(() => undefined) },
+    functions: { invoke: () => mockInvoke() },
   },
 }));
 
@@ -83,6 +84,9 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   kvStore.delete(QUEUE_KEY);
   kvStore.delete('prayerlock.dailyQuests.v1');
+  kvStore.delete('prayerlock.dailyQuests.v2.u1');
+  mockInvoke.mockReset();
+  mockInvoke.mockResolvedValue({ data: { results: { u1: 'fallback:unavailable' } }, error: null });
   mockCalls.length = 0;
   resetConnectivityForTests();
   mockServerGam = { level: 1, total_xp: 0, xp_today: 0, xp_today_date: null, current_streak: 0, best_streak: 0 };
@@ -189,18 +193,12 @@ it('undo of an offline completion just leaves the queue', async () => {
 
 it('keeps queued quests ticked when the day reloads offline', async () => {
   const store = makeStore();
-  kvStore.set(
-    'prayerlock.dailyQuests.v1',
-    JSON.stringify({
-      date: (() => {
-        const d = new Date();
-        return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
-      })(),
-      daily_life_score: 0,
-      pillars: {},
-      quests: [quest('a'), quest('b')],
-    }),
-  );
+  saveQuestsCache('u1', {
+    date: localDateOf(new Date()),
+    daily_life_score: 0,
+    pillars: {},
+    quests: [quest('a'), quest('b')],
+  });
   reportOffline();
   await store.dispatch(completeQuest(quest('a')));
   mockRpcImpl = offlineRpc;
@@ -209,6 +207,59 @@ it('keeps queued quests ticked when the day reloads offline', async () => {
   expect(qs.find((q) => q.quest_id === 'a')?.completed).toBe(true);
   expect(qs.find((q) => q.quest_id === 'b')?.completed).toBe(false);
   expect(store.getState().quests.pillarScores.health).toBe(50);
+});
+
+it('ignores old unowned and other accounts’ offline quest caches', async () => {
+  const store = makeStore();
+  const day = {
+    date: localDateOf(new Date()),
+    daily_life_score: 0,
+    pillars: {},
+    quests: [quest('private')],
+  };
+  kvStore.set('prayerlock.dailyQuests.v1', JSON.stringify(day));
+  saveQuestsCache('another-user', day);
+  mockRpcImpl = offlineRpc;
+
+  const result = await store.dispatch(fetchDailyQuests());
+  expect(fetchDailyQuests.rejected.match(result)).toBe(true);
+  expect(store.getState().quests.quests).toEqual([]);
+});
+
+it('ignores a daily quest response that finishes after signing out', async () => {
+  const store = makeStore();
+  let finish: (result: RpcResult) => void = () => undefined;
+  mockRpcImpl = () => new Promise<RpcResult>((resolve) => { finish = resolve; });
+  const load = store.dispatch(fetchDailyQuests());
+
+  store.dispatch(sessionExpired());
+  finish({ data: [], error: null });
+  await load;
+
+  expect(store.getState().quests.date).toBeNull();
+  expect(mockInvoke).not.toHaveBeenCalled();
+});
+
+it('shares one generation attempt across concurrent daily loads and stops on fallback', async () => {
+  const store = makeStore();
+  mockRpcImpl = () => Promise.resolve({ data: [], error: null });
+  await Promise.all([store.dispatch(fetchDailyQuests()), store.dispatch(fetchDailyQuests())]);
+
+  expect(mockInvoke).toHaveBeenCalledTimes(1);
+  expect(mockCalls.filter((call) => call.name === 'assign_daily_quests')).toHaveLength(2);
+});
+
+it('refreshes once after generation even when the refreshed list has no AI quests', async () => {
+  const store = makeStore();
+  mockRpcImpl = () => Promise.resolve({ data: [], error: null });
+  mockInvoke.mockResolvedValue({ data: { results: { u1: 'ok:2:balanced' } }, error: null });
+
+  await store.dispatch(fetchDailyQuests());
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(mockCalls.filter((call) => call.name === 'assign_daily_quests')).toHaveLength(2);
+  expect(mockInvoke).toHaveBeenCalledTimes(1);
+  expect(store.getState().quests.refreshing).toBe(false);
 });
 
 it('drives the XState machine: OptimisticPending, Syncing, then Synced', async () => {
