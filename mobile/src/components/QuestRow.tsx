@@ -1,6 +1,20 @@
+// Motion (frequent action, so it stays small and under 300 ms):
+// - the empty checkbox squashes under the finger (anticipation) and the
+//   drawn tick pops in slightly too big, then settles (squash and stretch);
+// - a beat later the XP pill bumps (secondary action, follow-through);
+// - the sparks start from the finger (origin awareness, XpParticles).
 import React, { memo, useEffect, useRef } from 'react';
 import i18n from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import type { Quest } from '../api/types';
 import {
@@ -17,6 +31,7 @@ import {
 import { useTheme } from '../theme/useTheme';
 import { rememberCompletionOrigin } from '../features/celebrations/anchors';
 import { playHaptic } from '../lib/haptics';
+import { DURATION, SPRING } from '../lib/motion';
 import DrawnCheck from './DrawnCheck';
 import { SparklesGlyph, StarGlyph } from './icons';
 import { PressableScale } from './Motion';
@@ -28,6 +43,17 @@ export interface QuestRowProps {
   /** When set, the checkbox completes the quest in place. */
   onComplete?: (quest: Quest) => void;
   showPillarLabel?: boolean;
+}
+
+/** Pops its child in a little too big, then settles. Plays once on mount. */
+function PopIn({ play, children }: { play: boolean; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(play && !reduceMotion ? 0.6 : 1);
+  useEffect(() => {
+    if (scale.value !== 1) scale.value = withSpring(1, SPRING.pop);
+  }, [scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 export const DIFFICULTY_LABELS: Readonly<Record<Quest['difficulty'], string>> = {
@@ -59,6 +85,20 @@ export function QuestRow({
   useEffect(() => {
     wasDone.current = quest.completed;
   }, [quest.completed]);
+  const reduceMotion = useReducedMotion();
+  const press = useSharedValue(1);
+  const xpBump = useSharedValue(1);
+  useEffect(() => {
+    if (!justDone || reduceMotion) return;
+    xpBump.value = withDelay(
+      DURATION.instant,
+      withSequence(withTiming(1.16, { duration: 110 }), withSpring(1, SPRING.settle)),
+    );
+    // Only a fresh completion bumps; justDone is derived from props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justDone]);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+  const xpStyle = useAnimatedStyle(() => ({ transform: [{ scale: xpBump.value }] }));
   // Block tiles: the whole row takes the pillar color with black text.
   const block = blockTiles();
   const tileInk = colors.onAccent;
@@ -75,6 +115,7 @@ export function QuestRow({
       style={[styles.row, blockRow, dimmed && styles.dimmed]}
     >
       {onComplete && !quest.completed && !dimmed ? (
+        <Animated.View style={pressStyle}>
         <Pressable
           testID="quest-complete"
           accessibilityRole="checkbox"
@@ -90,6 +131,13 @@ export function QuestRow({
             onComplete(quest);
           }}
           hitSlop={11}
+          onPressIn={() => {
+            if (!reduceMotion) press.value = withSpring(0.8, SPRING.press);
+          }}
+          onPressOut={() => {
+            // Springs from wherever it is: a cancelled press just lets go.
+            press.value = withSpring(1, SPRING.pop);
+          }}
           style={({ pressed }) => [
             styles.check,
             block
@@ -98,7 +146,9 @@ export function QuestRow({
             pressed && { backgroundColor: block ? withAlpha(tileInk, 0.15) : pastel.tint },
           ]}
         />
+        </Animated.View>
       ) : quest.completed ? (
+        <PopIn play={justDone}>
         <DrawnCheck
           animate={justDone}
           color={block ? pillarColor : colors.onAccent}
@@ -108,6 +158,7 @@ export function QuestRow({
             block && { backgroundColor: tileInk, borderColor: tileInk },
           ]}
         />
+        </PopIn>
       ) : (
         <View
           style={[
@@ -155,12 +206,12 @@ export function QuestRow({
           ) : null}
         </View>
       </View>
-      <View style={[styles.xpPill, block && { backgroundColor: tileInk }]}>
+      <Animated.View style={[styles.xpPill, block && { backgroundColor: tileInk }, xpStyle]}>
         <StarGlyph size={13} />
         <Txt variant="bodySemi" color={block ? colors.ink : colors.ink} style={styles.xp}>
           {t('common.xpPlus', { count: quest.xp_reward })}
         </Txt>
-      </View>
+      </Animated.View>
     </PressableScale>
   );
 }

@@ -2,9 +2,23 @@
 // module: drag the thumb, tap the track, or use the accessibility
 // increment/decrement actions. `onChange` fires while dragging (for live
 // previews) and `onCommit` once when the finger lifts (for undo history).
+//
+// Rubber banding: dragging past either end pulls the thumb a little
+// further with growing resistance and stretches it along the track
+// (squash and stretch); letting go springs it back with a small wobble.
 
 import React, { useMemo, useRef, useState } from 'react';
-import { PanResponder, Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  Animated,
+  PanResponder,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
+import { rubberBand } from '../lib/motion';
 import { colors, mix, spacing, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import Txt from './Txt';
@@ -28,6 +42,9 @@ export interface SliderProps {
 
 const THUMB = 26;
 const TOUCH = 44;
+/** The furthest the thumb can be pulled past an end, in px. */
+const BAND = 22;
+const useNative = Platform.OS !== 'web';
 
 export function Slider({ label, value, min = -1, max = 1, step = 0.05, low, high, valueText, onChange, onCommit, tint }: SliderProps) {
   useTheme();
@@ -38,6 +55,32 @@ export function Slider({ label, value, min = -1, max = 1, step = 0.05, low, high
   latest.current = value;
   const cb = useRef({ onChange, onCommit });
   cb.current = { onChange, onCommit };
+  const reduceMotion = useReducedMotion();
+  const reduceRef = useRef(reduceMotion);
+  reduceRef.current = reduceMotion;
+  const overshoot = useRef(new Animated.Value(0)).current;
+  const thumbMotion = useMemo(
+    () => ({
+      transform: [
+        { translateX: overshoot },
+        {
+          scaleX: overshoot.interpolate({
+            inputRange: [-BAND, 0, BAND],
+            outputRange: [1.25, 1, 1.25],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scaleY: overshoot.interpolate({
+            inputRange: [-BAND, 0, BAND],
+            outputRange: [0.88, 1, 0.88],
+            extrapolate: 'clamp',
+          }),
+        },
+      ],
+    }),
+    [overshoot],
+  );
 
   const snap = (v: number) => {
     const clamped = Math.max(min, Math.min(max, v));
@@ -58,18 +101,40 @@ export function Slider({ label, value, min = -1, max = 1, step = 0.05, low, high
         },
         onPanResponderMove: (_e, g) => {
           const span = Math.max(1, widthRef.current - THUMB);
-          const next = snapRef.current.snap(startRef.current + (g.dx / span) * (max - min));
+          const raw = startRef.current + (g.dx / span) * (max - min);
+          const next = snapRef.current.snap(raw);
           if (next !== latest.current) {
             latest.current = next;
             cb.current.onChange(next);
           }
+          if (!reduceRef.current) {
+            const past = raw > max ? raw - max : raw < min ? raw - min : 0;
+            overshoot.setValue(rubberBand((past / (max - min)) * span, BAND));
+          }
         },
-        onPanResponderRelease: () => cb.current.onCommit?.(latest.current),
-        onPanResponderTerminate: () => cb.current.onCommit?.(latest.current),
+        onPanResponderRelease: () => {
+          springBack();
+          cb.current.onCommit?.(latest.current);
+        },
+        onPanResponderTerminate: () => {
+          springBack();
+          cb.current.onCommit?.(latest.current);
+        },
         onPanResponderTerminationRequest: () => false,
       }),
-    [min, max],
+    // springBack only touches `overshoot`, which never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [min, max, overshoot],
   );
+
+  function springBack() {
+    Animated.spring(overshoot, {
+      toValue: 0,
+      speed: 24,
+      bounciness: 10,
+      useNativeDriver: useNative,
+    }).start();
+  }
 
   const set = (next: number) => {
     const v = snap(next);
@@ -136,7 +201,10 @@ export function Slider({ label, value, min = -1, max = 1, step = 0.05, low, high
         <View style={styles.track} pointerEvents="none" />
         {min < 0 ? <View style={[styles.tick, { left: zeroX - 1 }]} pointerEvents="none" /> : null}
         <View style={[styles.fill, { left: fillLeft, width: fillWidth }, tint ? { backgroundColor: tint } : null]} pointerEvents="none" />
-        <View style={[styles.thumb, { left: thumbX }, tint ? { borderColor: tint } : null]} pointerEvents="none" />
+        <Animated.View
+          style={[styles.thumb, { left: thumbX }, tint ? { borderColor: tint } : null, thumbMotion]}
+          pointerEvents="none"
+        />
       </Pressable>
       </View>
       {low || high ? (

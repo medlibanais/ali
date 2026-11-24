@@ -25,9 +25,9 @@ export const CelebrationHost = memo(function CelebrationHost() {
   }, [dispatch, current]);
 
   // A takeover lands with a heavy double thump (lib/haptics PRESETS).
+  // Level-up plays its own, timed to the ring burst (LevelUpModal).
   React.useEffect(() => {
-    if (current?.kind === 'levelUp') playHaptic('levelUp');
-    else if (current?.kind === 'perfectDay') playHaptic('perfectDay');
+    if (current?.kind === 'perfectDay') playHaptic('perfectDay');
   }, [current?.id, current?.kind]);
 
   // Reduced motion: no flying particles, just the bar's glow.

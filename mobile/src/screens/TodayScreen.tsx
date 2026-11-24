@@ -26,7 +26,8 @@ import { VALID_OPTION_IDS } from '../avatar/options';
 import Backdrop from '../components/Backdrop';
 import EmptyState from '../components/EmptyState';
 import { FadeInUp, PressableScale } from '../components/Motion';
-import PillarOrbit from '../components/PillarOrbit';
+import { originVector, staggerDelay } from '../lib/motion';
+import PillarOrbit, { ORBIT_ANGLES } from '../components/PillarOrbit';
 import type { PillarId } from '../components/PillarBubble';
 import QuestRow from '../components/QuestRow';
 import Screen from '../components/Screen';
@@ -185,19 +186,29 @@ export const TodayQuestItem = memo(function TodayQuestItem({
   showPillarLabel,
   onOpen,
   onComplete,
+  baseDelay = 220,
+  from,
 }: {
   questId: string;
   index: number;
   showPillarLabel: boolean;
   onOpen: (quest: Quest) => void;
   onComplete: (quest: Quest) => void;
+  /** Wait before the first row moves (0 once the user is tapping around). */
+  baseDelay?: number;
+  /** Where the row enters from: the side of the tapped pillar. */
+  from?: { x: number; y: number };
 }) {
   const quest = useAppSelector((state) => selectQuestById(state, questId));
-  // The entrance stagger is fixed at mount; reordering must not replay it.
-  const delay = useRef(220 + index * 50).current;
+  // The entrance is fixed at mount; reordering must not replay it.
+  const entrance = useRef({
+    delay: staggerDelay(index, 40, 6, baseDelay),
+    x: from?.x ?? 0,
+    y: from?.y ?? 12,
+  }).current;
   if (!quest) return null;
   return (
-    <FadeInUp delay={delay}>
+    <FadeInUp delay={entrance.delay} fromX={entrance.x} distance={entrance.y}>
       <QuestRow
         quest={quest}
         onPress={onOpen}
@@ -236,6 +247,13 @@ export const QuestSection = memo(function QuestSection({
     sameTodayList,
   );
   const hiddenCount = list.inScopeCount - list.ids.length;
+  // Origin awareness: a pillar's quests slide in from that pillar's side of
+  // the orbit, one after another. Once the user has tapped a pillar the
+  // rows start at once (Doherty threshold: under 400 ms to respond).
+  const tapped = useRef(false);
+  if (expandedPillar !== null) tapped.current = true;
+  const from = expandedPillar ? originVector(ORBIT_ANGLES[expandedPillar], 28) : undefined;
+  const baseDelay = tapped.current ? 0 : 220;
   const scopeLabel =
     expandedPillar === null ? t('today.upNext') : t('today.today', { pillar: PILLAR_LABELS[expandedPillar] });
 
@@ -255,7 +273,8 @@ export const QuestSection = memo(function QuestSection({
           accessibilityRole="button"
           accessibilityLabel={expandedPillar !== null ? t('today.showAllPillars') : t('today.seeAllQuests')}
           onPress={expandedPillar !== null ? onClearPillar : onSeeAll}
-          hitSlop={10}
+          hitSlop={12}
+          style={styles.seeAll}
         >
           <Txt variant="bodySemi" color={colors.accent}>
             {expandedPillar !== null ? t('today.showAll') : t('today.seeAll')}
@@ -279,11 +298,14 @@ export const QuestSection = memo(function QuestSection({
       ) : (
         <>
           {list.openCount === 0 ? (
-            <Txt variant="body" color={colors.inkSoft} align="center" style={styles.allDone}>
-              {expandedPillar === null
-                ? t('today.everythingIsDoneFor')
-                : t('today.allQuestsAreDone', { pillar: PILLAR_LABELS[expandedPillar].toLowerCase() })}
-            </Txt>
+            // Peak-end: the list's last word rises in, not just appears.
+            <FadeInUp distance={8}>
+              <Txt variant="body" color={colors.inkSoft} align="center" style={styles.allDone}>
+                {expandedPillar === null
+                  ? t('today.everythingIsDoneFor')
+                  : t('today.allQuestsAreDone', { pillar: PILLAR_LABELS[expandedPillar].toLowerCase() })}
+              </Txt>
+            </FadeInUp>
           ) : null}
           {list.ids.map((id, index) => (
             <TodayQuestItem
@@ -293,6 +315,8 @@ export const QuestSection = memo(function QuestSection({
               showPillarLabel={expandedPillar === null}
               onOpen={onOpen}
               onComplete={onComplete}
+              baseDelay={baseDelay}
+              from={from}
             />
           ))}
         </>
@@ -669,6 +693,12 @@ const styles = themed(() =>
   },
   allDone: {
     marginBottom: spacing.md,
+  },
+  // Fitts: the text link gets a full 44 px target.
+  seeAll: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingStart: spacing.sm,
   },
   allQuests: {
     flexDirection: 'row',

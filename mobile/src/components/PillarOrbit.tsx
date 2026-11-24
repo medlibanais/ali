@@ -33,7 +33,7 @@ import { StarGlyph } from './icons';
 import { colors, radius, softShadow, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
-const ORBIT_ANGLES: Record<PillarId, number> = {
+export const ORBIT_ANGLES: Readonly<Record<PillarId, number>> = {
   spirituality: -90,
   health: -18,
   family: 54,
@@ -74,11 +74,13 @@ const LivePillarBubble = memo(function LivePillarBubble({
   pillar,
   size,
   expanded,
+  muted,
   onPress,
 }: {
   pillar: PillarId;
   size: number;
   expanded: boolean;
+  muted: boolean;
   onPress: (pillar: PillarId) => void;
 }) {
   const score = useAppSelector((state) => selectPillarScore(state, pillar));
@@ -92,6 +94,7 @@ const LivePillarBubble = memo(function LivePillarBubble({
       done={done}
       total={total}
       expanded={expanded}
+      muted={muted}
       onPress={onPress}
     />
   );
@@ -268,6 +271,7 @@ function PillarOrbitBase({
                 pillar={pillar}
                 size={orb}
                 expanded={expandedPillar === pillar}
+                muted={expandedPillar !== null && expandedPillar !== pillar}
                 onPress={onPillarPress}
               />
             </FloatingOrb>

@@ -5,6 +5,11 @@
 //   3. "LEVEL 12: DISCIPLINED HUMAN" rises in, and a card flips in 3D from
 //      the old title (or level) to the new one.
 //   4. "Share to Instagram" shares a picture of the moment (phone app only).
+// Motion principles: just before the burst the avatar winds up, shrinking a
+// touch while the ring finishes (anticipation); the burst kicks it out
+// bigger than life with the heavy haptic on the same frame (exaggeration);
+// the title card keeps settling after the flip (follow-through). This is
+// the app's peak moment, so it is allowed to run longer than 300 ms.
 // It always uses the Neon palette, like the story card: it is the moment
 // people share, so it looks like GROW whatever theme is set.
 
@@ -33,6 +38,7 @@ import Txt from '../../components/Txt';
 import { useAppSelector } from '../../store/hooks';
 import { THEMES } from '../../theme/themes';
 import { fonts, radius, spacing } from '../../theme/tokens';
+import { playHaptic } from '../../lib/haptics';
 import ConfettiBurst from './ConfettiBurst';
 import type { LevelUpInfo } from './logic';
 
@@ -51,6 +57,8 @@ const BURST_AT = RING_START + RING_MS;
 const TEXT_AT = BURST_AT + 100;
 const FLIP_AT = BURST_AT + 650;
 const FLIP_MS = 750;
+/** The wind-up before the burst. */
+const CHARGE_MS = 220;
 
 function Face({ top, bottom, label, highlight }: { top: string; bottom: string; label: string; highlight: boolean }) {
   return (
@@ -89,26 +97,51 @@ export const LevelUpModal = memo(function LevelUpModal({
   const burst = useSharedValue(done);
   const text = useSharedValue(done);
   const flip = useSharedValue(reduceMotion ? 180 : 0);
+  const charge = useSharedValue(0);
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(
       t('celebrations.levelUpLevel', { toLevel: info.toLevel, toTitle: info.toTitle }),
     );
-    if (reduceMotion) return;
+    if (reduceMotion) {
+      playHaptic('levelUp');
+      return undefined;
+    }
     fade.value = withTiming(1, { duration: 320 });
     grow.value = withDelay(80, withSpring(1, { mass: 1, stiffness: 140, damping: 13 }));
     ring.value = withDelay(RING_START, withTiming(1, { duration: RING_MS, easing: Easing.inOut(Easing.cubic) }));
-    // Haptics: a strong impact belongs here, at BURST_AT (see the haptics work).
+    // Anticipation: charge up as the ring closes, release on the burst.
+    charge.value = withDelay(
+      BURST_AT - CHARGE_MS,
+      withSequence(
+        withTiming(1, { duration: CHARGE_MS, easing: Easing.in(Easing.quad) }),
+        withTiming(0, { duration: 90 }),
+      ),
+    );
+    const thump = setTimeout(() => playHaptic('levelUp'), BURST_AT);
     burst.value = withDelay(BURST_AT, withTiming(1, { duration: 420, easing: Easing.out(Easing.quad) }));
     text.value = withDelay(TEXT_AT, withSpring(1, { mass: 1, stiffness: 120, damping: 15 }));
-    flip.value = withDelay(FLIP_AT, withTiming(180, { duration: FLIP_MS, easing: Easing.inOut(Easing.cubic) }));
-  }, [fade, grow, ring, burst, text, flip, info.toLevel, info.toTitle, reduceMotion]);
+    flip.value = withDelay(
+      FLIP_AT,
+      withSequence(
+        withTiming(186, { duration: FLIP_MS, easing: Easing.inOut(Easing.cubic) }),
+        // Follow-through: overshoots a few degrees, then settles.
+        withSpring(180, { mass: 0.8, stiffness: 180, damping: 9 }),
+      ),
+    );
+    return () => clearTimeout(thump);
+  }, [fade, grow, ring, burst, text, flip, charge, info.toLevel, info.toTitle, reduceMotion]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
   const avatarStyle = useAnimatedStyle(() => ({
     transform: [
       // Scales up from small, then a little kick when the ring bursts.
-      { scale: interpolate(grow.value, [0, 1], [0.3, 1]) * (1 + 0.08 * Math.sin(Math.PI * burst.value)) },
+      {
+        scale:
+          interpolate(grow.value, [0, 1], [0.3, 1]) *
+          (1 - 0.07 * charge.value) *
+          (1 + 0.14 * Math.sin(Math.PI * burst.value)),
+      },
     ],
   }));
   const ringStyle = useAnimatedStyle(() => ({

@@ -1,8 +1,14 @@
 // Motion: small, shared animation helpers that keep the app feeling fluid.
-// - FadeInUp: content eases up into place when a screen mounts.
-// - PressableScale: a Pressable that gently sinks when pressed and springs
-//   back, instead of flashing its opacity.
+// - FadeInUp: content eases into place when it mounts (slow in, slow out,
+//   under 300 ms). `fromX` lets it enter from the side of whatever was
+//   tapped (origin awareness); `delay` staggers a list.
+// - PressableScale: a Pressable that sinks when pressed (anticipation) and
+//   springs back with a small overshoot (follow-through). The spring starts
+//   from wherever the scale is, so it can be interrupted at any moment, and
+//   sliding the finger off cancels the press.
+// Both stay still when the phone asks for reduced motion.
 // The native driver is not available on web, so it is only used natively.
+// Timings live in lib/motion.ts.
 
 import React, { useEffect, useMemo, useRef } from 'react';
 import {
@@ -14,6 +20,10 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
+import { DURATION, EASE_STANDARD } from '../lib/motion';
+
+const easeStandard = Easing.bezier(...EASE_STANDARD);
 
 export const useNative = Platform.OS !== 'web';
 
@@ -21,30 +31,38 @@ export interface FadeInUpProps {
   children: React.ReactNode;
   /** Delay in ms, handy for staggering a list. */
   delay?: number;
-  /** Starting offset in px. */
+  /** Starting offset below, in px. */
   distance?: number;
+  /** Starting offset sideways, in px: enter from the side that was tapped. */
+  fromX?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 export function FadeInUp({
   children,
   delay = 0,
-  distance = 14,
+  distance = 12,
+  fromX = 0,
   style,
 }: FadeInUpProps) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReducedMotion();
+  const progress = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      progress.setValue(1);
+      return undefined;
+    }
     const anim = Animated.timing(progress, {
       toValue: 1,
-      duration: 480,
+      duration: DURATION.max - 20,
       delay,
-      easing: Easing.out(Easing.cubic),
+      easing: easeStandard,
       useNativeDriver: useNative,
     });
     anim.start();
     return () => anim.stop();
-  }, [progress, delay]);
+  }, [progress, delay, reduceMotion]);
 
   return (
     <Animated.View
@@ -53,6 +71,12 @@ export function FadeInUp({
         {
           opacity: progress,
           transform: [
+            {
+              translateX: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [fromX, 0],
+              }),
+            },
             {
               translateY: progress.interpolate({
                 inputRange: [0, 1],
@@ -84,14 +108,18 @@ export function PressableScale({
   ...rest
 }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const reduceMotion = useReducedMotion();
 
-  const to = (value: number) =>
+  const to = (value: number) => {
+    if (reduceMotion) return;
+    // Sink fast with no wobble; release with a little bounce.
     Animated.spring(scale, {
       toValue: value,
       speed: 40,
       bounciness: value === 1 ? 8 : 0,
       useNativeDriver: useNative,
     }).start();
+  };
 
   return (
     <Pressable

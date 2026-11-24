@@ -2,7 +2,8 @@
 //   - useHeroSource(key) (HeroSource.ts): ref for the view a hero flies FROM.
 //   - <HeroTarget heroKey>: wraps the view a hero flies TO. On focus, if a
 //     hero was launched for its key, it starts at the source's position
-//     and size and springs into place on the UI thread (Reanimated).
+//     and size and springs into place on the UI thread (Reanimated),
+//     along a gentle arc rather than a straight line (lib/motion arcPoint).
 
 import React, { useCallback, useRef } from 'react';
 import { View, ViewStyle } from 'react-native';
@@ -14,6 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { heroOffset, heroPending, measureView, takeHero } from '../lib/hero';
+import { arcPoint } from '../lib/motion';
 
 export { useHeroSource } from './HeroSource';
 
@@ -40,8 +42,10 @@ export function HeroTarget({
   children: React.ReactNode;
 }) {
   const ref = useRef<View>(null);
+  // Flight vector and progress: 1 = at the source, 0 = landed.
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const flight = useSharedValue(0);
   const scale = useSharedValue(1);
   // Mounting mid-flight (first visit): start hidden so it never flashes
   // in its final spot before jumping to the start of the flight.
@@ -67,30 +71,30 @@ export function HeroTarget({
         const { dx, dy, scale: s } = heroOffset(from, to);
         tx.value = dx;
         ty.value = dy;
+        flight.value = 1;
         scale.value = s;
         opacity.value = 1;
-        tx.value = withSpring(0, SPRING);
-        ty.value = withSpring(0, SPRING);
+        flight.value = withSpring(0, SPRING);
         scale.value = withSpring(1, SPRING);
       })();
       return () => {
         cancelled = true;
+        flight.value = 0;
         tx.value = 0;
         ty.value = 0;
         scale.value = 1;
         opacity.value = 1;
       };
-    }, [heroKey, opacity, scale, tx, ty]),
+    }, [heroKey, opacity, scale, tx, ty, flight]),
   );
 
-  const animated = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [
-      { translateX: tx.value },
-      { translateY: ty.value },
-      { scale: scale.value },
-    ],
-  }));
+  const animated = useAnimatedStyle(() => {
+    const p = arcPoint(tx.value, ty.value, flight.value, 0.14, 70);
+    return {
+      opacity: opacity.value,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: scale.value }],
+    };
+  });
 
   return (
     <Animated.View ref={ref} collapsable={false} style={[style, animated, { zIndex: 10 }]}>
