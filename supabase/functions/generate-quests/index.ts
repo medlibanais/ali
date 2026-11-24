@@ -10,6 +10,7 @@
 // log 'fallback'. On success the AI quests replace the day's untouched
 // predefined quests.
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callGroq } from '../_shared/llm.ts';
 import {
@@ -36,22 +37,27 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? 'prayerlock-dev-cron-secret';
+  const cronSecret = Deno.env.get('CRON_SECRET');
   const admin = createClient(supabaseUrl, serviceKey);
 
   // ---- auth: cron secret (all users) or user JWT (self only) ----
   let targetUserIds: string[] = [];
   let mode = 'on_demand';
   try {
-    const body = await req.json().catch(() => ({}));
-    mode = body?.mode === 'nightly' ? 'nightly' : 'on_demand';
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        (body.mode !== undefined && body.mode !== 'nightly' && body.mode !== 'on_demand')) {
+      return json({ error: 'invalid_body' }, 400);
+    }
+    mode = body.mode === 'nightly' ? 'nightly' : 'on_demand';
 
     if (mode === 'nightly') {
-      if (req.headers.get('x-cron-secret') !== cronSecret) {
+      if (!matchesConfiguredSecret(req.headers.get('x-cron-secret'), cronSecret)) {
         return json({ error: 'invalid_cron_secret' }, 401);
       }
       const { data: users } = await admin

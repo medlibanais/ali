@@ -12,6 +12,7 @@
 // Written with the service role: the app itself can never write
 // gamification (0012 trigger + 0013 revoke), so the number can't be faked.
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { deliver } from '../_shared/push.ts';
 import {
@@ -36,10 +37,11 @@ interface Profile {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? 'prayerlock-dev-cron-secret';
-  if (req.headers.get('x-cron-secret') !== cronSecret) {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!matchesConfiguredSecret(req.headers.get('x-cron-secret'), cronSecret)) {
     return json({ error: 'invalid_cron_secret' }, 401);
   }
   const admin = createClient(supabaseUrl, serviceKey);
