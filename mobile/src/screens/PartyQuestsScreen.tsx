@@ -95,14 +95,18 @@ export function PartyQuestsScreen({ navigation }: Props) {
   const [size, setSize] = useState(4);
   const [code, setCode] = useState('');
 
+  const trimmed = description.trim();
+  const canStart = trimmed.length >= 3 && trimmed.length <= DESCRIPTION_MAX;
   const startParty = async () => {
+    if (!canStart) return;
     try {
-      const state = await create.mutateAsync({
+      const state = await create.submit({
         pillar,
         description,
         difficulty,
         maxParticipants: size,
       });
+      if (!state) return;
       setDescription('');
       navigation.navigate('PartyQuest', { id: state.id });
       // Offer the invite straight away; the screen also has a button.
@@ -113,9 +117,6 @@ export function PartyQuestsScreen({ navigation }: Props) {
       toast.showToast({ message: partyErrorText(e) });
     }
   };
-
-  const trimmed = description.trim();
-  const canStart = trimmed.length >= 3 && trimmed.length <= DESCRIPTION_MAX;
 
   return (
     <Screen scroll keyboardAvoiding>
@@ -167,7 +168,11 @@ export function PartyQuestsScreen({ navigation }: Props) {
         <TextInput
           style={[styles.input, styles.multiline]}
           value={description}
-          onChangeText={(t) => setDescription(t.slice(0, DESCRIPTION_MAX))}
+          editable={!create.isPending}
+          onChangeText={(text) => {
+            create.startNewDraftAfterSuccess();
+            setDescription(text.slice(0, DESCRIPTION_MAX));
+          }}
           placeholder="Walk 5 km after work"
           placeholderTextColor={colors.inkFaint}
           multiline
