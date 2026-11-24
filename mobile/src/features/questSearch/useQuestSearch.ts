@@ -1,26 +1,16 @@
 // Semantic quest search hook. Debounces typing, then calls the
 // search-quests edge function (which embeds the query with gte-small and
 // runs the search_quests pgvector RPC). Results are cached per query.
-import { useEffect, useState } from 'react';
 import i18n from '../../i18n';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { useDebouncedSearch } from '../../lib/useDebouncedSearch';
 import { describeFunctionError, isNotDeployed } from '../../lib/functionErrors';
 import {
   normalizeQuery,
   parseSearchResponse,
-  SEARCH_DEBOUNCE_MS,
   type QuestSearchResult,
 } from './logic';
-
-export function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(id);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 export class QuestSearchError extends Error {
   constructor(readonly reason: 'offline' | 'not_deployed' | 'unavailable' | 'failed') {
@@ -43,9 +33,14 @@ export function questSearchErrorMessage(error: unknown): string {
   }
 }
 
-async function searchQuests(query: string, limit: number): Promise<QuestSearchResult[]> {
+async function searchQuests(
+  query: string,
+  limit: number,
+  signal: AbortSignal,
+): Promise<QuestSearchResult[]> {
   const { data, error } = await supabase.functions.invoke('search-quests', {
     body: { query, limit },
+    signal,
   });
   if (error) {
     const failure = await describeFunctionError(error);
@@ -58,7 +53,7 @@ async function searchQuests(query: string, limit: number): Promise<QuestSearchRe
 }
 
 export interface QuestSearchState {
-  /** The query actually searched (after debounce + trim); '' when idle. */
+  /** Current normalized input, or an empty string when too short. */
   query: string;
   results: QuestSearchResult[];
   /** True while the user is typing or a request is in flight. */
@@ -68,14 +63,13 @@ export interface QuestSearchState {
 }
 
 export function useQuestSearch(input: string, limit = 5): QuestSearchState {
-  const debounced = useDebouncedValue(input, SEARCH_DEBOUNCE_MS);
-  const query = normalizeQuery(debounced);
-  const pending = normalizeQuery(input) !== query;
+  const query = normalizeQuery(input);
+  const requestQuery = useDebouncedSearch(query);
 
   const result = useQuery({
-    queryKey: ['quest-search', query, limit],
-    queryFn: () => searchQuests(query, limit),
-    enabled: query.length > 0,
+    queryKey: ['quest-search', requestQuery, limit],
+    queryFn: ({ signal }) => searchQuests(requestQuery, limit, signal),
+    enabled: requestQuery.length > 0,
     staleTime: 10 * 60 * 1000,
     retry: (count, err) =>
       count < 1 && err instanceof QuestSearchError && err.reason === 'unavailable',
@@ -83,11 +77,11 @@ export function useQuestSearch(input: string, limit = 5): QuestSearchState {
 
   return {
     query,
-    results: query ? result.data ?? [] : [],
-    searching: query.length > 0 && (pending || result.isFetching),
-    error: query && result.error ? questSearchErrorMessage(result.error) : null,
+    results: requestQuery ? result.data ?? [] : [],
+    searching: query.length > 0 && (!requestQuery || result.isFetching),
+    error: requestQuery && result.error ? questSearchErrorMessage(result.error) : null,
     retry: () => {
-      void result.refetch();
+      if (requestQuery) void result.refetch();
     },
   };
 }

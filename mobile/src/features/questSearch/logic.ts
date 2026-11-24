@@ -4,7 +4,6 @@ import i18n from '../../i18n';
 
 export const MIN_QUERY_LENGTH = 3;
 export const MAX_QUERY_LENGTH = 200;
-export const SEARCH_DEBOUNCE_MS = 350;
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
