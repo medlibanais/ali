@@ -57,8 +57,9 @@ export const selectDayMood = createSelector(
     moodForScore(PILLARS.reduce((sum, p) => sum + (scores[p] ?? 0), 0) / PILLARS.length),
 );
 
-export const selectDoneCount = (state: RootState): number =>
-  selectActiveQuests(state).filter((q) => q.completed).length;
+export const selectDoneCount = createSelector([selectActiveQuests], (active) =>
+  active.filter((q) => q.completed).length,
+);
 
 export const selectActiveCount = (state: RootState): number =>
   selectActiveQuests(state).length;
@@ -86,8 +87,10 @@ export function buildTodayList(active: Quest[], pillar: Pillar | null): TodayLis
   return { ids, openCount: open.length, inScopeCount: inScope.length };
 }
 
-export const selectTodayList = (state: RootState, pillar: Pillar | null): TodayList =>
-  buildTodayList(selectActiveQuests(state), pillar);
+export const selectTodayList = createSelector(
+  [selectActiveQuests, (_state: RootState, pillar: Pillar | null) => pillar],
+  buildTodayList,
+);
 
 /** Equality for useAppSelector: same ids in the same order and same counts. */
 export function sameTodayList(a: TodayList, b: TodayList): boolean {

@@ -30,14 +30,17 @@ import { bgStyle } from './palettes';
 import { loadCachedRender, saveCachedRender, setCacheVersion } from './renderCache';
 import { irisFor, partsFor, skinFor, targetsFor } from './shape';
 import type { AvatarConfig, Mood } from './types';
+import { MODEL_PARTS_VERSION, PACK_ASSETS, PART_PACKS } from './modelParts';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const VIEWER = require('../../assets/avatar3d/viewer.html');
-// The human every avatar is shaped from (built by tools/human/build.py).
+// The human every avatar is shaped from (built by tools/human/build.py and
+// split by scripts/split-human.mjs): a core every render needs, plus one
+// pack per hair, outfit, shoes, glasses and skin, loaded only when worn.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const MODEL: number = require('../../assets/avatar3d/models/human.bin');
+const MODEL: number = require('../../assets/avatar3d/models/core.bin');
 // A new viewer or model changes these hashes, so old disk pictures miss.
-setCacheVersion(`${Asset.fromModule(VIEWER).hash ?? ''}:${Asset.fromModule(MODEL).hash ?? ''}`);
+setCacheVersion(`${Asset.fromModule(VIEWER).hash ?? ''}:${Asset.fromModule(MODEL).hash ?? ''}:${MODEL_PARTS_VERSION}`);
 
 /** 'head-thumb' and 'body-thumb' are the small pictures on the editor's choices. */
 export type Mode = 'head' | 'full-body' | 'head-thumb' | 'body-thumb' | 'head-hd' | 'body-hd';
@@ -225,6 +228,34 @@ async function assetUri(module: number): Promise<string> {
   return asset.localUri ?? asset.uri;
 }
 
+/** Model packs a render command needs (see modelParts.ts). */
+export function packsFor(command: Record<string, unknown>): string[] {
+  const names = new Set<string>();
+  const parts = (command.parts as { id: string }[] | undefined) ?? [];
+  for (const part of parts) for (const name of PART_PACKS[part.id] ?? []) names.add(name);
+  const skin = (command.skin as { id?: string } | undefined)?.id;
+  if (skin) for (const name of PART_PACKS[`skin:${skin}`] ?? []) names.add(name);
+  return [...names].sort();
+}
+
+const packUris = new Map<string, Promise<string>>();
+
+/** URL (web) or local file (Android) of each pack, resolved once. */
+export function packUrls(names: string[]): Promise<Record<string, string>> {
+  return Promise.all(
+    names.map((name) => {
+      let p = packUris.get(name);
+      if (!p) {
+        const module = PACK_ASSETS[name];
+        p = module === undefined ? Promise.reject(new Error(`unknown pack ${name}`)) : assetUri(module);
+        packUris.set(name, p);
+        p.catch(() => packUris.delete(name));
+      }
+      return p.then((uri) => [name, uri] as const);
+    }),
+  ).then((pairs) => Object.fromEntries(pairs));
+}
+
 /**
  * Mount once, near the app root. Hidden; it only renders avatars into
  * images for Avatar3D.
@@ -292,8 +323,13 @@ function RendererHost() {
     }
     busy.current = req;
     setMode(req.mode);
-    // Give the view a frame to take the mode's size before rendering.
-    setTimeout(() => send.current(JSON.stringify({ ...req.command, model: modelUri })), 60);
+    // Resolve only the packs this look wears, then give the view a frame
+    // to take the mode's size before rendering.
+    packUrls(packsFor(req.command))
+      .then((packs) => {
+        setTimeout(() => send.current(JSON.stringify({ ...req.command, model: modelUri, packs })), 60);
+      })
+      .catch(() => onMessage(JSON.stringify({ type: 'error' })));
   };
   pump = next;
 

@@ -7,6 +7,7 @@
 // random config (source 'random') so the app always has something to show.
 // Keys (GROQ_API_KEY, FAL_KEY) come ONLY from Edge Function secrets.
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import {
   extractJson,
@@ -54,12 +55,16 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const webhookSecret = Deno.env.get('AVATAR_WEBHOOK_SECRET') ?? 'prayerlock-dev-cron-secret';
+  const webhookSecret = Deno.env.get('AVATAR_WEBHOOK_SECRET');
   const admin: Admin = createClient(supabaseUrl, serviceKey);
 
   let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    const input: unknown = await req.json();
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return json({ error: 'invalid_body' }, 400);
+    }
+    body = input as Record<string, unknown>;
   } catch {
     return json({ error: 'invalid_body' }, 400);
   }
@@ -69,7 +74,7 @@ Deno.serve(async (req: Request) => {
   let ownerId: string | null = null; // set when a person calls for their own job
   const sentSecret = req.headers.get('x-webhook-secret');
   if (sentSecret !== null) {
-    if (!timingSafeEqual(sentSecret, webhookSecret)) return json({ error: 'forbidden' }, 403);
+    if (!matchesConfiguredSecret(sentSecret, webhookSecret)) return json({ error: 'forbidden' }, 403);
     const record = body.record as Record<string, unknown> | undefined;
     jobId = typeof record?.id === 'string' ? record.id : '';
   } else {
@@ -83,7 +88,7 @@ Deno.serve(async (req: Request) => {
     ownerId = user.id;
     jobId = typeof body.job_id === 'string' ? body.job_id : '';
   }
-  if (!/^[0-9a-f-]{36}$/i.test(jobId)) return json({ error: 'missing_job_id' }, 400);
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(jobId)) return json({ error: 'missing_job_id' }, 400);
 
   // ---- claim the job (only one caller wins) ----
   const job = await claimJob(admin, jobId, ownerId);
@@ -293,13 +298,6 @@ function toBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
 }
 
 function sleep(ms: number): Promise<void> {

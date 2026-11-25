@@ -4,14 +4,18 @@
 // skeleton. Everything here is plain array maths with no three.js, so
 // it runs the same in the WebView and in a test.
 //
-// The data comes from assets/avatar3d/models/human.bin, built by
-// tools/human/build.py.
+// The data comes from assets/avatar3d/models/core.bin plus one pack per
+// wardrobe item (assets/avatar3d/parts/*.bin), built by tools/human/build.py
+// and split by scripts/split-human.mjs. A view stored in a pack names it
+// in `b`; its offset counts from the start of that pack.
 
 type ViewType = 'f32' | 'u16' | 'u32' | 'i16' | 'u8';
 interface View {
   o: number;
   n: number;
   t: ViewType;
+  /** Pack that holds the bytes; absent for the core file. */
+  b?: string;
 }
 interface TextureView extends View {
   mime: string;
@@ -43,6 +47,8 @@ export interface ProxyHeader {
   normalMap?: number;
   hide?: View;
   tint?: boolean;
+  /** Packs this item needs (split model). */
+  packs?: string[];
 }
 interface Header {
   version: number;
@@ -59,7 +65,7 @@ interface Header {
   };
   targets: Record<string, TargetData>;
   proxies: Record<string, ProxyHeader>;
-  skins: Record<string, { map: number; for: string; tone: [number, number, number] }>;
+  skins: Record<string, { map: number; for: string; tone: [number, number, number]; packs?: string[] }>;
   textures: TextureView[];
 }
 
@@ -118,6 +124,7 @@ export class Human {
   readonly header: Header;
   private readonly buf: ArrayBuffer;
   private readonly start: number;
+  private readonly packs = new Map<string, ArrayBuffer>();
   private readonly cache = new Map<View, Num>();
   readonly nVerts: number;
   /** Shaped body, MakeHuman units, before the pose. */
@@ -142,20 +149,56 @@ export class Human {
     this.mats = new Float32Array(nb * 12);
   }
 
+  /** Adds a downloaded pack (scripts/split-human.mjs). */
+  addPack(name: string, buf: ArrayBuffer) {
+    this.packs.set(name, buf);
+  }
+
+  hasPack(name: string): boolean {
+    return this.packs.has(name);
+  }
+
+  /** Packs still missing for these items and this skin. */
+  missingPacks(partIds: readonly string[], skinId?: string): string[] {
+    const want = new Set<string>();
+    for (const id of partIds) for (const p of this.header.proxies[id]?.packs ?? []) want.add(p);
+    if (skinId) for (const p of this.header.skins[skinId]?.packs ?? []) want.add(p);
+    return [...want].filter((p) => !this.packs.has(p));
+  }
+
+  /** Drops packs not needed by these items, to release memory. */
+  keepOnly(partIds: readonly string[], skinId?: string) {
+    const keep = new Set<string>();
+    for (const id of partIds) for (const p of this.header.proxies[id]?.packs ?? []) keep.add(p);
+    if (skinId) for (const p of this.header.skins[skinId]?.packs ?? []) keep.add(p);
+    for (const name of [...this.packs.keys()]) {
+      if (keep.has(name)) continue;
+      this.packs.delete(name);
+      for (const v of [...this.cache.keys()]) if (v.b === name) this.cache.delete(v);
+    }
+  }
+
+  private where(v: { o: number; b?: string }): [ArrayBuffer, number] {
+    if (!v.b) return [this.buf, this.start + v.o];
+    const pack = this.packs.get(v.b);
+    if (!pack) throw new Error(`model pack ${v.b} not loaded`);
+    return [pack, v.o];
+  }
+
   arr(v: View): Num {
     let a = this.cache.get(v);
     if (!a) {
-      const o = this.start + v.o;
+      const [buf, o] = this.where(v);
       a =
         v.t === 'f32'
-          ? new Float32Array(this.buf, o, v.n)
+          ? new Float32Array(buf, o, v.n)
           : v.t === 'u16'
-            ? new Uint16Array(this.buf, o, v.n)
+            ? new Uint16Array(buf, o, v.n)
             : v.t === 'u32'
-              ? new Uint32Array(this.buf, o, v.n)
+              ? new Uint32Array(buf, o, v.n)
               : v.t === 'i16'
-                ? new Int16Array(this.buf, o, v.n)
-                : new Uint8Array(this.buf, o, v.n);
+                ? new Int16Array(buf, o, v.n)
+                : new Uint8Array(buf, o, v.n);
       this.cache.set(v, a);
     }
     return a;
@@ -163,7 +206,8 @@ export class Human {
 
   textureBlob(i: number): Blob {
     const t = this.header.textures[i];
-    return new Blob([new Uint8Array(this.buf, this.start + t.o, t.n)], { type: t.mime });
+    const [buf, o] = this.where(t);
+    return new Blob([new Uint8Array(buf, o, t.n)], { type: t.mime });
   }
 
   /** Blend the targets into the base body and find the joints. */

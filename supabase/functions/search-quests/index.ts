@@ -1,19 +1,19 @@
 // search-quests: semantic search over the quest library.
 // POST { query: string, limit?: number } with the user's JWT.
-// 1. embeds the query with gte-small (built into Edge Functions, no key)
-// 2. calls rpc search_quests(query_embedding) as the user, so RLS applies
+// Validates and rate-limits each authenticated caller before embedding the
+// query, then searches the catalog as the user so RLS applies.
 // Returns the top quests with cosine similarity and a 0-100 relevance.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embed, embedMissing, toPgVector } from '../_shared/embeddings.ts';
 import { relevanceFromSimilarity } from '../_shared/relevance.ts';
+import { parseSearchInput } from './input.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_QUERY = 200;
 const SELF_HEAL_LIMIT = 10;
 
 interface Row {
@@ -52,17 +52,21 @@ Deno.serve(async (req: Request) => {
   } = await userClient.auth.getUser();
   if (!user) return json({ error: 'invalid_session' }, 401);
 
-  const body = (await req.json().catch(() => ({}))) as { query?: unknown; limit?: unknown };
-  const query = typeof body.query === 'string' ? body.query.trim().slice(0, MAX_QUERY) : '';
-  if (query.length < 2) return json({ error: 'query_too_short' }, 400);
-  const limit =
-    typeof body.limit === 'number' && Number.isFinite(body.limit)
-      ? Math.min(20, Math.max(1, Math.round(body.limit)))
-      : 5;
+  const input = parseSearchInput(await req.json().catch(() => null));
+  if ('error' in input) return json(input, 400);
+  const { query, limit } = input;
 
-  // Self-heal: a quest added or edited since the last generate-embeddings
-  // run has a null vector and would be invisible. Embed a few per call.
   const admin = createClient(supabaseUrl, serviceKey);
+  const { error: rateError } = await admin.rpc('reserve_quest_search', { p_user: user.id });
+  if (rateError) {
+    if (rateError.code === 'P0001' && rateError.message === 'rate_limited') {
+      return json({ error: 'rate_limited' }, 429);
+    }
+    console.error('quest search rate limit failed', rateError.code);
+    return json({ error: 'search_unavailable' }, 503);
+  }
+
+  // Embed a few recently added or edited catalog entries with missing vectors.
   const { count: missing } = await admin
     .from('predefined_quests')
     .select('id', { count: 'exact', head: true })
@@ -86,7 +90,10 @@ Deno.serve(async (req: Request) => {
     match_count: limit,
   });
   const t2 = performance.now();
-  if (error) return json({ error: 'search_failed', message: error.message }, 500);
+  if (error) {
+    console.error('quest search failed', error.code);
+    return json({ error: 'search_failed' }, 500);
+  }
 
   const results = ((data ?? []) as Row[]).map((r) => ({
     ...r,

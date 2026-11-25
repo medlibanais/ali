@@ -185,7 +185,22 @@ export interface FlushHooks {
  * Sends the queue for one user, in order. Used by the Redux thunk in the
  * foreground and by the background task (no Redux) in the background.
  */
-export async function flushOfflineQueue(userId: string, hooks: FlushHooks = {}): Promise<SyncResult> {
+export function flushOfflineQueue(userId: string, hooks: FlushHooks = {}): Promise<SyncResult> {
+  // The foreground thunk and the Android background task share this JS
+  // runtime and the queue. Two flushes at once could replay a completion
+  // after its undo (re-completing a quest the person un-ticked), so they
+  // run one after the other; the second sees only what is left.
+  const run = flushChain.then(() => flushOnce(userId, hooks));
+  flushChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+let flushChain: Promise<void> = Promise.resolve();
+
+async function flushOnce(userId: string, hooks: FlushHooks): Promise<SyncResult> {
   const result: SyncResult = {
     synced: 0,
     duplicates: 0,
@@ -200,6 +215,9 @@ export async function flushOfflineQueue(userId: string, hooks: FlushHooks = {}):
   for (; index < queue.length; index += 1) {
     const item = queue[index];
     if (index > 0 && pace > 0) await wait(pace);
+    // Cancelled meanwhile (an undo of a queued completion removes both).
+    const still = await readOfflineQueue(userId);
+    if (!still.some((i) => i.clientId === item.clientId)) continue;
     const outcome = await syncOne(item);
     if (outcome.kind === 'offline') {
       result.stoppedBy = 'offline';

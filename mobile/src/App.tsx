@@ -8,12 +8,10 @@ import {
   LinkingOptions,
   createNavigationContainerRef,
 } from '@react-navigation/native';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { appFonts } from './theme/fonts';
-import { queryClient } from './lib/queryClient';
 import { store } from './store';
 import RootNavigator from './navigation/RootNavigator';
 import SplashScreen from './screens/SplashScreen';
@@ -156,11 +154,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <Provider store={store}>
-        <QueryClientProvider client={queryClient}>
-          <ToastProvider>
-            <ThemedRoot />
-          </ToastProvider>
-        </QueryClientProvider>
+        <ToastProvider>
+          <ThemedRoot />
+        </ToastProvider>
       </Provider>
     </SafeAreaProvider>
   );

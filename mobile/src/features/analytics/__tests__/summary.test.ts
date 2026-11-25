@@ -1,6 +1,9 @@
-jest.mock('../../../lib/supabase', () => ({ supabase: {} }));
+jest.mock('@tanstack/react-query', () => ({ useQuery: jest.fn() }));
+jest.mock('../../../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
-import { summarizePeriod, type DayScore } from '../api';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../../lib/supabase';
+import { summarizePeriod, useScoresRange, type DayScore } from '../api';
 
 function day(date: string, overrides: Partial<DayScore> = {}): DayScore {
   return {
@@ -18,6 +21,26 @@ function day(date: string, overrides: Partial<DayScore> = {}): DayScore {
     ...overrides,
   };
 }
+
+it('scopes personal score requests and cache keys to the signed-in account', async () => {
+  const query = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lte: jest.fn().mockReturnThis(),
+    order: jest.fn().mockResolvedValue({ data: [], error: null }),
+  };
+  (supabase.from as jest.Mock).mockReturnValue(query);
+
+  useScoresRange('account-a', '2026-10-01', '2026-10-31');
+  const [options] = (useQuery as jest.Mock).mock.calls[0];
+  expect(options.queryKey).toContain('account-a');
+  await expect(options.queryFn()).resolves.toEqual([]);
+  expect(supabase.from).toHaveBeenCalledWith('daily_scores');
+  expect(query.eq).toHaveBeenCalledWith('user_id', 'account-a');
+  expect(query.gte).toHaveBeenCalledWith('score_date', '2026-10-01');
+  expect(query.lte).toHaveBeenCalledWith('score_date', '2026-10-31');
+});
 
 describe('summarizePeriod', () => {
   it('handles an empty period', () => {

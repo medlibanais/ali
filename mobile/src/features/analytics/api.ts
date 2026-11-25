@@ -1,7 +1,6 @@
 // Analytics data layer: everything computed from daily_scores,
 // quest_completions and gamification. No mock series anywhere.
 
-import i18n from '../../i18n';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Pillar } from '../../theme/tokens';
@@ -50,17 +49,16 @@ function mapRow(r: ScoreRow): DayScore {
   };
 }
 
-function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-export function useScoresRange(from: string, to: string) {
+export function useScoresRange(userId: string | null, from: string, to: string) {
   return useQuery({
-    queryKey: ['analytics', 'scores', from, to],
+    queryKey: ['analytics', 'scores', userId, from, to],
+    enabled: userId !== null,
     queryFn: async (): Promise<DayScore[]> => {
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('daily_scores')
-        .select('*')
+        .select('score_date, overall, health, family, work, fun, spirituality, assigned_count, completed_count, skipped_count, xp_earned')
+        .eq('user_id', userId)
         .gte('score_date', from)
         .lte('score_date', to)
         .order('score_date');
@@ -70,49 +68,19 @@ export function useScoresRange(from: string, to: string) {
   });
 }
 
-export function useScoresLastDays(days: number) {
-  const to = dateKey(new Date());
-  const from = dateKey(new Date(Date.now() - (days - 1) * 86400000));
-  return useScoresRange(from, to);
-}
-
-export interface StreakInfo {
-  current: number;
-  best: number;
-  level: number;
-  totalXp: number;
-  breaks: string[]; // dates with assigned quests but zero completions (last 12w)
-}
-
-export function useStreakInfo() {
+export function useStreakInfo(userId: string | null) {
   return useQuery({
-    queryKey: ['analytics', 'streak'],
-    queryFn: async (): Promise<StreakInfo> => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error(i18n.t('errors.notSignedIn'));
-      const { data: g } = await supabase
+    queryKey: ['analytics', 'streak', userId],
+    enabled: userId !== null,
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data, error } = await supabase
         .from('gamification')
-        .select('level, total_xp, current_streak, best_streak')
-        .eq('user_id', user.id)
+        .select('level, current_streak, best_streak')
+        .eq('user_id', userId)
         .maybeSingle();
-      const from = dateKey(new Date(Date.now() - 83 * 86400000));
-      const { data: rows } = await supabase
-        .from('daily_scores')
-        .select('score_date, assigned_count, completed_count')
-        .gte('score_date', from)
-        .order('score_date');
-      const breaks = ((rows ?? []) as ScoreRow[])
-        .filter((r) => r.assigned_count > 0 && r.completed_count === 0)
-        .map((r) => r.score_date);
-      return {
-        current: g?.current_streak ?? 0,
-        best: g?.best_streak ?? 0,
-        level: g?.level ?? 1,
-        totalXp: g?.total_xp ?? 0,
-        breaks,
-      };
+      if (error) throw error;
+      return data;
     },
   });
 }
@@ -123,22 +91,21 @@ export interface AiInsight {
   suggestion: string;
 }
 
-export function useAiInsights() {
+export function useAiInsights(userId: string | null) {
   return useQuery({
-    queryKey: ['analytics', 'ai-insights'],
+    queryKey: ['analytics', 'ai-insights', userId],
+    enabled: userId !== null,
     queryFn: async (): Promise<AiInsight[]> => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return [];
-      const { data } = await supabase
+      if (!userId) return [];
+      const { data, error } = await supabase
         .from('ai_insights')
-        .select('insights, week_start')
-        .eq('user_id', user.id)
+        .select('insights')
+        .eq('user_id', userId)
         .order('week_start', { ascending: false })
         .limit(1)
         .maybeSingle();
-      const list = (data?.insights as AiInsight[] | undefined) ?? [];
+      if (error) throw error;
+      const list = data?.insights as AiInsight[] | undefined;
       return Array.isArray(list) ? list : [];
     },
   });
@@ -160,11 +127,11 @@ export function pillarAverages(
 }
 
 export function weekdayPerformance(days: DayScore[]): number[] {
-  // index 0 = Sunday .. 6 = Saturday (JS getDay)
+  // index 0 = Sunday .. 6 = Saturday (UTC date key)
   const sums = new Array(7).fill(0);
   const counts = new Array(7).fill(0);
   for (const d of days) {
-    const wd = new Date(`${d.date}T12:00:00Z`).getDay();
+    const wd = new Date(`${d.date}T12:00:00Z`).getUTCDay();
     if (d.assigned > 0) {
       sums[wd] += d.overall;
       counts[wd] += 1;
@@ -218,7 +185,7 @@ export function summarizePeriod(
   const daysWithData = new Set(
     current
       .filter((d) => d.assigned > 0)
-      .map((d) => new Date(`${d.date}T12:00:00Z`).getDay()),
+      .map((d) => new Date(`${d.date}T12:00:00Z`).getUTCDay()),
   ).size;
   return {
     avgScore: avgOverall(current) ?? 0,

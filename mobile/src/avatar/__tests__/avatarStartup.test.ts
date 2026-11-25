@@ -16,7 +16,7 @@ jest.mock('expo-asset', () => ({
   Asset: { fromModule: () => ({ hash: 'h', uri: 'u', localUri: 'u', downloadAsync: () => Promise.resolve() }) },
 }));
 jest.mock('../../../assets/avatar3d/viewer.html', () => 1, { virtual: true });
-jest.mock('../../../assets/avatar3d/models/human.bin', () => 2, { virtual: true });
+jest.mock('../../../assets/avatar3d/models/core.bin', () => 2, { virtual: true });
 
 // eslint-disable-next-line import/first
 import { __avatar3dInternals, requestRender } from '../Avatar3D';
@@ -56,5 +56,26 @@ describe('hashKey', () => {
   it('is stable and spreads similar keys apart', () => {
     expect(hashKey('a')).toBe(hashKey('a'));
     expect(hashKey('["head",1]')).not.toBe(hashKey('["head",2]'));
+  });
+});
+
+describe('render cache bounds', () => {
+  const { pickEvictions } = jest.requireActual<typeof import('../renderCache')>('../renderCache');
+  const files = (n: number, size: number) =>
+    Array.from({ length: n }, (_, i) => ({ name: `f${i}`, time: i, size }));
+
+  it('keeps at most the entry limit, oldest out first', () => {
+    expect(pickEvictions(files(50, 1000), 48, 1e9)).toEqual(['f0', 'f1']);
+  });
+
+  it('also keeps the folder under the byte limit', () => {
+    // 40 full-body pictures of 250 KB = 10 MB: drop the oldest until <= 8 MB.
+    const out = pickEvictions(files(40, 250_000), 48, 8_000_000);
+    expect(out).toHaveLength(8);
+    expect(out[0]).toBe('f0');
+  });
+
+  it('never deletes the picture just saved', () => {
+    expect(pickEvictions([{ name: 'big', time: 1, size: 9e9 }], 48, 1000)).toEqual([]);
   });
 });

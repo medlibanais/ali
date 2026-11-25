@@ -3,6 +3,7 @@
 // Produces 2-3 insights {pattern, insight, suggestion} stored in
 // ai_insights, plus a weekly_reports row for the completed week.
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callGroq } from '../_shared/llm.ts';
 import { deliver } from '../_shared/push.ts';
@@ -61,15 +62,16 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? 'prayerlock-dev-cron-secret';
+  const cronSecret = Deno.env.get('CRON_SECRET');
   const admin = createClient(supabaseUrl, serviceKey);
 
   let targetUserIds: string[] = [];
-  const isCron = req.headers.get('x-cron-secret') === cronSecret;
+  const isCron = matchesConfiguredSecret(req.headers.get('x-cron-secret'), cronSecret);
   if (isCron) {
     const { data: users } = await admin
       .from('profiles')
@@ -87,6 +89,16 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser();
     if (!user) return json({ error: 'invalid_session' }, 401);
     targetUserIds = [user.id];
+    // On-demand: reserve before any model call (migration 0045).
+    const { error: budgetError } = await admin.rpc('reserve_ai_call', {
+      p_user: user.id,
+      p_action: 'ai_weekly_insights',
+      p_max: 3,
+      p_window: '1 hour',
+    });
+    if (budgetError) {
+      return json({ error: 'rate_limited', retry_after_seconds: 3600 }, 429);
+    }
   }
 
   const results: Record<string, string> = {};

@@ -1,6 +1,10 @@
 # Realistic avatar model
 
-`build.py` packs the avatar model the app loads, `assets/avatar3d/models/human.bin`.
+`build.py` packs the avatar model, `assets/avatar3d/models/human.bin`, and
+`scripts/split-human.mjs` splits it into what the app loads: `models/core.bin`
+(body, shapes, eyes, teeth, brows, lashes) and one file per hair, outfit, shoes,
+glasses and skin in `assets/avatar3d/parts/`, so a render only loads what the
+avatar wears. `human.bin` itself is not committed.
 The app never runs this. Run it only to add or remove hair, clothes or shapes.
 
 ## Sources (all CC0, no attribution required)
@@ -21,7 +25,8 @@ cd mobile/tools/human
 python3 build.py --mh <makehuman checkout> \
   --assets <system assets> <glasses01> <pants01> <shirts01> <hair01> <dress01> <skirts01> <suits01> <shoes01> \
   --out ../../assets/avatar3d/models/human.bin
-cd ../.. && npm run build:avatar3d   # only if avatar3d/*.ts changed
+cd ../.. && node scripts/split-human.mjs   # writes core.bin, parts/ and src/avatar/modelParts.ts
+npm run build:avatar3d                     # only if avatar3d/*.ts changed
 npx jest src/avatar                   # checks the app only asks for what the file holds
 ```
 

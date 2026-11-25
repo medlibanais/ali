@@ -1,7 +1,7 @@
 -- Party Quests (0035): RLS, invites, completion, fair XP, idempotency.
 -- Run with: npm run db:test   (supabase test db, pgTAP)
 begin;
-select plan(30);
+select plan(36);
 
 -- ana creates, ben and cy are ana's friends, dan is a stranger.
 insert into auth.users (id, email) values
@@ -145,6 +145,39 @@ select pg_temp.act_as('00000000-0000-0000-0000-0000000000b3');
 select throws_ok(
   $$select public.join_party_quest((select v from pg_temp.ctx where k = 'code2'))$$,
   'party_full', 'a full party refuses more members');
+
+---------------------------------------------------------------- retrying a create request
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
+-- Ana already created two parties above. The new keyed party fills her quota.
+select public.create_party_quest('fun', 'Legacy party 3');
+select public.create_party_quest('fun', 'Legacy party 4');
+insert into pg_temp.ctx
+  select 'keyed_party', public.create_party_quest(
+    'health', 'Plan a walk', 'medium', 4, '00000000-0000-4000-8000-000000000043'
+  ) ->> 'id';
+select is(
+  public.create_party_quest(
+    'health', '  Plan a walk  ', 'medium', 4, '00000000-0000-4000-8000-000000000043'
+  ) ->> 'id',
+  (select v from pg_temp.ctx where k = 'keyed_party'), 'same key returns the original party at the cap');
+select is(
+  (select count(*)::int from public.party_quests where create_request_id = '00000000-0000-4000-8000-000000000043'),
+  1, 'retry creates no extra party');
+select is(
+  (select count(*)::int from public.party_members where party_id = (select v::uuid from pg_temp.ctx where k = 'keyed_party')),
+  1, 'retry creates no extra host membership');
+select throws_ok(
+  $$select public.create_party_quest('health', 'Changed details', 'medium', 4, '00000000-0000-4000-8000-000000000043')$$,
+  'party_request_mismatch', 'a key cannot be reused with changed details');
+select throws_ok(
+  $$select public.create_party_quest('health', 'Another walk', 'medium', 4, '00000000-0000-4000-8000-000000000044')$$,
+  'party_limit_reached', 'a new request still respects the cap');
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b4');
+select isnt(
+  public.create_party_quest(
+    'health', 'Plan a walk', 'medium', 4, '00000000-0000-4000-8000-000000000043'
+  ) ->> 'id',
+  (select v from pg_temp.ctx where k = 'keyed_party'), 'the key belongs to the creator');
 
 select * from finish();
 rollback;

@@ -10,6 +10,7 @@
 // It works in passes of PASS_LIMIT quests and loops until none are left
 // or the time budget runs out; `remaining` > 0 means "call it again".
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedMissing } from '../_shared/embeddings.ts';
 
@@ -35,14 +36,18 @@ Deno.serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? '';
+  const cronSecret = Deno.env.get('CRON_SECRET');
 
   const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  const byServiceKey = serviceKey !== '' && bearer === serviceKey;
-  const byCron = cronSecret !== '' && req.headers.get('x-cron-secret') === cronSecret;
+  const byServiceKey = matchesConfiguredSecret(bearer, serviceKey);
+  const byCron = matchesConfiguredSecret(req.headers.get('x-cron-secret'), cronSecret);
   if (!byServiceKey && !byCron) return json({ error: 'forbidden' }, 403);
 
-  const body = (await req.json().catch(() => ({}))) as { force?: unknown };
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      (body.force !== undefined && typeof body.force !== 'boolean')) {
+    return json({ error: 'invalid_body' }, 400);
+  }
   const force = body.force === true;
   const admin = createClient(supabaseUrl, serviceKey);
 

@@ -50,6 +50,7 @@ import {
 import ShareProfileSheet from '../features/share/ShareProfileSheet';
 import { bestStreakLabel } from '../lib/format';
 import { levelProgress, xpToNextLevel } from '../lib/levels';
+import { buildAccountExport, ExportError } from '../features/account/exportData';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -213,52 +214,8 @@ export function ProfileScreen({ navigation }: Props) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error(i18n.t('errors.notSignedIn'));
 
-      const [
-        profile,
-        goals,
-        gam,
-        achievements,
-        scores,
-        quests,
-        completions,
-        conversations,
-      ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        supabase.from('user_goals').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('achievements').select('*').eq('user_id', user.id),
-        supabase.from('daily_scores').select('*').eq('user_id', user.id),
-        supabase.from('quests').select('*').eq('user_id', user.id),
-        supabase.from('quest_completions').select('*').eq('user_id', user.id),
-        supabase.from('conversations').select('id').eq('user_id', user.id),
-      ]);
-
-      const conversationIds = (conversations.data ?? []).map(
-        (c: { id: string }) => c.id,
-      );
-      const { data: messages } = conversationIds.length
-        ? await supabase
-            .from('messages')
-            .select('*')
-            .in('conversation_id', conversationIds)
-        : { data: [] };
-
-      const payload = JSON.stringify(
-        {
-          exported_at: new Date().toISOString(),
-          account: { id: user.id, email: user.email },
-          profile: profile.data,
-          goals: goals.data,
-          gamification: gam.data,
-          achievements: achievements.data ?? [],
-          daily_scores: scores.data ?? [],
-          quests: quests.data ?? [],
-          completions: completions.data ?? [],
-          messages: messages ?? [],
-        },
-        null,
-        2,
-      );
+      const exported = await buildAccountExport({ id: user.id, email: user.email });
+      const payload = JSON.stringify(exported, null, 2);
       try {
         await Share.share({ message: payload });
       } catch {
@@ -267,11 +224,14 @@ export function ProfileScreen({ navigation }: Props) {
         });
       }
     } catch (error) {
+      // Say which part failed; never hand over a partial export.
       toast.showToast({
         message:
-          error instanceof Error
-            ? error.message
-            : t('profile.exportIsNotAvailable'),
+          error instanceof ExportError
+            ? t('profile.exportFailedPart', { part: error.section })
+            : error instanceof Error
+              ? error.message
+              : t('profile.exportIsNotAvailable'),
       });
     } finally {
       setExporting(false);

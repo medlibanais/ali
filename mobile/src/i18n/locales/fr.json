@@ -391,7 +391,13 @@
     "backToSignIn": "Retour à la connexion"
   },
   "splash": {
-    "whoAreYouBecoming": "Qui deviens-tu"
+    "whoAreYouBecoming": "Qui deviens-tu",
+    "profileUnavailable": {
+      "title": "Impossible de charger ton compte",
+      "body": "Vérifie ta connexion, puis réessaie. Ta progression est en sécurité.",
+      "retry": "Réessayer",
+      "signOut": "Se déconnecter"
+    }
   },
   "onboarding": {
     "welcome": "Bienvenue",
@@ -729,7 +735,8 @@
     "preparingExport": "Préparation de l'export",
     "exportMyData": "Exporter mes données",
     "youCanSignBack2": "Tu peux te reconnecter à tout moment",
-    "growAtYourOwn": "GROW · À ton rythme"
+    "growAtYourOwn": "GROW · À ton rythme",
+    "exportFailedPart": "Export interrompu : impossible de lire {{part}}. Rien n'a été partagé. Réessaie."
   },
   "friends": {
     "friends": "Amis",

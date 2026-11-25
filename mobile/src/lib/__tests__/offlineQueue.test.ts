@@ -1,3 +1,4 @@
+import { newClientId } from '../clientId';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyQuestsResponse, Quest } from '../../api/types';
 import {
@@ -10,7 +11,6 @@ import {
   estimateXp,
   isMissingSyncRpc,
   isOfflineError,
-  newClientId,
   pendingXpOf,
   permanentSyncReason,
   readOfflineQueue,

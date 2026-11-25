@@ -114,7 +114,23 @@ Deno.serve(async (req: Request) => {
 
   let insights: PatternInsight[] | null = null;
   let source: 'ai' | 'rules' = 'rules';
-  if (hasGroqKey()) {
+  // Reserve the model call first (migration 0045): parallel or repeated
+  // requests past the budget get the rule-based insights instead.
+  let modelAllowed = hasGroqKey();
+  if (modelAllowed && serviceKey) {
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const { error: budgetError } = await admin.rpc('reserve_ai_call', {
+      p_user: user.id,
+      p_action: 'ai_insights',
+      p_max: 6,
+      p_window: '1 hour',
+    });
+    if (budgetError) {
+      console.warn('generate-insights: model budget', budgetError.message);
+      modelAllowed = false;
+    }
+  }
+  if (modelAllowed) {
     const llm = await callGroq(
       [
         { role: 'system', content: buildPrompt(patterns) },

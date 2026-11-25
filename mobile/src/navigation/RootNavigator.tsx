@@ -1,16 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { StyleSheet, View } from 'react-native';
 import { markFirstScreenPainted } from '../lib/bootSplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useLanguageSync } from '../i18n/useLanguageSync';
 import { supabase } from '../lib/supabase';
+import { createQueryClient } from '../lib/queryClient';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { restoreSession, sessionExpired } from '../store/slices/authSlice';
+import { logout, restoreSession, sessionExpired } from '../store/slices/authSlice';
 import { colors, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
-import SplashScreen from '../screens/SplashScreen';
+import SplashScreen, { ProfileUnavailableScreen } from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -210,9 +212,19 @@ function AppNavigator() {
   );
 }
 
+function AccountNavigator() {
+  const [queryClient] = useState(createQueryClient);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppNavigator />
+    </QueryClientProvider>
+  );
+}
+
 export function RootNavigator() {
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
+  const userId = useAppSelector((state) => state.auth.userId);
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -241,6 +253,15 @@ export function RootNavigator() {
           <AuthNavigator />
         </View>
       );
+    case 'profileUnavailable':
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <ProfileUnavailableScreen
+            onRetry={() => dispatch(restoreSession())}
+            onSignOut={() => dispatch(logout())}
+          />
+        </View>
+      );
     case 'needsOnboarding':
       return (
         <View style={styles.fill} onLayout={onOnboardingPainted}>
@@ -248,7 +269,7 @@ export function RootNavigator() {
         </View>
       );
     case 'ready':
-      return <AppNavigator />;
+      return <AccountNavigator key={userId} />;
   }
 }
 

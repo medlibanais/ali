@@ -16,6 +16,7 @@
 // POST body (all optional): { "dry_run": true } lists who would be
 // notified without sending anything.
 
+import { matchesConfiguredSecret } from '../_shared/configuredSecret.ts';
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { deliver } from '../_shared/push.ts';
 
@@ -84,8 +85,8 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'method_not_allowed' }, 405);
   }
 
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? 'prayerlock-dev-cron-secret';
-  if (req.headers.get('x-cron-secret') !== cronSecret) {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!matchesConfiguredSecret(req.headers.get('x-cron-secret'), cronSecret)) {
     return json({ error: 'invalid_cron_secret' }, 401);
   }
 
@@ -99,13 +100,12 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
-  let dryRun = false;
-  try {
-    const body = (await req.json()) as { dry_run?: unknown } | null;
-    dryRun = body?.dry_run === true;
-  } catch {
-    // Empty or invalid body: normal cron call.
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      (body.dry_run !== undefined && typeof body.dry_run !== 'boolean')) {
+    return json({ error: 'invalid_body' }, 400);
   }
+  const dryRun = body.dry_run === true;
 
   const { data, error } = await admin.rpc('smart_notify_candidates', {
     p_start_hour: WINDOW_START_HOUR,

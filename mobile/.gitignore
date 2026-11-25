@@ -13,3 +13,5 @@ dist-check/
 
 # Detox test output
 e2e/artifacts/
+# Intermediate output of tools/human/build.py; the app ships core.bin + parts/ (scripts/split-human.mjs)
+assets/avatar3d/models/human.bin

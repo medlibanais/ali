@@ -50,6 +50,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'retry-after',
 };
 
 const DAILY_LIMIT = 20;
@@ -127,16 +128,15 @@ Deno.serve(async (req: Request) => {
     const dayEnd = bounds?.day_end ?? `${today}T23:59:59.999Z`;
     const resetsAt = new Date(dayEnd).toISOString();
 
-    const { count: sentCount } = await admin
-      .from('messages')
-      .select('id, conversations!inner(user_id)', { count: 'exact', head: true })
-      .eq('conversations.user_id', user.id)
-      .eq('role', 'user')
-      .gte('created_at', dayStart)
-      .lt('created_at', dayEnd);
-    const sentToday = sentCount ?? 0;
-
     if (wantsStatus) {
+      const { count: sentCount } = await admin
+        .from('messages')
+        .select('id, conversations!inner(user_id)', { count: 'exact', head: true })
+        .eq('conversations.user_id', user.id)
+        .eq('role', 'user')
+        .gte('created_at', dayStart)
+        .lt('created_at', dayEnd);
+      const sentToday = sentCount ?? 0;
       return json(
         {
           limit: DAILY_LIMIT,
@@ -203,17 +203,46 @@ Deno.serve(async (req: Request) => {
       conversationId = created.id as string;
     }
 
-    if (sentToday >= DAILY_LIMIT) {
+    // ---- reserve the quota (atomic, before any provider call) ----
+    // coach_reserve_message counts today's messages and saves this one under
+    // a per-account lock (migration 0045), so parallel sends cannot pass the
+    // daily limit. The saved message is what counts.
+    const { data: reservation, error: reserveError } = await admin.rpc(
+      'coach_reserve_message',
+      {
+        p_user: user.id,
+        p_conversation: conversationId,
+        p_content: safeMessage,
+        p_limit: DAILY_LIMIT,
+      },
+    );
+    if (reserveError || !reservation) {
+      console.error('coach reserve', reserveError?.message);
+      return json({ error: 'storage_failed' }, 500);
+    }
+    const reserved = reservation as CoachReservation;
+    const quotaResetsAt = reserved.resets_at
+      ? new Date(reserved.resets_at).toISOString()
+      : resetsAt;
+    if (!reserved.ok || !reserved.message) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((Date.parse(quotaResetsAt) - Date.now()) / 1000),
+      );
       return json(
         {
           error: 'rate_limit_exceeded',
           message: 'Daily message limit reached. Resets at midnight.',
+          limit: DAILY_LIMIT,
           remaining_today: 0,
-          resets_at: resetsAt,
+          resets_at: quotaResetsAt,
         },
         429,
+        { 'Retry-After': String(retryAfter) },
       );
     }
+    const userRow = reserved.message;
+    const remainingToday = reserved.remaining_today;
 
     // ---- context for the LLM (and for the UI badge) ----
     const todayMs = Date.parse(`${today}T00:00:00Z`);
@@ -438,13 +467,13 @@ Deno.serve(async (req: Request) => {
       return streamReply({
         admin,
         conversationId,
-        message: safeMessage,
         intent,
         safetyReply: isDeterministic(intent) ? safetyResponse(intent) : null,
         turns: isDeterministic(intent) ? [] : buildTurns(),
         fallback: () => fallbackReply(ctx),
-        remainingToday: DAILY_LIMIT - sentToday - 1,
-        resetsAt,
+        userRow,
+        remainingToday,
+        resetsAt: quotaResetsAt,
         contextUsed,
         suggestions: suggestions(ctx),
       });
@@ -482,24 +511,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ---- persist both messages ----
-    const { data: userRow, error: userInsertError } = await admin
+    // ---- persist the reply (the user's message was saved by the reservation) ----
+    const { data: aiRow, error: aiInsertError } = await admin
       .from('messages')
-      .insert({ conversation_id: conversationId, role: 'user', content: safeMessage })
+      .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
       .select('id, content, created_at')
       .single();
-    const { data: aiRow, error: aiInsertError } = userRow
-      ? await admin
-        .from('messages')
-        .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
-        .select('id, content, created_at')
-        .single()
-      : { data: null, error: null };
-    if (!userRow || !aiRow) {
-      console.error(
-        'coach message insert',
-        userInsertError?.message ?? aiInsertError?.message,
-      );
+    if (!aiRow) {
+      console.error('coach message insert', aiInsertError?.message);
       return json({ error: 'storage_failed' }, 500);
     }
 
@@ -508,8 +527,8 @@ Deno.serve(async (req: Request) => {
         conversation_id: conversationId,
         user_message: userRow,
         ai_message: aiRow,
-        remaining_today: DAILY_LIMIT - sentToday - 1,
-        resets_at: resetsAt,
+        remaining_today: remainingToday,
+        resets_at: quotaResetsAt,
         context_used: contextUsed,
         suggestions: suggestions(ctx),
         intent,
@@ -533,12 +552,13 @@ Deno.serve(async (req: Request) => {
 interface StreamArgs {
   admin: SupabaseClient;
   conversationId: string;
-  message: string;
   intent: string;
   /** Rule-based answer (crisis, acute medical...). Never goes to the model. */
   safetyReply: string | null;
   turns: ChatTurn[];
   fallback: () => string;
+  /** The user's message, already saved by coach_reserve_message. */
+  userRow: SavedMessage;
   remainingToday: number;
   resetsAt: string;
   contextUsed: Record<string, unknown>;
@@ -546,6 +566,21 @@ interface StreamArgs {
 }
 
 type EdgeRuntimeLike = { waitUntil(p: Promise<unknown>): void };
+
+interface SavedMessage {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
+/** Result of the coach_reserve_message RPC (migration 0045). */
+interface CoachReservation {
+  ok: boolean;
+  sent_today: number;
+  remaining_today: number;
+  resets_at: string | null;
+  message?: SavedMessage;
+}
 
 /**
  * Server-Sent Events:
@@ -584,19 +619,9 @@ function streamReply(a: StreamArgs): Response {
       };
 
       const work = (async () => {
-        // The user's message is saved first: it is what the daily limit
-        // counts, so a dropped stream cannot dodge the limit.
-        const { data: userRow, error: userError } = await a.admin
-          .from('messages')
-          .insert({ conversation_id: a.conversationId, role: 'user', content: a.message })
-          .select('id, content, created_at')
-          .single();
-        if (!userRow) {
-          console.error('coach message insert', userError?.message);
-          send('error', { error: 'storage_failed' });
-          close();
-          return;
-        }
+        // The user's message was saved by the quota reservation, before the
+        // stream opened, so a dropped stream cannot dodge the limit.
+        const userRow = a.userRow;
         send('meta', {
           conversation_id: a.conversationId,
           user_message: userRow,
@@ -707,10 +732,14 @@ function streamReply(a: StreamArgs): Response {
   });
 }
 
-function json(body: unknown, status: number): Response {
+function json(
+  body: unknown,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   });
 }
 
