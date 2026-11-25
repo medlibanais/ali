@@ -1,6 +1,5 @@
 // Node-side helpers for the journey test: read the confirmation email from
-// the local mail catcher (Mailpit), confirm the account, and read what the
-// app saved. Everything goes through the anon key and the test user's own
+// the local mail catcher (Mailpit) and read what the app saved. Everything goes through the anon key and the test user's own
 // session, so Row Level Security applies exactly as it does in the app.
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { resolveSupabase } from '../scripts/local-supabase';
@@ -25,12 +24,11 @@ interface MailpitSearch {
   messages: { ID: string }[];
 }
 interface MailpitMessage {
-  Text: string;
   HTML: string;
 }
 
-/** Waits for the sign-up email and returns its confirmation link. */
-export async function findConfirmationLink(email: string, timeoutMs = 30000): Promise<string> {
+/** Waits for the sign-up email and returns its verification code. */
+export async function findConfirmationCode(email: string, timeoutMs = 30000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   const query = encodeURIComponent(`to:"${email}"`);
   while (Date.now() < deadline) {
@@ -40,29 +38,14 @@ export async function findConfirmationLink(email: string, timeoutMs = 30000): Pr
       const first = found.messages[0];
       if (first) {
         const msg = (await (await fetch(`${mailpitUrl}/api/v1/message/${first.ID}`)).json()) as MailpitMessage;
-        const body = `${msg.Text}\n${msg.HTML}`.replace(/&amp;/g, '&');
-        const link = body.match(/https?:\/\/[^\s"'<>]+\/auth\/v1\/verify\?[^\s"'<>)\]]+/);
-        if (link) return link[0];
-        throw new Error(`The email to ${email} has no confirmation link.`);
+        const code = msg.HTML.match(/data-verification-code="true"[^>]*>\s*(\d{6})\s*</)?.[1];
+        if (code) return code;
+        throw new Error(`The email to ${email} has no verification code.`);
       }
     }
     await sleep(1000);
   }
   throw new Error(`No confirmation email for ${email} reached ${mailpitUrl} within ${timeoutMs} ms.`);
-}
-
-/**
- * Opens the confirmation link the way a mail client would. Supabase
- * confirms the address and redirects to the app; we only need the
- * confirmation, so the redirect is not followed.
- */
-export async function confirmEmail(email: string): Promise<void> {
-  const link = await findConfirmationLink(email);
-  const res = await fetch(link, { redirect: 'manual' });
-  const location = res.headers.get('location') ?? '';
-  if (res.status < 300 || res.status >= 400 || location.includes('error=')) {
-    throw new Error(`Confirming ${email} failed: HTTP ${res.status} ${location}`);
-  }
 }
 
 /** Signs in as the test user from Node (no session saved to disk). */

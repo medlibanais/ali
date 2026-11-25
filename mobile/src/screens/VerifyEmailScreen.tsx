@@ -1,33 +1,58 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, StyleSheet, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Linking, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
-import Card from '../components/Card';
+import DrawnCheck from '../components/DrawnCheck';
+import Glass from '../components/Glass';
+import { MailGlyph } from '../components/icons';
 import Screen from '../components/Screen';
+import { useToast } from '../components/Toast';
 import Txt from '../components/Txt';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList } from '../navigation/types';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppDispatch } from '../store/hooks';
 import { resendVerification } from '../store/slices/authSlice';
-import { colors, spacing } from '../theme/tokens';
+import { colors, fonts, radius, spacing, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'VerifyEmail'>;
+type LinkParams = {
+  code?: string;
+  token_hash?: string;
+  signupSession?: { access_token: string; refresh_token: string };
+};
+type Verification = 'idle' | 'verifying' | 'verified' | 'invalidCode' | 'invalidLink';
 
-type VerifyState = 'idle' | 'verifying' | 'verified' | 'failed';
+const OTP_LENGTH = 6;
+const CELLS = Array.from({ length: OTP_LENGTH }, (_, i) => i);
+const FOCUS_GLOW = FadeIn.duration(160).reduceMotion(ReduceMotion.System);
 
-function paramsFromUrl(url: string): URLSearchParams | null {
+function normalizeCode(value: string): string {
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => String(digit.charCodeAt(0) & 0xf))
+    .replace(/[^0-9]/g, '')
+    .slice(0, OTP_LENGTH);
+}
+
+function verificationParams(url: string): LinkParams | null {
   try {
-    const queryIndex = url.indexOf('?');
-    const hashIndex = url.indexOf('#');
-    const raw =
-      queryIndex >= 0
-        ? url.slice(queryIndex + 1)
-        : hashIndex >= 0
-          ? url.slice(hashIndex + 1)
-          : null;
-    return raw ? new URLSearchParams(raw) : null;
+    const link = new URL(url);
+    const isAppLink = link.protocol === 'prayerlock:' &&
+      (link.hostname === 'verify-email' || link.pathname === '/verify-email');
+    const isWebLink = typeof window !== 'undefined' &&
+      link.origin === window.location?.origin && link.pathname === '/verify-email';
+    if (!isAppLink && !isWebLink) return null;
+    const fragment = new URLSearchParams(link.hash.slice(1));
+    const access = fragment.get('access_token');
+    const refresh = fragment.get('refresh_token');
+    return {
+      signupSession: fragment.get('type') === 'signup' && access && refresh
+        ? { access_token: access, refresh_token: refresh }
+        : undefined,
+      code: link.searchParams.get('code') ?? fragment.get('code') ?? undefined,
+      token_hash: link.searchParams.get('token_hash') ?? fragment.get('token_hash') ?? undefined,
+    };
   } catch {
     return null;
   }
@@ -36,155 +61,290 @@ function paramsFromUrl(url: string): URLSearchParams | null {
 export function VerifyEmailScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   useTheme();
+  const { showToast } = useToast();
   const dispatch = useAppDispatch();
-  const { busy } = useAppSelector((state) => state.auth);
-  const email = route.params?.email;
-  const [state, setState] = useState<VerifyState>('idle');
-  const [message, setMessage] = useState<string | null>(null);
+  const email = route.params?.email?.trim();
+  const routeCode = route.params?.code;
+  const routeTokenHash = route.params?.token_hash;
+  const [state, setState] = useState<Verification>('idle');
+  const [digits, setDigits] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [resending, setResending] = useState(false);
   const [resendNote, setResendNote] = useState<string | null>(null);
+  const actionInFlight = useRef(false);
+  const confirmed = useRef(false);
+  const lastLink = useRef<string>();
 
-  const handleUrl = useCallback(async (url: string | null, params: {
-    code?: string;
-    token_hash?: string;
-  }) => {
-    const urlParams = url ? paramsFromUrl(url) : null;
-    const code = params.code ?? urlParams?.get('code') ?? null;
-    const tokenHash = params.token_hash ?? urlParams?.get('token_hash') ?? null;
-    if (!code && !tokenHash) return;
-
+  const verify = useCallback(async (
+    request: () => Promise<{ error: unknown }>,
+    failure: 'invalidCode' | 'invalidLink',
+  ) => {
+    if (actionInFlight.current || confirmed.current) return;
+    actionInFlight.current = true;
     setState('verifying');
+    setResendNote(null);
     try {
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-      } else if (tokenHash) {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'signup',
-        });
-        if (error) throw error;
-      }
+      const { error } = await request();
+      if (error) throw error;
+      confirmed.current = true;
       setState('verified');
-      setMessage(t('verifyEmail.yourEmailIsVerified'));
-      // The auth state listener moves the app into onboarding automatically.
+      // The auth listener may already have routed the user to onboarding.
+      showToast({ message: t('verifyEmail.emailVerified') });
     } catch {
-      setState('failed');
-      setMessage(
-        t('verifyEmail.thatLinkIsInvalid'),
-      );
+      setState(failure);
+    } finally {
+      actionInFlight.current = false;
     }
-  }, []);
+  }, [showToast, t]);
 
   useEffect(() => {
-    const params = {
-      code: route.params?.code,
-      token_hash: route.params?.token_hash,
+    let active = true;
+    const handleLink = (params: LinkParams | null) => {
+      if (!active || !params || actionInFlight.current || confirmed.current) return;
+      const { code, token_hash, signupSession } = params;
+      const key = code ?? token_hash ?? signupSession?.access_token;
+      if (!key || lastLink.current === key) return;
+      lastLink.current = key;
+      if (code) {
+        void verify(() => supabase.auth.exchangeCodeForSession(code), 'invalidLink');
+      } else if (token_hash) {
+        void verify(() => supabase.auth.verifyOtp({ token_hash, type: 'signup' }), 'invalidLink');
+      } else if (signupSession) {
+        void verify(() => supabase.auth.setSession(signupSession), 'invalidLink');
+      }
     };
-    if (params.code || params.token_hash) {
-      handleUrl(null, params);
-      return;
-    }
-    const sub = Linking.addEventListener('url', ({ url }) =>
-      handleUrl(url, {}),
-    );
-    Linking.getInitialURL().then((url) => {
-      if (url && url.includes('verify-email')) handleUrl(url, {});
-    });
-    return () => sub.remove();
-  }, [route.params?.code, route.params?.token_hash, handleUrl]);
+    handleLink({ code: routeCode, token_hash: routeTokenHash });
+    const subscription = Linking.addEventListener('url', ({ url }) => handleLink(verificationParams(url)));
+    void Linking.getInitialURL()
+      .then((url) => { if (url) handleLink(verificationParams(url)); })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [routeCode, routeTokenHash, verify]);
+
+  const verifyCode = (token: string) => {
+    if (!email || token.length !== OTP_LENGTH) return;
+    void verify(() => supabase.auth.verifyOtp({ email, token, type: 'email' }), 'invalidCode');
+  };
 
   const resend = async () => {
-    if (!email) {
-      setResendNote(t('verifyEmail.signInAgainTo'));
-      return;
-    }
+    if (!email || actionInFlight.current || confirmed.current) return;
+    actionInFlight.current = true;
+    setResending(true);
     setResendNote(null);
-    const result = await dispatch(resendVerification({ email }));
-    if (resendVerification.fulfilled.match(result)) {
-      setResendNote(t('verifyEmail.aNewLinkIs'));
-    } else {
-      setResendNote(result.payload ?? t('verifyEmail.couldNotResendThe'));
+    try {
+      const result = await dispatch(resendVerification({ email }));
+      if (resendVerification.fulfilled.match(result)) {
+        setDigits('');
+        setState('idle');
+        setResendNote(t('verifyEmail.newCodeSent'));
+      } else {
+        setResendNote(result.payload ?? t('verifyEmail.couldNotResendThe'));
+      }
+    } finally {
+      actionInFlight.current = false;
+      setResending(false);
     }
   };
 
+  const verifying = state === 'verifying';
+  const verified = state === 'verified';
+  const failed = state === 'invalidCode' || state === 'invalidLink';
+  const statusMessage = state === 'invalidCode'
+    ? t('verifyEmail.invalidCode')
+    : state === 'invalidLink' ? t('verifyEmail.thatLinkIsInvalid') : null;
+
   return (
-    <Screen scroll>
-      <View style={styles.header}>
-        <Txt testID="verify-title" variant="display">{t('verifyEmail.checkYourInbox')}</Txt>
-        <Txt variant="body" color={colors.inkSoft} style={styles.subtitle}>
-          {email
-            ? t('verifyEmail.weSentAVerification', { email })
-            : t('verifyEmail.weSentYouA')}{' '}
-          {t('verifyEmail.openItOnThis')}
+    <Screen scroll keyboardAvoiding contentStyle={styles.screen}>
+      <Glass style={styles.panel} intensity={48} tint={0.72}>
+        <View style={styles.badge} accessible={false}>
+          {verified
+            ? <DrawnCheck animate size={28} color={colors.onAccent} />
+            : <MailGlyph size={26} color={colors.onAccent} />}
+        </View>
+        <Txt testID="verify-title" variant="title" align="center" style={styles.title}>
+          {verified ? t('verifyEmail.emailVerified') : t('verifyEmail.checkYourInbox')}
         </Txt>
-      </View>
+        <Txt variant="body" align="center" color={colors.inkSoft}>
+          {verified
+            ? t('verifyEmail.yourEmailIsVerified')
+            : email
+              ? t('verifyEmail.codeSentTo', { email })
+              : t('verifyEmail.weSentYouA')}
+        </Txt>
 
-      {state !== 'idle' ? (
-        <Card style={styles.statusCard}>
-          <Txt variant="heading">
-            {state === 'verifying'
-              ? t('verifyEmail.verifyingYourLink')
-              : state === 'verified'
-                ? t('verifyEmail.emailVerified')
-                : t('verifyEmail.verificationFailed')}
-          </Txt>
-          {message ? (
-            <Txt
-              variant="body"
-              color={state === 'failed' ? colors.danger : colors.inkSoft}
-              style={styles.statusMessage}
-            >
-              {message}
+        {email && !verified ? (
+          <>
+            <View style={styles.codeField}>
+              <View
+                style={styles.cells}
+                pointerEvents="none"
+                aria-hidden
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                {CELLS.map((index) => {
+                  const active = focused && !verifying && index === Math.min(digits.length, OTP_LENGTH - 1);
+                  return (
+                    <View
+                      key={index}
+                      style={[styles.cell, digits[index] ? styles.filledCell : null,
+                        active ? styles.activeCell : null, failed ? styles.invalidCell : null]}
+                    >
+                      {active && !failed ? (
+                        <Animated.View entering={FOCUS_GLOW} style={styles.cellGlow} />
+                      ) : null}
+                      <Txt variant="heading" align="center" style={styles.digit}>{digits[index] ?? '·'}</Txt>
+                    </View>
+                  );
+                })}
+              </View>
+              <TextInput
+                testID="verify-code"
+                accessibilityLabel={t('verifyEmail.codeLabel')}
+                value={digits}
+                editable={!verifying && !resending}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoCorrect={false}
+                caretHidden
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onChangeText={(value) => {
+                  if (actionInFlight.current) return;
+                  const next = normalizeCode(value);
+                  if (next === digits) return;
+                  setDigits(next);
+                  setState('idle');
+                  if (next.length === OTP_LENGTH) verifyCode(next);
+                }}
+                style={styles.input}
+              />
+            </View>
+            <Txt variant="caption" align="center" color={colors.inkSoft} style={styles.hint}>
+              {t('verifyEmail.codeOrLink')}
             </Txt>
-          ) : null}
-          {state === 'verified' ? (
-            <Button
-              title={t('verifyEmail.continue')}
-              onPress={() => navigation.navigate('Login')}
-              style={styles.statusButton}
-            />
-          ) : null}
-        </Card>
-      ) : null}
+          </>
+        ) : null}
 
-      <View style={styles.resendSection}>
-        <Txt variant="body" color={colors.inkSoft} style={styles.resendText}>
-          {t('verifyEmail.nothingArrivedYetCheck')}
-        </Txt>
-        <Button
-          title={t('verifyEmail.resendVerificationEmail')}
-          variant="secondary"
-          onPress={resend}
-          loading={busy}
-        />
+        {statusMessage ? (
+          <Txt accessibilityRole="alert" variant="body" color={colors.danger} align="center" style={styles.status}>
+            {statusMessage}
+          </Txt>
+        ) : null}
+        {email && !verified ? (
+          <Button
+            title={t('verifyEmail.verifyCode')}
+            testID="verify-submit"
+            onPress={() => verifyCode(digits)}
+            disabled={digits.length !== OTP_LENGTH || resending}
+            loading={verifying}
+            style={styles.verifyButton}
+          />
+        ) : verifying ? (
+          <Txt variant="body" align="center" accessibilityLiveRegion="polite" style={styles.status}>
+            {t('verifyEmail.verifyingYourLink')}
+          </Txt>
+        ) : null}
+
+        {email && !verified ? (
+          <Button
+            title={t('verifyEmail.resendVerificationEmail')}
+            variant="ghost"
+            onPress={resend}
+            disabled={verifying}
+            loading={resending}
+            style={styles.resendButton}
+          />
+        ) : null}
         {resendNote ? (
-          <Txt variant="caption" color={colors.inkSoft} style={styles.resendNote}>
+          <Txt variant="caption" align="center" accessibilityLiveRegion="polite" color={colors.inkSoft}>
             {resendNote}
           </Txt>
         ) : null}
-      </View>
+      </Glass>
 
-      <Button
-        title={t('verifyEmail.backToSignIn')}
-        testID="verify-back-to-sign-in"
-        variant="ghost"
-        onPress={() => navigation.navigate('Login')}
-        style={styles.backButton}
-      />
+      {verified ? (
+        <Button
+          title={t('verifyEmail.continue')}
+          variant="ghost"
+          onPress={() => navigation.navigate('Login')}
+          style={styles.backButton}
+        />
+      ) : (
+        <Button
+          title={t('verifyEmail.backToSignIn')}
+          testID="verify-back-to-sign-in"
+          variant="ghost"
+          disabled={verifying}
+          onPress={() => navigation.navigate('Login')}
+          style={styles.backButton}
+        />
+      )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  header: { marginTop: spacing.xxl, marginBottom: spacing.xl },
-  subtitle: { marginTop: spacing.sm },
-  statusCard: { marginBottom: spacing.xl },
-  statusMessage: { marginTop: spacing.sm },
-  statusButton: { marginTop: spacing.lg },
-  resendSection: { marginBottom: spacing.xl },
-  resendText: { marginBottom: spacing.lg },
-  resendNote: { marginTop: spacing.md },
-  backButton: { marginTop: spacing.sm },
-});
+const styles = themed(() => StyleSheet.create({
+  screen: { justifyContent: 'center', paddingTop: spacing.xl, paddingBottom: spacing.xl },
+  panel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: withAlpha(colors.accent, 0.26),
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+  },
+  badge: {
+    alignSelf: 'center',
+    width: 54,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+  },
+  title: { marginBottom: spacing.sm },
+  codeField: { position: 'relative', marginTop: spacing.xl },
+  cells: { flexDirection: 'row', direction: 'ltr', gap: 6 },
+  cell: {
+    flex: 1,
+    minHeight: 54,
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: withAlpha(colors.paper, 0.72),
+  },
+  filledCell: { borderColor: withAlpha(colors.accent, 0.55) },
+  activeCell: { borderColor: colors.accent },
+  cellGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.sm,
+    backgroundColor: withAlpha(colors.accent, 0.12),
+  },
+  invalidCell: { borderColor: colors.danger },
+  digit: { fontFamily: fonts.mono },
+  input: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    fontSize: 16,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+    textAlign: 'center',
+    writingDirection: 'ltr',
+  },
+  hint: { marginTop: spacing.md },
+  status: { marginTop: spacing.md },
+  verifyButton: { marginTop: spacing.lg },
+  resendButton: { marginTop: spacing.sm },
+  backButton: { marginTop: spacing.md, alignSelf: 'center' },
+}));
 
 export default VerifyEmailScreen;

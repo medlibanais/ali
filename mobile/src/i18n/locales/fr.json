@@ -373,6 +373,12 @@
     "backToSignIn": "Retour à la connexion"
   },
   "verifyEmail": {
+    "codeSentTo": "Saisis le code à six chiffres envoyé à {{email}}.",
+    "codeLabel": "Code de vérification à six chiffres",
+    "codeOrLink": "Tu peux aussi utiliser le lien de confirmation dans le courriel.",
+    "invalidCode": "Impossible de vérifier ce code. Vérifie les chiffres ou demande un nouveau code.",
+    "newCodeSent": "Un nouveau courriel de vérification est en route. Vérifie tes courriers indésirables si tu ne le reçois pas.",
+    "verifyCode": "Vérifier mon adresse",
     "yourEmailIsVerified": "Ton e-mail est vérifié. Préparation de ton compte…",
     "thatLinkIsInvalid": "Ce lien est invalide ou a expiré. Demandes-en un nouveau ci-dessous.",
     "signInAgainTo": "Reconnecte-toi pour demander un nouveau lien.",
