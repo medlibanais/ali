@@ -406,6 +406,22 @@ verify_jwt = false
 [functions.predict-streak]
 verify_jwt = false
 
+[functions.coach-nudges]
+verify_jwt = false
+
+[functions.smart-notify]
+verify_jwt = false
+
+# Scheduled calls use the configured cron secret. App calls check the user JWT.
+[functions.generate-quests]
+verify_jwt = false
+
+[functions.weekly-insights]
+verify_jwt = false
+
+[functions.notify-friend]
+verify_jwt = false
+
 [functions.generate-insights]
 verify_jwt = false
 

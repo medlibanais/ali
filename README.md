@@ -224,6 +224,14 @@ tier. When a prompt is trimmed, the function logs `coach prompt trimmed`.
 Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 `FAL_BASE_URL` can point the functions at a mock server for offline tests.
 
+### Scheduled jobs
+
+For scheduled jobs, configure `project_url` and a randomly generated
+`cron_secret` in Supabase Vault. Set the matching `CRON_SECRET` in Edge
+Function secrets. Use the local gateway URL and a separate secret for
+development. Configure the Vault values before deploying the hardened
+functions. Apply migration 0044 before deploying `search-quests`.
+
 ## Languages (English, French, Arabic)
 
 The app follows the phone's language on first launch, and Profile →
