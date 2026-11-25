@@ -28,6 +28,9 @@
 --   AI quests  On-demand generation is claimed per account and date, so
 --              parallel requests make one provider call. At most 6
 --              on-demand claims per hour per account.
+--   Insights   On-demand pattern insights: 6 model calls per hour; the
+--              weekly report on demand: 3 per hour. Over the budget the
+--              functions answer from rules/cache instead of the model.
 
 ----------------------------------------------------------------------
 -- Coach: count + save the user's message in one locked step
@@ -265,6 +268,36 @@ $$;
 revoke execute on function public.claim_quest_generation(uuid, date, boolean)
   from public, anon, authenticated;
 grant execute on function public.claim_quest_generation(uuid, date, boolean)
+  to service_role;
+
+----------------------------------------------------------------------
+-- Other on-demand model calls (Insights): a locked per-account budget
+----------------------------------------------------------------------
+-- Raises rate_limited when p_max calls were already reserved in p_window.
+-- Same rate_limits table and semantics as hit_rate_limit, serialized.
+create or replace function public.reserve_ai_call(
+  p_user uuid,
+  p_action text,
+  p_max int,
+  p_window interval
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_user is null or p_action is null or p_action !~ '^ai_[a-z_]{1,40}$' then
+    raise exception 'invalid_arguments' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_action || ':' || p_user::text, 0));
+  perform public.hit_rate_limit(p_user, p_action, p_max, p_window);
+end;
+$$;
+
+revoke execute on function public.reserve_ai_call(uuid, text, int, interval)
+  from public, anon, authenticated;
+grant execute on function public.reserve_ai_call(uuid, text, int, interval)
   to service_role;
 
 notify pgrst, 'reload schema';

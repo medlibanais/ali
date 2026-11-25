@@ -1,7 +1,7 @@
 -- Migration 0045: AI quotas are reserved in Postgres before any paid call.
 -- Parallel requests are covered by ai_quota_race.sh.
 begin;
-select plan(17);
+select plan(20);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000000f1', 'quota-a@example.test'),
@@ -58,6 +58,18 @@ update quest_generation_log set status = 'ok', generated_count = 3
   where user_id = '00000000-0000-4000-8000-0000000000f1';
 select is(public.claim_quest_generation('00000000-0000-4000-8000-0000000000f1', current_date, true),
   'done', 'a finished day is not generated again');
+
+-- Insights model budget.
+select lives_ok(
+  $$select public.reserve_ai_call('00000000-0000-4000-8000-0000000000f2', 'ai_insights', 2, interval '1 hour')
+    from generate_series(1, 2)$$,
+  'two insight calls fit the budget');
+select throws_ok(
+  $$select public.reserve_ai_call('00000000-0000-4000-8000-0000000000f2', 'ai_insights', 2, interval '1 hour')$$,
+  'rate_limited', 'the third insight call is refused');
+select throws_ok(
+  $$select public.reserve_ai_call('00000000-0000-4000-8000-0000000000f2', 'complete_quest', 2, interval '1 hour')$$,
+  'invalid_arguments', 'only ai_* budgets can be reserved through it');
 
 reset role;
 select * from finish();

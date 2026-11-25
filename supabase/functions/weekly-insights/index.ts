@@ -89,6 +89,16 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser();
     if (!user) return json({ error: 'invalid_session' }, 401);
     targetUserIds = [user.id];
+    // On-demand: reserve before any model call (migration 0045).
+    const { error: budgetError } = await admin.rpc('reserve_ai_call', {
+      p_user: user.id,
+      p_action: 'ai_weekly_insights',
+      p_max: 3,
+      p_window: '1 hour',
+    });
+    if (budgetError) {
+      return json({ error: 'rate_limited', retry_after_seconds: 3600 }, 429);
+    }
   }
 
   const results: Record<string, string> = {};
