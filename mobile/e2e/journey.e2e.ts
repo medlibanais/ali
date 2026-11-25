@@ -263,6 +263,19 @@ describe('New user journey', () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       xpAfter = parseXp(await textOf('today-total-xp'));
     }
+    if (xpAfter <= xpBefore) {
+      // Tells "the server never got the completion" (tap missed, queued,
+      // refused: the toast text is at the end of the label) from "the
+      // server has it but the screen did not catch up".
+      try {
+        const c = await signInAs(EMAIL, PASSWORD);
+        console.warn(`[xp] screen=${xpAfter} database=${await readTotalXp(c)}`);
+      } catch (err) {
+        console.warn(`[xp] database unreadable: ${(err as Error).message.split('\n')[0]}`);
+      }
+      await logTop('XP did not go up');
+      if (device.getPlatform() === 'android') logJsConsole('XP did not go up');
+    }
     jestExpect(xpAfter).toBeGreaterThan(xpBefore);
 
     // The server (complete_quest RPC) is the only writer of XP; check it too.
