@@ -88,6 +88,15 @@ Deno.serve(async (req: Request) => {
   for (const userId of targetUserIds) {
     results[userId] = await generateForUser(admin, userId, mode);
   }
+  if (mode === 'on_demand' && Object.values(results)[0] === 'rate_limited') {
+    return new Response(
+      JSON.stringify({ error: 'rate_limited', mode, results }),
+      {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '600' },
+      },
+    );
+  }
 
   return json({ ok: true, mode, results }, 200);
 });
@@ -118,16 +127,19 @@ async function generateForUser(
           .slice(0, 10)
       : today;
 
-  // Idempotent: already generated for this date?
-  const { data: existing } = await admin
-    .from('quest_generation_log')
-    .select('status, generated_count')
-    .eq('user_id', userId)
-    .eq('target_date', target)
-    .maybeSingle();
-  if (existing?.status === 'ok' && existing.generated_count > 0) {
-    return 'already_done';
+  // Idempotent and single-flight: claim this account and date before any
+  // provider call (migration 0045). Parallel on-demand calls, a second
+  // device or the nightly job then make one Groq call, not several.
+  const { data: claim, error: claimError } = await admin.rpc(
+    'claim_quest_generation',
+    { p_user: userId, p_date: target, p_on_demand: mode !== 'nightly' },
+  );
+  if (claimError) {
+    if (claimError.message?.includes('rate_limited')) return 'rate_limited';
+    return `failed:claim ${claimError.message}`;
   }
+  if (claim === 'done') return 'already_done';
+  if (claim === 'busy') return 'in_progress';
 
   // Context: goals, level, weakest pillar, recent titles (avoid repeats).
   const [goalsRes, gamRes, recentRes, scoresRes] = await Promise.all([
@@ -218,7 +230,7 @@ async function generateForUser(
       difficulty_level: profile.level,
       error: lastError,
       duration_ms: Date.now() - started,
-    });
+    }, { onConflict: 'user_id,target_date' });
     return `fallback:${lastError}`;
   }
 
@@ -251,7 +263,7 @@ async function generateForUser(
       difficulty_level: profile.level,
       error: insertError.message,
       duration_ms: Date.now() - started,
-    });
+    }, { onConflict: 'user_id,target_date' });
     return `failed:${insertError.message}`;
   }
 
@@ -297,7 +309,7 @@ async function generateForUser(
     difficulty_level: profile.level,
     error: diffError ? `difficulty_rpc: ${diffError.message}`.slice(0, 500) : null,
     duration_ms: Date.now() - started,
-  });
+  }, { onConflict: 'user_id,target_date' });
   await admin.rpc('recompute_daily_score', {
     p_user: userId,
     p_date: target,
