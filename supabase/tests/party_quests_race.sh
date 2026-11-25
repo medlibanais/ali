@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Race test for Party Quests (0035): the last two members tap "I did my
-# part" at the same instant, many times. Every member must be paid
-# exactly once per party.
+# Race test for Party Quests: retry creation and finish from two sessions.
+# Each creation must return the same party and XP must be paid once.
 #
 # Usage: DB_URL=postgres://postgres:postgres@localhost:54322/postgres \
 #          bash supabase/tests/party_quests_race.sh [rounds]
@@ -37,9 +36,23 @@ q "insert into auth.users (id, email) values ('$A','a@race.local'),('$B','b@race
    delete from quests where user_id in ('$A','$B','$C');
    update gamification set xp_today = 0, xp_today_date = null where user_id in ('$A','$B','$C');" >/dev/null
 
+create_result=$(mktemp)
+trap 'rm -f "$create_result"' EXIT
 fail=0
 for i in $(seq 1 "$ROUNDS"); do
-  party=$(as_user $A "select (public.create_party_quest('health', 'Race round $i', 'easy', 3)) ->> 'id';")
+  request_id=$(q "select gen_random_uuid();")
+  at=$(q "select (now() + interval '700 milliseconds')::text")
+  create_sql="do \$\$ begin perform pg_sleep_until('$at'); end \$\$;
+    select public.create_party_quest(
+    'health', 'Race round $i', 'easy', 3, '$request_id') ->> 'id';"
+  as_user "$A" "$create_sql" >"$create_result" &
+  first_create_pid=$!
+  party=$(as_user "$A" "$create_sql")
+  wait "$first_create_pid"
+  if [[ -z "$party" || "$party" != "$(cat "$create_result")" ]]; then
+    echo "FAIL: concurrent retries returned different party IDs"
+    exit 1
+  fi
   code=$(q "select invite_code from party_quests where id = '$party'")
   as_user $B "select 1 from public.join_party_quest('$code');" >/dev/null
   as_user $C "select 1 from public.join_party_quest('$code');" >/dev/null

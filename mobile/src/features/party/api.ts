@@ -2,8 +2,10 @@
 // Every rule (friends-only joins, membership, XP, races) lives in
 // Postgres (migration 0035); the app only calls RPCs and reads.
 
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { newClientId } from '../../lib/clientId';
 import { useAppDispatch } from '../../store/hooks';
 import { fetchGamification } from '../../store/slices/gamificationSlice';
 import { fetchDailyQuests } from '../../store/slices/questsSlice';
@@ -73,19 +75,49 @@ function useStoreState() {
 
 export function useCreateParty() {
   const store = useStoreState();
-  return useMutation({
-    mutationFn: async (input: CreatePartyInput): Promise<PartyState> => {
+  const submitting = useRef(false);
+  const attempt = useRef<{ fingerprint: string; requestId: string; completed: boolean } | null>(null);
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: async (input: CreatePartyInput & { requestId: string }): Promise<PartyState> => {
       const { data, error } = await supabase.rpc('create_party_quest', {
         p_pillar: input.pillar,
-        p_description: input.description.trim(),
+        p_description: input.description,
         p_difficulty: input.difficulty,
         p_max_participants: input.maxParticipants,
+        p_request_id: input.requestId,
       });
       if (error) throw error;
       return data as PartyState;
     },
     onSuccess: store,
   });
+
+  async function submit(input: CreatePartyInput): Promise<PartyState | null> {
+    if (submitting.current || attempt.current?.completed) return null;
+
+    const description = input.description.trim();
+    const fingerprint = JSON.stringify([input.pillar, description, input.difficulty, input.maxParticipants]);
+    const submission = attempt.current?.fingerprint === fingerprint
+      ? attempt.current
+      : { fingerprint, requestId: newClientId(), completed: false };
+    attempt.current = submission;
+    submitting.current = true;
+    try {
+      const party = await mutateAsync({ ...input, description, requestId: submission.requestId });
+      submission.completed = true;
+      return party;
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  // The description is cleared on success. Typing again starts a new draft,
+  // even if the user wants to create another party with identical details.
+  function startNewDraftAfterSuccess() {
+    if (attempt.current?.completed) attempt.current = null;
+  }
+
+  return { submit, isPending, startNewDraftAfterSuccess };
 }
 
 export function useJoinParty() {
