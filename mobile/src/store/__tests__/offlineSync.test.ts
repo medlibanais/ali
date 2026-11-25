@@ -381,3 +381,34 @@ it('tags the post-sync XP refresh so reward animations do not replay', async () 
   await store.dispatch(syncOfflineCompletions());
   expect(seen).toContainEqual({ reason: 'sync' });
 });
+
+it('sends each queued action once, in order, when two flushes start together', async () => {
+  // Foreground reconnect and the background task fire at the same moment.
+  const store = makeStore();
+  mockRpcImpl = (name) =>
+    Promise.resolve(
+      name === 'complete_quest'
+        ? { data: { quest_id: 'a', xp_awarded: 15, total_xp: 15, level: 1, level_up: false, daily_score: 0, current_streak: 1, best_streak: 1, new_badges: [] }, error: null }
+        : { data: null, error: null },
+    );
+  reportOffline();
+  await store.dispatch(completeQuest(quest('b')));
+  await store.dispatch(completeQuest(quest('c')));
+  expect((await readOfflineQueue('u1')).map((i) => i.questId)).toEqual(['b', 'c']);
+
+  reportOnline();
+  mockCalls.length = 0;
+  // Slow server answers, so both flushes overlap.
+  mockRpcImpl = () => new Promise((r) => setTimeout(() => r({ data: {}, error: null }), 20));
+  const { flushOfflineQueue } = jest.requireActual<typeof import('../offlineSync')>('../offlineSync');
+  const [one, two] = await Promise.all([
+    store.dispatch(syncOfflineCompletions()),
+    flushOfflineQueue('u1'),
+  ]);
+  const sent = mockCalls.filter((c) => c.name.startsWith('sync_')).map((c) => `${c.name}:${c.params.p_quest_id}`);
+  // Each queued action goes to the server exactly once, in order.
+  expect(sent).toEqual(['sync_quest_completion:b', 'sync_quest_completion:c']);
+  expect(syncOfflineCompletions.fulfilled.match(one)).toBe(true);
+  expect(two.synced + (syncOfflineCompletions.fulfilled.match(one) ? one.payload.synced : 0)).toBe(2);
+  expect(await readOfflineQueue('u1')).toEqual([]);
+});
