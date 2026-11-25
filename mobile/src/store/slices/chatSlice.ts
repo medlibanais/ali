@@ -322,6 +322,30 @@ async function findSavedReply(
   return data ? rowToMessage(data as MessageRow) : null;
 }
 
+/**
+ * The user's message, if the server saved it although the line dropped
+ * before its first event arrived (the quota reservation saves the message
+ * before the stream opens). Matches this chat, this text, sent just now.
+ */
+async function findSavedUserMessage(
+  conversationId: string,
+  text: string,
+  sentAt: number,
+): Promise<{ id: string; content: string; created_at: string } | null> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content, created_at')
+    .eq('conversation_id', conversationId)
+    .eq('role', 'user')
+    .eq('content', text)
+    .gte('created_at', new Date(sentAt - 5000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { id: string; content: string; created_at: string } | null) ?? null;
+}
+
 /** Waits between reconnect checks: about 30 seconds in all. */
 const RECONNECT_DELAYS_MS = [1000, 2000, 3000, 4000, 5000, 5000, 5000, 5000];
 /** Words are shown in small batches so the list is not re-rendered per token. */
@@ -359,6 +383,7 @@ export const sendChatMessage = createAsyncThunk<
     return rejectWithValue(coachFailure({ kind: 'http', status: 401, code: null }));
   }
 
+  const sentAt = Date.now();
   let meta: StreamMeta | null = null;
   let streamed = '';
   let buffer = '';
@@ -430,16 +455,32 @@ export const sendChatMessage = createAsyncThunk<
     };
   }
 
-  // Nothing reached the server, or it refused (401, 429, 503...).
-  if (!m) {
-    if (outcome.kind === 'stopped') {
-      return rejectWithValue({ message: '', rateLimited: false, conversationGone: false, stopped: true });
+  // The line dropped before the first event: the server may still have
+  // saved the message (and counted it). Look for it before telling the
+  // person to resend, so a retry does not post it twice.
+  let recovered: { id: string; content: string; created_at: string } | null = null;
+  if (!m && outcome.kind === 'failed' && outcome.failure.kind === 'network' && conversationId) {
+    dispatch(chatSlice.actions.streamReconnecting());
+    for (const delay of RECONNECT_DELAYS_MS.slice(0, 3)) {
+      await sleep(delay, signal);
+      if (signal.aborted) break;
+      recovered = await findSavedUserMessage(conversationId, text, sentAt).catch(() => null);
+      if (recovered) break;
     }
-    return rejectWithValue(coachFailure(outcome.failure));
   }
 
-  const userMessage = streamedToMessage(m.user_message, 'user');
-  const savedAfter = m.user_message.created_at;
+  // Nothing reached the server, or it refused (401, 429, 503...).
+  if (!m && !recovered) {
+    if (outcome.kind === 'stopped' || signal.aborted) {
+      return rejectWithValue({ message: '', rateLimited: false, conversationGone: false, stopped: true });
+    }
+    return rejectWithValue(coachFailure((outcome as { failure: FunctionFailure }).failure));
+  }
+
+  const savedRow = m ? m.user_message : recovered!;
+  const chatId = m ? m.conversation_id : conversationId!;
+  const userMessage = streamedToMessage(savedRow, 'user');
+  const savedAfter = savedRow.created_at;
 
   if (outcome.kind === 'stopped') {
     // The server saves what was written so far; pick up its row so the
@@ -447,7 +488,7 @@ export const sendChatMessage = createAsyncThunk<
     let saved: ChatMessage | null = null;
     if (streamed) {
       await new Promise((r) => setTimeout(r, 800));
-      saved = await findSavedReply(m.conversation_id, savedAfter).catch(() => null);
+      saved = await findSavedReply(chatId, savedAfter).catch(() => null);
     }
     return {
       ...base(userMessage),
@@ -471,7 +512,7 @@ export const sendChatMessage = createAsyncThunk<
       await sleep(delay, signal);
       if (signal.aborted) break;
       try {
-        const saved = await findSavedReply(m.conversation_id, savedAfter);
+        const saved = await findSavedReply(chatId, savedAfter);
         if (saved) {
           return { ...base(userMessage), aiMessage: saved, degraded: false, stopped: false };
         }
