@@ -724,7 +724,8 @@
     "preparingExport": "Preparing export",
     "exportMyData": "Export my data",
     "youCanSignBack2": "You can sign back in anytime",
-    "growAtYourOwn": "GROW · At your own pace"
+    "growAtYourOwn": "GROW · At your own pace",
+    "exportFailedPart": "Export stopped: we couldn't read your {{part}}. Nothing was shared. Try again."
   },
   "friends": {
     "friends": "Friends",

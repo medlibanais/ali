@@ -768,7 +768,8 @@
     "preparingExport": "جارٍ تجهيز التصدير",
     "exportMyData": "تصدير بياناتي",
     "youCanSignBack2": "يمكنك تسجيل الدخول مجددًا في أي وقت",
-    "growAtYourOwn": "GROW · على وتيرتك"
+    "growAtYourOwn": "GROW · على وتيرتك",
+    "exportFailedPart": "توقّف التصدير: تعذّرت قراءة {{part}}. لم تتم مشاركة أي شيء. حاول مرة أخرى."
   },
   "friends": {
     "friends": "الأصدقاء",

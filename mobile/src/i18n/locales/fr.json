@@ -735,7 +735,8 @@
     "preparingExport": "Préparation de l'export",
     "exportMyData": "Exporter mes données",
     "youCanSignBack2": "Tu peux te reconnecter à tout moment",
-    "growAtYourOwn": "GROW · À ton rythme"
+    "growAtYourOwn": "GROW · À ton rythme",
+    "exportFailedPart": "Export interrompu : impossible de lire {{part}}. Rien n'a été partagé. Réessaie."
   },
   "friends": {
     "friends": "Amis",
