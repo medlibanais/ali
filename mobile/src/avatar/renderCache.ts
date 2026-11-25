@@ -19,6 +19,9 @@ import { Platform } from 'react-native';
 
 /** Most pictures kept. Each is about 50-150 KB. */
 const MAX_NATIVE = 48;
+// Measured: a head picture is about 185 KB, a full body about 250 KB, so
+// 48 entries could reach about 12 MB. Keep the folder under 8 MB as well.
+export const MAX_NATIVE_BYTES = 8 * 1024 * 1024;
 const MAX_WEB = 10;
 const WEB_PREFIX = 'grow.avatar3d.';
 const WEB_INDEX = 'grow.avatar3d.index';
@@ -94,19 +97,36 @@ async function nativeSave(key: string, dataUrl: string): Promise<void> {
 
 async function nativePrune(dir: string): Promise<void> {
   const names = await fs().readDirectoryAsync(dir);
-  if (names.length <= MAX_NATIVE) return;
   const stats = await Promise.all(
     names.map(async (name) => {
       const info = await fs().getInfoAsync(dir + name);
-      return { name, time: info.exists ? info.modificationTime ?? 0 : 0 };
+      return info.exists
+        ? { name, time: info.modificationTime ?? 0, size: info.size ?? 0 }
+        : { name, time: 0, size: 0 };
     }),
   );
-  stats.sort((a, b) => a.time - b.time);
-  await Promise.all(
-    stats
-      .slice(0, stats.length - MAX_NATIVE)
-      .map((s) => fs().deleteAsync(dir + s.name, { idempotent: true })),
-  );
+  const doomed = pickEvictions(stats, MAX_NATIVE, MAX_NATIVE_BYTES);
+  await Promise.all(doomed.map((name) => fs().deleteAsync(dir + name, { idempotent: true })));
+}
+
+/** Oldest files to delete so at most `maxCount` files and `maxBytes` remain. */
+export function pickEvictions(
+  files: { name: string; time: number; size: number }[],
+  maxCount: number,
+  maxBytes: number,
+): string[] {
+  const byAge = [...files].sort((a, b) => a.time - b.time);
+  let count = byAge.length;
+  let bytes = byAge.reduce((sum, f) => sum + f.size, 0);
+  const out: string[] = [];
+  // Never delete the newest file (the picture just saved).
+  for (const f of byAge.slice(0, -1)) {
+    if (count <= maxCount && bytes <= maxBytes) break;
+    out.push(f.name);
+    count -= 1;
+    bytes -= f.size;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- web
