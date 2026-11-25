@@ -4,7 +4,7 @@ import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { CompositeScreenProps } from '@react-navigation/native';
+import { useIsFocused, type CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Chip from '../components/Chip';
 import EmptyState from '../components/EmptyState';
@@ -87,7 +87,8 @@ export function QuestsScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [completedOpen, setCompletedOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const search = useQuestSearch(searchText);
+  const isFocused = useIsFocused();
+  const search = useQuestSearch(isFocused ? searchText : '');
   const searchActive = searchText.trim().length > 0;
 
   useEffect(() => {

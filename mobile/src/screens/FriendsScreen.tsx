@@ -99,10 +99,11 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const [query, setQuery] = useState('');
   const myUserId = useAppSelector((state) => state.auth.userId);
   const [inviteCode, setInviteCode] = useState('');
+  const isFocused = useIsFocused();
 
   const circle = useCircle();
   const requests = useFriendRequests();
-  const search = useUserSearch(query);
+  const search = useUserSearch(isFocused && section === 'find' ? query : '');
   const blocked = useBlockedUsers(section === 'find');
   const sendRequest = useSendRequest();
   const respond = useRespondRequest();
@@ -111,7 +112,6 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
   const unblock = useUnblockUser();
   const redeem = useRedeemInvite();
   const cheer = useCheer();
-  const isFocused = useIsFocused();
   const [pulse, setPulse] = useState<{ id: string | null; tick: number }>({ id: null, tick: 0 });
   const [now, setNow] = useState(() => Date.now());
 
@@ -453,7 +453,7 @@ export function FriendsScreen({ route }: { route?: { params?: { code?: string } 
               />
             </View>
             {query.trim().length >= 2 ? (
-              search.isLoading ? (
+              search.searching ? (
                 <Skeleton height={64} style={styles.skeletonBlock} />
               ) : (search.data ?? []).length === 0 ? (
                 <EmptyState

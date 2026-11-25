@@ -4,6 +4,7 @@
 import i18n from '../../i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { useDebouncedSearch } from '../../lib/useDebouncedSearch';
 import type { CircleRow, SearchHit } from './logic';
 
 export type {
@@ -51,16 +52,22 @@ function notify(body: Record<string, unknown>) {
 }
 
 export function useUserSearch(query: string) {
-  const q = query.trim().toLowerCase();
-  return useQuery({
+  const normalized = query.trim().toLowerCase();
+  const valid = normalized.length >= 2;
+  const q = useDebouncedSearch(valid ? normalized : '');
+  const result = useQuery({
     queryKey: ['friends', 'search', q],
-    enabled: q.length >= 2,
-    queryFn: async (): Promise<SearchHit[]> => {
-      const { data, error } = await supabase.rpc('search_users', { p_query: q });
+    enabled: q.length > 0,
+    queryFn: async ({ signal }): Promise<SearchHit[]> => {
+      const { data, error } = await supabase.rpc('search_users', { p_query: q }).abortSignal(signal);
       if (error) throw error;
       return (data ?? []) as SearchHit[];
     },
   });
+  return {
+    data: q ? result.data : undefined,
+    searching: valid && (!q || result.isLoading),
+  };
 }
 
 export const CIRCLE_KEY = ['friends', 'circle'] as const;
