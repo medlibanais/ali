@@ -246,7 +246,10 @@
     "ratingFailed": "تعذّر حفظ التقييم.",
     "sendFailed": "تعذّر إرسال الرسالة.",
     "couldNotRefreshThe": "تعذّر تحديث عدد رسائل اليوم.",
-    "theConnectionDroppedBefore": "انقطع الاتصال قبل وصول الرد. اضغط على إعادة المحاولة لتسأل مجددًا."
+    "theConnectionDroppedBefore": "انقطع الاتصال قبل وصول الرد. اضغط على إعادة المحاولة لتسأل مجددًا.",
+    "replyUncertain": "لم يرد مدربك في الوقت المناسب. إعادة المحاولة لن تستهلك رسالة أخرى.",
+    "replyPending": "تم إرسال رسالتك. سيظهر الرد هنا فور حفظه.",
+    "notSentYet": "لم تُرسل هذه الرسالة. اضغط إعادة المحاولة لإرسالها."
   },
   "friendErrors": {
     "ownAccount": "هذا حسابك أنت.",
@@ -616,7 +619,13 @@
     "youHaveLeft_two": "تبقّت لك رسالتان اليوم.",
     "youHaveLeft_few": "تبقّت لك {{count}} رسائل اليوم.",
     "youHaveLeft_many": "تبقّت لك {{count}} رسالة اليوم.",
-    "youHaveLeft_other": "تبقّت لك {{count}} رسالة اليوم."
+    "youHaveLeft_other": "تبقّت لك {{count}} رسالة اليوم.",
+    "tryAgain": "أعد المحاولة",
+    "tryAgainLabel": "اطلب من المدرب الرد على هذه الرسالة مرة أخرى",
+    "checkAgain": "تحقق مجددًا",
+    "checkAgainLabel": "تحقق مما إذا تم حفظ الرد",
+    "dismiss": "إخفاء",
+    "dismissLabel": "إخفاء هذا التنبيه"
   },
   "insights": {
     "thisWeek": "هذا الأسبوع",

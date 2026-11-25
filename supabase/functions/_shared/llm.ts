@@ -156,6 +156,22 @@ export interface StreamOptions extends LlmOptions {
   signal?: AbortSignal;
   /** Max silence between two chunks once the stream has started. */
   idleTimeoutMs?: number;
+  /**
+   * False: a timeout before the first token ends the stream with
+   * ProviderTimeout instead of trying again. The provider may already have
+   * billed that request, so the Coach leaves the next call to the person.
+   */
+  retryOnTimeout?: boolean;
+  /** Called before every HTTP request to the provider (for metrics). */
+  onAttempt?: (model: string) => void;
+}
+
+/** The provider did not answer in time: it may or may not have billed. */
+export class ProviderTimeout extends Error {
+  constructor() {
+    super('timeout');
+    this.name = 'ProviderTimeout';
+  }
 }
 
 export type StreamEvent =
@@ -228,7 +244,9 @@ export async function* streamGroq(
       let timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
       const reasoning = isReasoningModel(model);
       let started = false;
+      let timedOut = false;
       try {
+        options.onAttempt?.(model);
         const response = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',
           signal: controller.signal,
@@ -275,17 +293,14 @@ export async function* streamGroq(
         lastError = 'empty_completion';
       } catch (e) {
         if (started) return; // keep the partial answer
-        lastError =
-          e instanceof DOMException && e.name === 'AbortError'
-            ? 'timeout'
-            : e instanceof Error
-              ? e.message
-              : 'network_error';
         if (options.signal?.aborted) return;
+        timedOut = e instanceof DOMException && e.name === 'AbortError';
+        lastError = timedOut ? 'timeout' : e instanceof Error ? e.message : 'network_error';
       } finally {
         clearTimeout(timer);
         options.signal?.removeEventListener('abort', onAbort);
       }
+      if (timedOut && options.retryOnTimeout === false) throw new ProviderTimeout();
     }
   }
   throw new Error(lastError);
