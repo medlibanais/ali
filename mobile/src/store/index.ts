@@ -1,4 +1,5 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import { accountScopeMiddleware, withAccountReset } from './accountScope';
 import authReducer from './slices/authSlice';
 import userReducer from './slices/userSlice';
 import questsReducer from './slices/questsSlice';
@@ -14,8 +15,7 @@ import { celebrationMiddleware } from './celebrationMiddleware';
 import { THEMES } from '../theme/themes';
 import { applyThemeColors } from '../theme/tokens';
 
-export const store = configureStore({
-  reducer: {
+const rootReducer = combineReducers({
     auth: authReducer,
     user: userReducer,
     quests: questsReducer,
@@ -26,9 +26,15 @@ export const store = configureStore({
     language: languageReducer,
     sync: syncReducer,
     celebrations: celebrationsReducer,
-  },
+});
+
+export const store = configureStore({
+  // Account data is cleared between accounts (store/accountScope.ts).
+  reducer: withAccountReset(rootReducer) as typeof rootReducer,
   middleware: (getDefault) =>
-    getDefault().prepend(celebrationMiddleware.middleware).concat(syncMachineMiddleware),
+    getDefault()
+      .prepend(accountScopeMiddleware, celebrationMiddleware.middleware)
+      .concat(syncMachineMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
