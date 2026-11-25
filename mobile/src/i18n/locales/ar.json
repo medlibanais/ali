@@ -406,7 +406,13 @@
     "backToSignIn": "العودة لتسجيل الدخول"
   },
   "splash": {
-    "whoAreYouBecoming": "من تصبح"
+    "whoAreYouBecoming": "من تصبح",
+    "profileUnavailable": {
+      "title": "تعذّر تحميل حسابك",
+      "body": "تحقّق من اتصالك ثم حاول مرة أخرى. تقدّمك محفوظ.",
+      "retry": "حاول مرة أخرى",
+      "signOut": "تسجيل الخروج"
+    }
   },
   "onboarding": {
     "welcome": "مرحبًا",

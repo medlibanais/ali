@@ -386,7 +386,13 @@
     "backToSignIn": "Back to sign in"
   },
   "splash": {
-    "whoAreYouBecoming": "Who are you becoming"
+    "whoAreYouBecoming": "Who are you becoming",
+    "profileUnavailable": {
+      "title": "We couldn't load your account",
+      "body": "Check your connection, then try again. Your progress is safe.",
+      "retry": "Try again",
+      "signOut": "Sign out"
+    }
   },
   "onboarding": {
     "welcome": "Welcome",

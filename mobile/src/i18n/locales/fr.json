@@ -391,7 +391,13 @@
     "backToSignIn": "Retour à la connexion"
   },
   "splash": {
-    "whoAreYouBecoming": "Qui deviens-tu"
+    "whoAreYouBecoming": "Qui deviens-tu",
+    "profileUnavailable": {
+      "title": "Impossible de charger ton compte",
+      "body": "Vérifie ta connexion, puis réessaie. Ta progression est en sécurité.",
+      "retry": "Réessayer",
+      "signOut": "Se déconnecter"
+    }
   },
   "onboarding": {
     "welcome": "Bienvenue",

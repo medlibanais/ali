@@ -8,11 +8,11 @@ import { useLanguageSync } from '../i18n/useLanguageSync';
 import { supabase } from '../lib/supabase';
 import { createQueryClient } from '../lib/queryClient';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { restoreSession, sessionExpired } from '../store/slices/authSlice';
+import { logout, restoreSession, sessionExpired } from '../store/slices/authSlice';
 import { colors, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
-import SplashScreen from '../screens/SplashScreen';
+import SplashScreen, { ProfileUnavailableScreen } from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -251,6 +251,15 @@ export function RootNavigator() {
       return (
         <View style={styles.fill} onLayout={onAuthPainted}>
           <AuthNavigator />
+        </View>
+      );
+    case 'profileUnavailable':
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <ProfileUnavailableScreen
+            onRetry={() => dispatch(restoreSession())}
+            onSignOut={() => dispatch(logout())}
+          />
         </View>
       );
     case 'needsOnboarding':

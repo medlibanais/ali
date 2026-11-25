@@ -1,5 +1,6 @@
 import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { rememberOnboardingCompleted } from '../../lib/onboardingCache';
 import { supabase } from '../../lib/supabase';
 import { isLanguage, Language } from '../../i18n/languages';
 
@@ -130,15 +131,19 @@ export const submitOnboarding = createAsyncThunk<
       );
     }
 
-    const { error: profileError } = await supabase
+    // Three idempotent steps, safe to retry after any failure. Onboarding
+    // is marked complete only in the last one, after the profile and the
+    // goals are both saved, so a half-saved account is never treated as
+    // finished (and is asked again on the next launch).
+    const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
       .update({
         username,
         first_name: payload.first_name.trim(),
         timezone: payload.timezone,
-        onboarding_completed: true,
       })
-      .eq('id', userId);
+      .eq('id', userId)
+      .select('id');
     if (profileError) {
       if (profileError.message.toLowerCase().includes('duplicate') ||
           profileError.code === '23505') {
@@ -146,19 +151,34 @@ export const submitOnboarding = createAsyncThunk<
       }
       throw profileError;
     }
+    if (!profileRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
 
     const { dream_body, dream_personality, ...goals } = payload.goals;
-    const { error: goalsError } = await supabase
+    const { data: goalRows, error: goalsError } = await supabase
       .from('user_goals')
-      .update({
-        ...goals,
-        ...(dream_body !== undefined ? { dream_body } : {}),
-        ...(dream_personality !== undefined
-          ? { dream_personality }
-          : {}),
-      })
-      .eq('user_id', userId);
+      .upsert(
+        {
+          user_id: userId,
+          ...goals,
+          ...(dream_body !== undefined ? { dream_body } : {}),
+          ...(dream_personality !== undefined
+            ? { dream_personality }
+            : {}),
+        },
+        { onConflict: 'user_id' },
+      )
+      .select('user_id');
     if (goalsError) throw goalsError;
+    if (!goalRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
+
+    const { data: doneRows, error: doneError } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', userId)
+      .select('id');
+    if (doneError) throw doneError;
+    if (!doneRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
+    rememberOnboardingCompleted(userId);
   } catch (error) {
     return rejectWithValue(
       error instanceof Error ? error.message : i18n.t('errors.saveAnswers'),
