@@ -150,7 +150,13 @@ export function PressableScale({
 /** A slow, endless up-and-down drift. Returns a translateY value. */
 export function useFloat(amplitude = 4, duration = 2600, delay = 0) {
   const t = useRef(new Animated.Value(0)).current;
+  // Less motion asked for: hold still (an endless loop draws every frame).
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
+    if (reduceMotion) {
+      t.setValue(0);
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(t, {
@@ -170,7 +176,7 @@ export function useFloat(amplitude = 4, duration = 2600, delay = 0) {
     const run = Animated.sequence([Animated.delay(delay), loop]);
     run.start();
     return () => run.stop();
-  }, [t, duration, delay]);
+  }, [t, duration, delay, reduceMotion]);
   // Same node across re-renders: a new interpolation on every render would
   // make Animated detach and re-attach the transform mid-loop.
   return useMemo(

@@ -8,6 +8,7 @@ import { StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
+  useReducedMotion,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -67,14 +68,17 @@ export function LoadingDots({
 }: LoadingDotsProps) {
   const { t } = useTranslation();
   const clock = useSharedValue(0);
+  // Less motion asked for: the dots hold still.
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
+    if (reduceMotion) return;
     clock.value = withRepeat(
       withTiming(1, { duration: CYCLE_MS, easing: Easing.linear }),
       -1,
       false,
     );
     return () => cancelAnimation(clock);
-  }, [clock]);
+  }, [clock, reduceMotion]);
 
   return (
     <View
