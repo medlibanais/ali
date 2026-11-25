@@ -5,7 +5,7 @@
 // Runs against the local Supabase (`npm run db:start`); see e2e/README.md.
 import { expect as jestExpect } from '@jest/globals';
 import { by, device, element, expect, waitFor } from 'detox';
-import { ensureAppFocus, logJsConsole, prepareEmulator } from './support/android';
+import { ensureAppFocus, logDeviceLoad, logJsConsole, prepareEmulator } from './support/android';
 import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
 
 const RUN = Date.now().toString(36);
@@ -107,8 +107,10 @@ function parseXp(text: string): number {
   return Number(latin.replace(/[^0-9]/g, ''));
 }
 
+/** XP on Today before the quest tap (step 4), compared in step 5. */
+let xpBefore = 0;
+
 describe('New user journey', () => {
-  let xpBefore = 0;
 
   // A system window (permission or save-password prompt) can appear at any
   // point; check before every step.
@@ -252,35 +254,52 @@ describe('New user journey', () => {
   });
 
   it('5. shows more XP than before', async () => {
-    await waitFor(element(by.id('today-total-xp')))
-      .toBeVisible()
-      .whileElement(by.id('today-scroll'))
-      .scroll(250, 'down', 0.5, 0.5);
-    // The XP refreshes once the server confirms the completion.
-    let xpAfter = xpBefore;
-    const deadline = Date.now() + LONG;
-    while (xpAfter <= xpBefore && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      xpAfter = parseXp(await textOf('today-total-xp'));
-    }
-    if (xpAfter <= xpBefore) {
-      // Tells "the server never got the completion" (tap missed, queued,
-      // refused: the toast text is at the end of the label) from "the
-      // server has it but the screen did not catch up".
+    try {
+      await checkXpWentUp();
+    } catch (e) {
+      // Works even when the app never idles (every Detox call then waits).
       try {
-        const c = await signInAs(EMAIL, PASSWORD);
-        console.warn(`[xp] screen=${xpAfter} database=${await readTotalXp(c)}`);
-      } catch (err) {
-        console.warn(`[xp] database unreadable: ${(err as Error).message.split('\n')[0]}`);
+        console.warn(`[xp] database=${await readTotalXp(await signInAs(EMAIL, PASSWORD))}`);
+      } catch {
+        console.warn('[xp] database unreadable');
       }
-      await logTop('XP did not go up');
-      if (device.getPlatform() === 'android') logJsConsole('XP did not go up');
+      if (device.getPlatform() === 'android') {
+        logDeviceLoad('step 5 failed');
+        logJsConsole('step 5 failed');
+      }
+      throw e;
     }
-    jestExpect(xpAfter).toBeGreaterThan(xpBefore);
-
-    // The server (complete_quest RPC) is the only writer of XP; check it too.
-    const client = await signInAs(EMAIL, PASSWORD);
-    jestExpect(await readTotalXp(client)).toBe(xpAfter);
-    await expect(element(by.id('today-total-xp'))).toBeVisible();
   });
 });
+
+async function checkXpWentUp(): Promise<void> {
+  await waitFor(element(by.id('today-total-xp')))
+    .toBeVisible()
+    .whileElement(by.id('today-scroll'))
+    .scroll(250, 'down', 0.5, 0.5);
+  // The XP refreshes once the server confirms the completion.
+  let xpAfter = xpBefore;
+  const deadline = Date.now() + LONG;
+  while (xpAfter <= xpBefore && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    xpAfter = parseXp(await textOf('today-total-xp'));
+  }
+  if (xpAfter <= xpBefore) {
+    // Tells "the server never got the completion" (tap missed, queued,
+    // refused: the toast text is at the end of the label) from "the
+    // server has it but the screen did not catch up".
+    try {
+      const c = await signInAs(EMAIL, PASSWORD);
+      console.warn(`[xp] screen=${xpAfter} database=${await readTotalXp(c)}`);
+    } catch (err) {
+      console.warn(`[xp] database unreadable: ${(err as Error).message.split('\n')[0]}`);
+    }
+    await logTop('XP did not go up');
+  }
+  jestExpect(xpAfter).toBeGreaterThan(xpBefore);
+
+  // The server (complete_quest RPC) is the only writer of XP; check it too.
+  const client = await signInAs(EMAIL, PASSWORD);
+  jestExpect(await readTotalXp(client)).toBe(xpAfter);
+  await expect(element(by.id('today-total-xp'))).toBeVisible();
+}
