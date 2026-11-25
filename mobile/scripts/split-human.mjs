@@ -9,6 +9,8 @@
 //                 texture, and per texture shared by several items
 //   src/avatar/modelParts.ts   generated: which packs each item needs and
 //                 the asset module of each pack
+//   src/avatar/modelManifest.ts  generated (scripts/avatar-assets.mjs):
+//                 byte size and SHA-256 of the core and every pack
 //
 // The header keeps every view; a view stored in a pack carries `b` (the
 // pack name) and its offset counts from the start of that pack.
@@ -166,6 +168,10 @@ ${names.map((n) => `  ${JSON.stringify(n)}: require('../../assets/avatar3d/parts
 };
 `;
 writeFileSync(outManifest, ts);
+
+// Sizes and hashes of the new files (the viewer checks downloads against them).
+const { readAssets, manifest, writeManifest } = await import('./avatar-assets.mjs');
+writeManifest(manifest(readAssets()));
 
 const mb = (n) => (n / 1e6).toFixed(2);
 console.log(`core.bin ${mb(core.length)} MB, ${names.length} packs ${mb(partBytes)} MB, source ${mb(src.length)} MB`);

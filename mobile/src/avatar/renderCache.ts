@@ -14,6 +14,13 @@
 // The cache key includes the content hashes of viewer.html and the model,
 // so rebuilding either one makes old pictures miss instead of showing a
 // stale look.
+//
+// Portraits: the person's own everyday avatar also has a named slot
+// ('<user id>:today|head|0') that points at its newest picture. After an
+// app update (new model, so every key misses) or an edit on another phone,
+// the slot's old picture is shown at once while the new one renders, and
+// the eviction below never deletes a picture a slot points at. Slots are
+// cleared on sign-out.
 
 import { Platform } from 'react-native';
 
@@ -25,6 +32,11 @@ export const MAX_NATIVE_BYTES = 8 * 1024 * 1024;
 const MAX_WEB = 10;
 const WEB_PREFIX = 'grow.avatar3d.';
 const WEB_INDEX = 'grow.avatar3d.index';
+const WEB_PORTRAITS = 'grow.avatar3d.portraits';
+const PORTRAITS_FILE = 'portraits.json';
+/** Slot -> picture file name. */
+type Portraits = Record<string, string>;
+const MAX_PORTRAITS = 8;
 
 /** cyrb53: a fast 53-bit string hash, plenty to name cache files. */
 export function hashKey(str: string): string {
@@ -96,7 +108,8 @@ async function nativeSave(key: string, dataUrl: string): Promise<void> {
 }
 
 async function nativePrune(dir: string): Promise<void> {
-  const names = await fs().readDirectoryAsync(dir);
+  const keep = new Set(Object.values(await nativePortraits(dir)));
+  const names = (await fs().readDirectoryAsync(dir)).filter((n) => n.endsWith('.png'));
   const stats = await Promise.all(
     names.map(async (name) => {
       const info = await fs().getInfoAsync(dir + name);
@@ -105,7 +118,7 @@ async function nativePrune(dir: string): Promise<void> {
         : { name, time: 0, size: 0 };
     }),
   );
-  const doomed = pickEvictions(stats, MAX_NATIVE, MAX_NATIVE_BYTES);
+  const doomed = pickEvictions(stats, MAX_NATIVE, MAX_NATIVE_BYTES, keep);
   await Promise.all(doomed.map((name) => fs().deleteAsync(dir + name, { idempotent: true })));
 }
 
@@ -114,19 +127,70 @@ export function pickEvictions(
   files: { name: string; time: number; size: number }[],
   maxCount: number,
   maxBytes: number,
+  keep: ReadonlySet<string> = new Set(),
 ): string[] {
   const byAge = [...files].sort((a, b) => a.time - b.time);
   let count = byAge.length;
   let bytes = byAge.reduce((sum, f) => sum + f.size, 0);
   const out: string[] = [];
-  // Never delete the newest file (the picture just saved).
+  // Never delete the newest file (the picture just saved), nor a portrait.
   for (const f of byAge.slice(0, -1)) {
     if (count <= maxCount && bytes <= maxBytes) break;
+    if (keep.has(f.name)) continue;
     out.push(f.name);
     count -= 1;
     bytes -= f.size;
   }
   return out;
+}
+
+async function nativePortraits(dir: string): Promise<Portraits> {
+  try {
+    const info = await fs().getInfoAsync(dir + PORTRAITS_FILE);
+    if (!info.exists) return {};
+    return parsePortraits(await fs().readAsStringAsync(dir + PORTRAITS_FILE));
+  } catch {
+    return {};
+  }
+}
+
+async function nativeSetPortrait(slot: string, name: string): Promise<void> {
+  const dir = nativeDir();
+  if (!dir) return;
+  await ensureDir(dir);
+  const next = withPortrait(await nativePortraits(dir), slot, name);
+  await fs().writeAsStringAsync(dir + PORTRAITS_FILE, JSON.stringify(next));
+}
+
+async function nativeLoadPortrait(slot: string): Promise<string | null> {
+  const dir = nativeDir();
+  if (!dir) return null;
+  const name = (await nativePortraits(dir))[slot];
+  if (!name) return null;
+  const info = await fs().getInfoAsync(dir + name);
+  return info.exists && !info.isDirectory ? dir + name : null;
+}
+
+/** Reads a slot index, dropping anything that is not slot -> file name. */
+export function parsePortraits(raw: string | null): Portraits {
+  try {
+    const obj: unknown = raw ? JSON.parse(raw) : {};
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+    const out: Portraits = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (typeof v === 'string' && /^[a-z0-9]+\.png$/.test(v)) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** The index with this slot pointed at `name`, newest last, capped. */
+export function withPortrait(index: Portraits, slot: string, name: string): Portraits {
+  const entries = Object.entries(index).filter(([k]) => k !== slot);
+  entries.push([slot, name]);
+  return Object.fromEntries(entries.slice(-MAX_PORTRAITS));
 }
 
 // ---------------------------------------------------------------- web
@@ -159,24 +223,60 @@ function webLoad(key: string): string | null {
   }
 }
 
+function webPortraits(store: Storage): Portraits {
+  try {
+    return parsePortraits(store.getItem(WEB_PORTRAITS));
+  } catch {
+    return {};
+  }
+}
+
 function webSave(key: string, dataUrl: string): void {
   const store = webStore();
   if (!store) return;
   const name = fileName(key);
+  const keep = new Set(Object.values(webPortraits(store)));
   const index = webIndex(store).filter((n) => n !== name);
   index.push(name);
-  // Oldest out first; also make room if the quota is hit.
-  while (index.length > MAX_WEB) store.removeItem(WEB_PREFIX + index.shift());
+  // Oldest out first (portraits stay); also make room if the quota is hit.
+  const evictOne = (): boolean => {
+    const at = index.findIndex((n, i) => i < index.length - 1 && !keep.has(n));
+    if (at < 0) return false;
+    store.removeItem(WEB_PREFIX + index[at]);
+    index.splice(at, 1);
+    return true;
+  };
+  while (index.length > MAX_WEB && evictOne());
   for (;;) {
     try {
       store.setItem(WEB_PREFIX + name, dataUrl);
       store.setItem(WEB_INDEX, JSON.stringify(index));
       return;
     } catch {
-      const oldest = index.length > 1 ? index.shift() : undefined;
-      if (!oldest) return;
-      store.removeItem(WEB_PREFIX + oldest);
+      if (!evictOne()) return;
     }
+  }
+}
+
+function webSetPortrait(slot: string, name: string): void {
+  const store = webStore();
+  if (!store) return;
+  try {
+    store.setItem(WEB_PORTRAITS, JSON.stringify(withPortrait(webPortraits(store), slot, name)));
+  } catch {
+    // quota: the slot just keeps its older picture
+  }
+}
+
+function webLoadPortrait(slot: string): string | null {
+  const store = webStore();
+  if (!store) return null;
+  const name = webPortraits(store)[slot];
+  if (!name) return null;
+  try {
+    return store.getItem(WEB_PREFIX + name);
+  } catch {
+    return null;
   }
 }
 
@@ -191,13 +291,49 @@ export async function loadCachedRender(key: string): Promise<string | null> {
   }
 }
 
-/** Saves a freshly drawn picture (a PNG data URL). Never throws. */
-export async function saveCachedRender(key: string, dataUrl: string): Promise<void> {
+/**
+ * Saves a freshly drawn picture (a PNG data URL), and points the portrait
+ * slot at it when one is given. Never throws.
+ */
+export async function saveCachedRender(key: string, dataUrl: string, portrait?: string): Promise<void> {
   if (!dataUrl.startsWith('data:image/')) return;
   try {
     if (Platform.OS === 'web') webSave(key, dataUrl);
     else await nativeSave(key, dataUrl);
+    if (portrait) await pointPortrait(portrait, key);
   } catch {
     // A full disk only costs a re-render next launch.
+  }
+}
+
+/** Points a portrait slot at the saved picture of `key`. Never throws. */
+export async function pointPortrait(slot: string, key: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') webSetPortrait(slot, fileName(key));
+    else await nativeSetPortrait(slot, fileName(key));
+  } catch {
+    // keeps the older picture
+  }
+}
+
+/** The newest picture of a portrait slot from any app version, or null. */
+export async function loadPortrait(slot: string): Promise<string | null> {
+  try {
+    return Platform.OS === 'web' ? webLoadPortrait(slot) : await nativeLoadPortrait(slot);
+  } catch {
+    return null;
+  }
+}
+
+/** Forgets every portrait slot (sign-out). The pictures age out as usual. */
+export async function clearPortraits(): Promise<void> {
+  try {
+    if (Platform.OS === 'web') webStore()?.removeItem(WEB_PORTRAITS);
+    else {
+      const dir = nativeDir();
+      if (dir) await fs().deleteAsync(dir + PORTRAITS_FILE, { idempotent: true });
+    }
+  } catch {
+    // nothing to clear
   }
 }

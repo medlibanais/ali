@@ -25,10 +25,22 @@ cd mobile/tools/human
 python3 build.py --mh <makehuman checkout> \
   --assets <system assets> <glasses01> <pants01> <shirts01> <hair01> <dress01> <skirts01> <suits01> <shoes01> \
   --out ../../assets/avatar3d/models/human.bin
-cd ../.. && node scripts/split-human.mjs   # writes core.bin, parts/ and src/avatar/modelParts.ts
+cd ../.. && node scripts/split-human.mjs   # writes core.bin, parts/, src/avatar/modelParts.ts and modelManifest.ts
 npm run build:avatar3d                     # only if avatar3d/*.ts changed
-npx jest src/avatar                   # checks the app only asks for what the file holds
+node scripts/avatar-assets.mjs             # what the bytes are (morph targets, meshes, textures)
+node scripts/avatar-assets.mjs --check     # the CI size budget (assets/avatar3d/budget.json)
+npx jest src/avatar                   # checks the app only asks for what the file holds, first-render budget
 ```
+
+## Size budget
+
+CI runs `node scripts/avatar-assets.mjs --check`. It fails when a model file
+changed without `src/avatar/modelManifest.ts` (run it with `--write`), or
+when the viewer, the core, a pack, or all packs together grow past
+`assets/avatar3d/budget.json` (the 2026-11-25 sizes plus about 2%). Jest
+checks the first full render of the built-in looks and of random looks
+against the same file. If a new hair or outfit is meant to add bytes, raise
+the number in `budget.json` in the same PR and say why.
 
 Needs Python 3 with `numpy` and `Pillow`. It takes about two minutes.
 

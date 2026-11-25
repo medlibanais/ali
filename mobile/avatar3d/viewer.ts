@@ -7,7 +7,13 @@
 //   in:  { type: 'render', model, targets, skin, parts, eyeColor, pose,
 //          mode, yaw, zoom, bare, colors, snapshot }
 //   out: { type: 'ready' } | { type: 'rendered' } | { type: 'snapshot', data }
-//        | { type: 'error', message }
+//        | { type: 'error', message, files? }
+//
+// Every model file is checked against the manifest the app sends
+// (`expect`: byte size and SHA-256, src/avatar/modelManifest.ts). A file
+// that arrives cut off or corrupted is fetched again, bypassing the HTTP
+// cache; if it still fails, the error names the files so the app can
+// re-resolve them (an Android cache folder the system cleared).
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -28,6 +34,8 @@ interface RenderCommand {
   model: string;
   /** Pack name -> URL, for the packs this render needs (split model). */
   packs?: Record<string, string>;
+  /** Expected size and hash of the core ('core') and of each pack. */
+  expect?: Record<string, ModelFile>;
   /** Shape target weights, already worked out by the app. */
   targets: Record<string, number>;
   skin: { id: string; color: string };
@@ -49,6 +57,63 @@ declare global {
     ReactNativeWebView?: { postMessage: (data: string) => void };
     avatarCommand?: (json: string) => void;
   }
+}
+
+interface ModelFile {
+  bytes: number;
+  sha256: string;
+}
+
+/** Thrown when a model file cannot be fetched intact; names the file. */
+class FileError extends Error {
+  constructor(readonly file: string, message: string) {
+    super(message);
+  }
+}
+
+const hex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** Why these bytes are not the expected file, or null if they are. */
+async function mismatch(buf: ArrayBuffer, want: ModelFile | undefined): Promise<string | null> {
+  if (!want) return null;
+  if (buf.byteLength !== want.bytes) return `${buf.byteLength} of ${want.bytes} bytes`;
+  // WebCrypto exists in secure contexts (https, file://). Without it the
+  // size check above still catches a cut-off download.
+  const subtle = typeof crypto !== 'undefined' ? crypto.subtle : undefined;
+  if (!subtle) return null;
+  try {
+    return hex(await subtle.digest('SHA-256', buf)) === want.sha256 ? null : 'hash mismatch';
+  } catch {
+    return null;
+  }
+}
+
+const RETRY_DELAYS_MS = [0, 400, 1500];
+
+/**
+ * Fetches a model file and checks it. A failed or corrupted download is
+ * tried again (up to three times in all), skipping the HTTP cache so a bad
+ * cached copy is replaced.
+ */
+export async function fetchModelFile(name: string, url: string, want: ModelFile | undefined): Promise<ArrayBuffer> {
+  let last = '';
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    if (RETRY_DELAYS_MS[attempt]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    try {
+      const r = await fetch(url, attempt ? { cache: 'reload' } : undefined);
+      if (!r.ok && r.status !== 0) {
+        last = `HTTP ${r.status}`;
+        continue;
+      }
+      const buf = await r.arrayBuffer();
+      const bad = await mismatch(buf, want);
+      if (!bad) return buf;
+      last = bad;
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e);
+    }
+  }
+  throw new FileError(name, `model file ${name}: ${last}`);
 }
 
 function post(msg: unknown) {
@@ -144,14 +209,10 @@ const models = new Map<string, Promise<Loaded>>();
 const root = new THREE.Group();
 scene.add(root);
 
-function loadModel(url: string): Promise<Loaded> {
+function loadModel(url: string, want: ModelFile | undefined): Promise<Loaded> {
   let p = models.get(url);
   if (!p) {
-    p = fetch(url)
-      .then((r) => {
-        if (!r.ok) throw new Error(`model ${r.status}`);
-        return r.arrayBuffer();
-      })
+    p = fetchModelFile('core', url, want)
       .then((buf) => ({
         human: new Human(buf),
         packLoads: new Map(),
@@ -169,25 +230,35 @@ function loadModel(url: string): Promise<Loaded> {
 const MAX_PACKS = 24;
 
 /** Downloads the packs this render needs that are not loaded yet. */
-function loadPacks(m: Loaded, names: string[], urls: Record<string, string> | undefined): Promise<void> {
-  return Promise.all(
+function loadPacks(
+  m: Loaded,
+  names: string[],
+  urls: Record<string, string> | undefined,
+  expect: Record<string, ModelFile> | undefined,
+): Promise<void> {
+  return Promise.allSettled(
     names.map((name) => {
       let p = m.packLoads.get(name);
       if (!p) {
         const url = urls?.[name];
-        if (!url) return Promise.reject(new Error(`model pack ${name} has no URL`));
-        p = fetch(url)
-          .then((r) => {
-            if (!r.ok) throw new Error(`pack ${name} ${r.status}`);
-            return r.arrayBuffer();
-          })
-          .then((buf) => m.human.addPack(name, buf));
+        if (!url) return Promise.reject(new FileError(name, `model pack ${name} has no URL`));
+        p = fetchModelFile(name, url, expect?.[name]).then((buf) => m.human.addPack(name, buf));
         m.packLoads.set(name, p);
         p.catch(() => m.packLoads.delete(name));
       }
       return p;
     }),
-  ).then(() => undefined);
+  ).then((results) => {
+    const failed = results.flatMap((r, i) => (r.status === 'rejected' ? [names[i]] : []));
+    if (failed.length) throw new FilesError(failed);
+  });
+}
+
+/** Some packs could not be loaded intact. */
+class FilesError extends Error {
+  constructor(readonly files: string[]) {
+    super(`model packs failed: ${files.join(', ')}`);
+  }
 }
 
 function image(m: Loaded, i: number): Promise<HTMLImageElement> {
@@ -426,11 +497,11 @@ let lastCmd: RenderCommand | null = null;
 async function render(cmd: RenderCommand) {
   try {
     lastCmd = cmd;
-    const m = await loadModel(cmd.model);
+    const m = await loadModel(cmd.model, cmd.expect?.core);
     const h = m.human;
     const parts = cmd.parts.filter((p) => h.header.proxies[p.id]);
     const partIds = parts.map((p) => p.id);
-    await loadPacks(m, h.missingPacks(partIds, cmd.skin.id), cmd.packs);
+    await loadPacks(m, h.missingPacks(partIds, cmd.skin.id), cmd.packs, cmd.expect);
     if (lastCmd !== cmd) return;
     // Textures first, so the picture never shows a half-dressed frame.
     const skin = h.header.skins[cmd.skin.id];
@@ -522,7 +593,8 @@ async function render(cmd: RenderCommand) {
     }
     if (cmd.snapshot) post({ type: 'snapshot', data: canvas.toDataURL('image/png') });
   } catch (e) {
-    post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+    const files = e instanceof FilesError ? e.files : e instanceof FileError ? [e.file] : undefined;
+    post({ type: 'error', message: e instanceof Error ? e.message : String(e), files });
   }
 }
 
