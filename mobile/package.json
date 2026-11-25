@@ -28,7 +28,8 @@
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@supabase/.*|@tanstack/.*|@reduxjs/.*|immer|redux|react-redux|reselect)"
     ],
     "moduleNameMapper": {
-      "^@react-native-community/netinfo$": "@react-native-community/netinfo/jest/netinfo-mock.js"
+      "^@react-native-community/netinfo$": "@react-native-community/netinfo/jest/netinfo-mock.js",
+      "\\.bin$": "<rootDir>/jest/binAssetStub.js"
     }
   },
   "dependencies": {

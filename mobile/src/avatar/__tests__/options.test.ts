@@ -33,7 +33,7 @@ const SEXES: Sex[] = ['female', 'male'];
 
 /** The JSON header of the model file the viewer loads. */
 function modelHeader(): { targets: Record<string, unknown>; proxies: Record<string, unknown>; skins: Record<string, unknown> } {
-  const file = path.join(__dirname, '../../../assets/avatar3d/models/human.bin');
+  const file = path.join(__dirname, '../../../assets/avatar3d/models/core.bin');
   const fd = fs.openSync(file, 'r');
   const len = Buffer.alloc(4);
   fs.readSync(fd, len, 0, 4, 0);

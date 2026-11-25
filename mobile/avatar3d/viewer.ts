@@ -24,8 +24,10 @@ interface PartCommand {
 
 interface RenderCommand {
   type: 'render';
-  /** URL of human.bin. */
+  /** URL of the core model file (core.bin). */
   model: string;
+  /** Pack name -> URL, for the packs this render needs (split model). */
+  packs?: Record<string, string>;
   /** Shape target weights, already worked out by the app. */
   targets: Record<string, number>;
   skin: { id: string; color: string };
@@ -132,6 +134,7 @@ function backdrop(from: string, to: string): THREE.Texture {
 
 interface Loaded {
   human: Human;
+  packLoads: Map<string, Promise<void>>;
   images: Map<number, Promise<HTMLImageElement>>;
   textures: Map<string, THREE.Texture>;
   meshes: Map<string, THREE.Mesh>;
@@ -149,11 +152,42 @@ function loadModel(url: string): Promise<Loaded> {
         if (!r.ok) throw new Error(`model ${r.status}`);
         return r.arrayBuffer();
       })
-      .then((buf) => ({ human: new Human(buf), images: new Map(), textures: new Map(), meshes: new Map() }));
+      .then((buf) => ({
+        human: new Human(buf),
+        packLoads: new Map(),
+        images: new Map(),
+        textures: new Map(),
+        meshes: new Map(),
+      }));
     models.set(url, p);
     p.catch(() => models.delete(url));
   }
   return p;
+}
+
+/** Keep at most this many packs in memory (the editor flips through many). */
+const MAX_PACKS = 24;
+
+/** Downloads the packs this render needs that are not loaded yet. */
+function loadPacks(m: Loaded, names: string[], urls: Record<string, string> | undefined): Promise<void> {
+  return Promise.all(
+    names.map((name) => {
+      let p = m.packLoads.get(name);
+      if (!p) {
+        const url = urls?.[name];
+        if (!url) return Promise.reject(new Error(`model pack ${name} has no URL`));
+        p = fetch(url)
+          .then((r) => {
+            if (!r.ok) throw new Error(`pack ${name} ${r.status}`);
+            return r.arrayBuffer();
+          })
+          .then((buf) => m.human.addPack(name, buf));
+        m.packLoads.set(name, p);
+        p.catch(() => m.packLoads.delete(name));
+      }
+      return p;
+    }),
+  ).then(() => undefined);
 }
 
 function image(m: Loaded, i: number): Promise<HTMLImageElement> {
@@ -395,6 +429,9 @@ async function render(cmd: RenderCommand) {
     const m = await loadModel(cmd.model);
     const h = m.human;
     const parts = cmd.parts.filter((p) => h.header.proxies[p.id]);
+    const partIds = parts.map((p) => p.id);
+    await loadPacks(m, h.missingPacks(partIds, cmd.skin.id), cmd.packs);
+    if (lastCmd !== cmd) return;
     // Textures first, so the picture never shows a half-dressed frame.
     const skin = h.header.skins[cmd.skin.id];
     const skinMap = skin ? await texture(m, skin.map) : null;
@@ -463,6 +500,26 @@ async function render(cmd: RenderCommand) {
     key.target.position.set(0, cmd.mode === 'head' ? head[1] : head[1] * 0.55, 0);
     renderer.render(scene, camera);
     post({ type: 'rendered' });
+    if (m.packLoads.size > MAX_PACKS) {
+      // Release the bytes of items no longer worn (decoded textures and
+      // meshes for them are dropped too, and rebuilt if worn again).
+      h.keepOnly(partIds, cmd.skin.id);
+      for (const name of [...m.packLoads.keys()]) if (!h.hasPack(name)) m.packLoads.delete(name);
+      const keep = new Set(partIds);
+      for (const [id, mesh] of m.meshes) {
+        if (id.startsWith('#') || keep.has(id) || keep.has(id.replace(/#soft$/, ''))) continue;
+        if (!(h.header.proxies[id.replace(/#soft$/, '')]?.packs?.length)) continue;
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+        m.meshes.delete(id);
+      }
+      h.header.textures.forEach((t, i) => {
+        if (!t.b || h.hasPack(t.b)) return;
+        m.textures.get(`t${i}`)?.dispose();
+        m.textures.delete(`t${i}`);
+        m.images.delete(i);
+      });
+    }
     if (cmd.snapshot) post({ type: 'snapshot', data: canvas.toDataURL('image/png') });
   } catch (e) {
     post({ type: 'error', message: e instanceof Error ? e.message : String(e) });

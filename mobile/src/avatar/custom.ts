@@ -4,7 +4,7 @@
 //
 // A slider runs from -1 to 1 (or 0 to 1 for amounts); 0 leaves the body
 // as it is. Each slider blends MakeHuman shape targets stored in the
-// model file (assets/avatar3d/models/human.bin): `neg` at the low end,
+// model file (assets/avatar3d/models/core.bin, from human.bin): `neg` at the low end,
 // `pos` at the high end. A preset is a named set of slider values, so
 // picking "Heart" moves the face sliders and they stay free to tweak.
 

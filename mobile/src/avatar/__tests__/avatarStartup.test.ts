@@ -16,7 +16,7 @@ jest.mock('expo-asset', () => ({
   Asset: { fromModule: () => ({ hash: 'h', uri: 'u', localUri: 'u', downloadAsync: () => Promise.resolve() }) },
 }));
 jest.mock('../../../assets/avatar3d/viewer.html', () => 1, { virtual: true });
-jest.mock('../../../assets/avatar3d/models/human.bin', () => 2, { virtual: true });
+jest.mock('../../../assets/avatar3d/models/core.bin', () => 2, { virtual: true });
 
 // eslint-disable-next-line import/first
 import { __avatar3dInternals, requestRender } from '../Avatar3D';
