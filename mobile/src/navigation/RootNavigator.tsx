@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { markFirstScreenPainted } from '../lib/bootSplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
+import { loadPlanning } from '../features/planning/store';
 import { useLanguageSync } from '../i18n/useLanguageSync';
 import { supabase } from '../lib/supabase';
 import { createQueryClient } from '../lib/queryClient';
@@ -213,6 +214,8 @@ function AppNavigator() {
 }
 
 function AccountNavigator() {
+  const dispatch = useAppDispatch();
+  useEffect(() => { dispatch(loadPlanning()); }, [dispatch]);
   const [queryClient] = useState(createQueryClient);
   return (
     <QueryClientProvider client={queryClient}>

@@ -19,9 +19,12 @@ import i18n, { appLocale } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { CompositeScreenProps } from '@react-navigation/native';
+import { useFocusEffect, type CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { sanitizeAvatarConfig } from '../avatar/types';
+import { readAvatarDoc } from '../avatar/types';
+import Button from '../components/Button';
+import { TodayPlan } from '../features/planning/TodayPlan';
+import { selectDailyPlan } from '../features/planning/selectors';
 import { VALID_OPTION_IDS } from '../avatar/options';
 import Backdrop from '../components/Backdrop';
 import EmptyState from '../components/EmptyState';
@@ -41,6 +44,7 @@ import { useUnreadCount } from '../features/notifications/api';
 import { markFirstScreenPainted } from '../lib/bootSplash';
 import { bestStreakLabel, streakLabel } from '../lib/format';
 import { playHaptic } from '../lib/haptics';
+import { localDateOf } from '../lib/offlineQueue';
 import { launchHero } from '../lib/hero';
 import { supabase } from '../lib/supabase';
 import type { AppStackParamList, MainTabParamList } from '../navigation/types';
@@ -143,10 +147,12 @@ const TodayOrbit = memo(function TodayOrbit({
   expandedPillar,
   onPillarPress,
   onAvatarPress,
+  onCreateFuture,
 }: {
   expandedPillar: PillarId | null;
   onPillarPress: (pillar: PillarId) => void;
   onAvatarPress: () => void;
+  onCreateFuture: () => void;
 }) {
   // Primitive picks: a refetched profile with the same values is a no-op.
   const rawConfig = useAppSelector((state) => state.user.profile?.avatar_config);
@@ -159,15 +165,15 @@ const TodayOrbit = memo(function TodayOrbit({
   });
   const level = useAppSelector((state) => state.gamification.level);
   const mood = useAppSelector(selectDayMood);
-  const avatarConfig = useMemo(
-    () => sanitizeAvatarConfig(rawConfig, VALID_OPTION_IDS),
-    [rawConfig],
-  );
+  const { t } = useTranslation();
+  const [showFuture, setShowFuture] = useState(false);
+  const doc = useMemo(() => readAvatarDoc(rawConfig, VALID_OPTION_IDS), [rawConfig]);
   return (
     <FadeInUp delay={80} style={styles.orbitWrap}>
       <PillarOrbit
-        avatarConfig={avatarConfig}
-        photoUrl={photoUrl}
+        avatarConfig={showFuture && doc.future ? doc.future : doc.current}
+        photoUrl={showFuture && doc.future ? null : photoUrl}
+        portraitOnly
         name={firstName}
         level={level}
         mood={mood}
@@ -175,6 +181,37 @@ const TodayOrbit = memo(function TodayOrbit({
         onPillarPress={onPillarPress}
         onAvatarPress={onAvatarPress}
       />
+      <View style={styles.journeyChoices}>
+        <Button variant={showFuture ? 'ghost' : 'secondary'} title={t('planning.currentYou')}
+          onPress={() => setShowFuture(false)} />
+        <Button variant={showFuture ? 'secondary' : 'ghost'} title={t('planning.futureYou')}
+          onPress={() => doc.future ? setShowFuture(true) : onCreateFuture()} />
+      </View>
+      <AvatarMilestone />
+    </FadeInUp>
+  );
+});
+
+const AvatarMilestone = memo(function AvatarMilestone() {
+  const { t } = useTranslation();
+  const completed = useAppSelector((s) => s.quests.lastCompleted);
+  const quest = useAppSelector((s) => {
+    const id = s.quests.lastCompleted?.questId;
+    return id ? selectQuestById(s, id) : undefined;
+  });
+  const goal = useAppSelector((s) => {
+    if (quest?.pillar === 'work') return s.user.profile?.career_goal;
+    if (quest?.pillar === 'health') return s.user.profile?.dream_body;
+    if (quest?.pillar === 'spirituality') return s.user.goals?.spiritual_practice;
+  });
+  if (!completed || !quest?.completed) return null;
+  return (
+    <FadeInUp key={completed.at} distance={8}>
+      <Txt variant="body" align="center" color={colors.inkSoft} accessibilityLiveRegion="polite">
+        {goal?.trim() ? t('planning.goalProgress', { goal }) : t('planning.pillarProgress', {
+          pillar: PILLAR_LABELS[quest.pillar],
+        })}
+      </Txt>
     </FadeInUp>
   );
 });
@@ -232,18 +269,20 @@ export const QuestSection = memo(function QuestSection({
   onSeeAll,
   onOpen,
   onComplete,
+  ordering,
 }: {
   expandedPillar: PillarId | null;
   onClearPillar: () => void;
   onSeeAll: () => void;
   onOpen: (quest: Quest) => void;
   onComplete: (quest: Quest) => void;
+  ordering?: { ids: string[]; focused: boolean };
 }) {
   const { t } = useTranslation();
   useTheme();
   // Re-renders only when the listed ids, their order or the counts change.
   const list = useAppSelector<TodayList>(
-    (state) => selectTodayList(state, expandedPillar),
+    (state) => selectTodayList(state, expandedPillar, ordering),
     sameTodayList,
   );
   const hiddenCount = list.inScopeCount - list.ids.length;
@@ -255,7 +294,7 @@ export const QuestSection = memo(function QuestSection({
   const from = expandedPillar ? originVector(ORBIT_ANGLES[expandedPillar], 28) : undefined;
   const baseDelay = tapped.current ? 0 : 220;
   const scopeLabel =
-    expandedPillar === null ? t('today.upNext') : t('today.today', { pillar: PILLAR_LABELS[expandedPillar] });
+    expandedPillar === null ? t(ordering?.focused ? 'planning.focusedQuests' : 'today.upNext') : t('today.today', { pillar: PILLAR_LABELS[expandedPillar] });
 
   return (
     <>
@@ -282,7 +321,7 @@ export const QuestSection = memo(function QuestSection({
         </Pressable>
       </View>
 
-      {list.inScopeCount === 0 ? (
+      {list.inScopeCount === 0 && ordering?.focused && expandedPillar === null ? null : list.inScopeCount === 0 ? (
         <EmptyState
           title={
             expandedPillar === null
@@ -337,6 +376,15 @@ export const QuestSection = memo(function QuestSection({
       ) : null}
     </>
   );
+});
+
+const GuidedQuestSection = memo(function GuidedQuestSection(props: React.ComponentProps<typeof QuestSection>) {
+  const { plan, ordered, focus, focused } = useAppSelector(selectDailyPlan);
+  const ordering = useMemo(() => plan || focus ? {
+    ids: (focus ? focused : ordered).map((q) => q.quest_id),
+    focused: Boolean(focus),
+  } : undefined, [plan, ordered, focus, focused]);
+  return <QuestSection {...props} ordering={ordering} />;
 });
 
 const ProgressStrip = memo(function ProgressStrip({
@@ -427,6 +475,8 @@ export function TodayScreen({ navigation, route }: Props) {
   const initialLoading = useAppSelector(selectInitialLoading);
   const refreshing = useAppSelector((state) => state.quests.refreshing);
   const [expandedPillar, setExpandedPillar] = useState<PillarId | null>(null);
+  const questDate = useAppSelector((state) => state.quests.date);
+  const dayFocus = useAppSelector((state) => state.planning.data.focus);
 
   const load = useCallback(
     (silent: boolean) => {
@@ -441,6 +491,14 @@ export function TodayScreen({ navigation, route }: Props) {
     // Offline completions sync in the background (OfflineBanner).
     load(false);
   }, [load]);
+
+  useFocusEffect(useCallback(() => {
+    if (questDate && questDate !== localDateOf(new Date())) void dispatch(fetchDailyQuests({ silent: true }));
+  }, [dispatch, questDate]));
+
+  useEffect(() => {
+    if (dayFocus?.date === questDate) setExpandedPillar(null);
+  }, [dayFocus, questDate]);
 
   // A tapped streak alert opens Today with its weakest pillar expanded.
   const pillarParam = route.params?.pillar;
@@ -530,6 +588,7 @@ export function TodayScreen({ navigation, route }: Props) {
     (quest: Quest) => navigation.navigate('QuestDetail', { quest }),
     [navigation],
   );
+  const openFutureEditor = useCallback(() => navigation.navigate('AvatarCreator', { who: 'future' }), [navigation]);
   const openAllQuests = useCallback(() => navigation.navigate('Quests'), [navigation]);
   const openNotifications = useCallback(
     () => navigation.navigate('Notifications'),
@@ -574,12 +633,14 @@ export function TodayScreen({ navigation, route }: Props) {
             ]}
           />
           <TodayHeader onBellPress={openNotifications} />
+          <TodayPlan onOpen={openQuest} />
           <TodayOrbit
             expandedPillar={expandedPillar}
             onPillarPress={togglePillar}
             onAvatarPress={openProfile}
+            onCreateFuture={openFutureEditor}
           />
-          <QuestSection
+          <GuidedQuestSection
             expandedPillar={expandedPillar}
             onClearPillar={clearPillar}
             onSeeAll={openAllQuests}
@@ -604,6 +665,7 @@ export function TodayScreen({ navigation, route }: Props) {
 
 const styles = themed(() =>
   StyleSheet.create({
+  journeyChoices: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: spacing.sm },
   paintMarker: {
     height: 0,
   },

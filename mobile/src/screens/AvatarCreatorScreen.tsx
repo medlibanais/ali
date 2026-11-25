@@ -23,7 +23,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import Avatar3D from '../avatar/Avatar3D';
+import Avatar3D, { cacheAvatarPortrait } from '../avatar/Avatar3D';
 import {
   applyPreset,
   matchingPreset,
@@ -270,6 +270,8 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
     const result = await dispatch(saveAvatarConfig(writeAvatarDoc({ current: draft.current, future: draft.future, looks })));
     setSaving(false);
     if (saveAvatarConfig.fulfilled.match(result)) {
+      cacheAvatarPortrait(draft.current);
+      if (draft.future) cacheAvatarPortrait(draft.future);
       if (fromOnboarding) {
         dispatch(onboardingCompletedLocally());
       } else {

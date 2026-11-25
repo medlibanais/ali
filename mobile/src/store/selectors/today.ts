@@ -77,9 +77,17 @@ export interface TodayList {
 const byPriority = (a: Quest, b: Quest) => (a.priority ?? 1) - (b.priority ?? 1);
 
 /** The quests listed under the orbit for all pillars, or the tapped one. */
-export function buildTodayList(active: Quest[], pillar: Pillar | null): TodayList {
+export function buildTodayList(
+  active: Quest[], pillar: Pillar | null, ordering?: { ids: string[]; focused: boolean },
+): TodayList {
   const inScope = active.filter((q) => pillar === null || q.pillar === pillar);
-  const open = inScope.filter((q) => !q.completed).sort(byPriority);
+  const rank = pillar === null && ordering ? new Map(ordering.ids.map((id, i) => [id, i])) : null;
+  const unranked = rank?.size ?? 0;
+  const open = inScope.filter((q) => !q.completed && (!rank || !ordering?.focused || rank.has(q.quest_id)))
+    .sort((a, b) => ((rank?.get(a.quest_id) ?? unranked) - (rank?.get(b.quest_id) ?? unranked)) || byPriority(a, b));
+  if (rank && ordering?.focused) {
+    return { ids: open.map((q) => q.quest_id), openCount: open.length, inScopeCount: open.length };
+  }
   const done = inScope.filter((q) => q.completed).sort(byPriority);
   const ids = [...open, ...done]
     .slice(0, pillar === null ? UP_NEXT_LIMIT : inScope.length)
@@ -88,7 +96,11 @@ export function buildTodayList(active: Quest[], pillar: Pillar | null): TodayLis
 }
 
 export const selectTodayList = createSelector(
-  [selectActiveQuests, (_state: RootState, pillar: Pillar | null) => pillar],
+  [
+    selectActiveQuests,
+    (_state: RootState, pillar: Pillar | null) => pillar,
+    (_state: RootState, _pillar: Pillar | null, ordering?: { ids: string[]; focused: boolean }) => ordering,
+  ],
   buildTodayList,
 );
 
