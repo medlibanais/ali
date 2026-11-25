@@ -164,7 +164,8 @@ export async function runTurn(a: RunTurnArgs): Promise<RunTurnResult> {
   let model = 'groq';
   let banned = false;
   let providerError: unknown = null;
-  let shownWhenGone: string | null = null;
+  // What actually reached the app before it hung up (for Stop).
+  let shown = '';
   const abort = new AbortController();
   a.providerSignal?.addEventListener('abort', () => abort.abort());
   try {
@@ -178,10 +179,9 @@ export async function runTurn(a: RunTurnArgs): Promise<RunTurnResult> {
         banned = true;
         break;
       }
-      if (a.sink.gone()) {
-        // Keep generating so the reply is saved; remember what was shown.
-        shownWhenGone ??= shaper.sent;
-      } else if (step.emit) {
+      // Once the app is gone, keep generating so the reply is saved.
+      if (!a.sink.gone() && step.emit) {
+        shown += step.emit;
         sendText(step.emit);
       }
       if (step.full) break;
@@ -189,7 +189,6 @@ export async function runTurn(a: RunTurnArgs): Promise<RunTurnResult> {
   } catch (e) {
     providerError = e;
   }
-  if (a.sink.gone()) shownWhenGone ??= shaper.sent;
 
   let reply = banned ? null : shaper.finish();
   if (reply && leaksSystemPrompt(reply)) {
@@ -201,9 +200,9 @@ export async function runTurn(a: RunTurnArgs): Promise<RunTurnResult> {
   if (a.sink.gone()) {
     const current = await a.store.get(a.turn.turn_id);
     if (current?.status === 'stopped') {
-      const shown = (shownWhenGone ?? '').trim();
-      if (!shown) return { view: current, providerCalls: 1, firstTextMs, replayed: false };
-      const view = await a.store.complete(a.turn.turn_id, shown, model, false, firstTextMs);
+      const kept = shown.trim();
+      if (!kept) return { view: current, providerCalls: 1, firstTextMs, replayed: false };
+      const view = await a.store.complete(a.turn.turn_id, kept, model, false, firstTextMs);
       return { view, providerCalls: 1, firstTextMs, replayed: false };
     }
   }

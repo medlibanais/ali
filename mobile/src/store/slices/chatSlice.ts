@@ -418,7 +418,6 @@ export const sendChatMessage = createAsyncThunk<
     text,
     sentAt: pending?.turnId === turnId ? pending.sentAt : Date.now(),
   });
-  dispatch(chatSlice.actions.streamTurn({ requestId, turnId }));
 
   let meta: StreamMeta | null = null;
   let streamed = '';
@@ -721,11 +720,6 @@ export const chatSlice = createSlice({
     },
     recoveryDismissed(state) {
       state.recovery = null;
-    },
-    streamTurn(state, action: PayloadAction<{ requestId: string; turnId: string }>) {
-      // The turn id this send uses; nothing to show yet.
-      void action;
-      void state;
     },
     streamMeta(state, action: PayloadAction<{ requestId: string; meta: StreamMeta }>) {
       const { requestId, meta } = action.payload;
