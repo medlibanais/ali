@@ -57,6 +57,19 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'invalid_body' }, 400);
     }
     const type = body.type;
+
+    // Pushes sent on a person's behalf are budgeted per sender (migration
+    // 0045), so a script cannot re-send the same request push over and
+    // over. Database-triggered events (cron secret) are not limited here.
+    if (actorId && !isCron) {
+      const { error: budgetError } = await admin.rpc('reserve_ai_call', {
+        p_user: actorId,
+        p_action: 'push_friend',
+        p_max: 30,
+        p_window: '1 hour',
+      });
+      if (budgetError) return json({ delivered: false, reason: 'rate_limited' }, 429);
+    }
     let recipientId: string | null = null;
     let title = '';
     let message = '';

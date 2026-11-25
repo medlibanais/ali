@@ -69,7 +69,7 @@ select throws_ok(
   'rate_limited', 'the third insight call is refused');
 select throws_ok(
   $$select public.reserve_ai_call('00000000-0000-4000-8000-0000000000f2', 'complete_quest', 2, interval '1 hour')$$,
-  'invalid_arguments', 'only ai_* budgets can be reserved through it');
+  'invalid_arguments', 'only ai_* and push_* budgets can be reserved through it');
 
 reset role;
 select * from finish();

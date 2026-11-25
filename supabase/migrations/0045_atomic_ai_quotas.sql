@@ -31,6 +31,7 @@
 --   Insights   On-demand pattern insights: 6 model calls per hour; the
 --              weekly report on demand: 3 per hour. Over the budget the
 --              functions answer from rules/cache instead of the model.
+--   Pushes     notify-friend on a person's behalf: 30 per hour per sender.
 
 ----------------------------------------------------------------------
 -- Coach: count + save the user's message in one locked step
@@ -271,7 +272,8 @@ grant execute on function public.claim_quest_generation(uuid, date, boolean)
   to service_role;
 
 ----------------------------------------------------------------------
--- Other on-demand model calls (Insights): a locked per-account budget
+-- Other on-demand model calls (Insights) and pushes sent on a person's
+-- behalf (notify-friend): a locked per-account budget
 ----------------------------------------------------------------------
 -- Raises rate_limited when p_max calls were already reserved in p_window.
 -- Same rate_limits table and semantics as hit_rate_limit, serialized.
@@ -287,7 +289,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if p_user is null or p_action is null or p_action !~ '^ai_[a-z_]{1,40}$' then
+  if p_user is null or p_action is null or p_action !~ '^(ai|push)_[a-z_]{1,40}$' then
     raise exception 'invalid_arguments' using errcode = '22023';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(p_action || ':' || p_user::text, 0));
