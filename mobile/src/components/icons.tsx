@@ -3,6 +3,7 @@
 // No icon fonts, no emoji, no third-party icon sets.
 
 import React from 'react';
+import { View } from 'react-native';
 import Svg, {
   Circle,
   Line,
@@ -12,6 +13,12 @@ import Svg, {
 } from 'react-native-svg';
 import { colors, Pillar } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import i18n from '../i18n';
+
+/** Mirrors arrows and chevrons that point "forward" in right-to-left. */
+function mirrorStyle() {
+  return i18n.dir(i18n.language) === 'rtl' ? { transform: [{ scaleX: -1 }] } : undefined;
+}
 
 export interface IconProps {
   size?: number;
@@ -223,21 +230,6 @@ export function CheckGlyph({ size = 14, color = colors.onAccent }: IconProps) {
   );
 }
 
-export function SendGlyph({ size = 20, color = colors.onAccent }: IconProps) {
-  useTheme();
-  return (
-    <Svg {...baseProps(size)}>
-      <Path
-        d="M4 12h15M13.5 5.5 20 12l-6.5 6.5"
-        stroke={color}
-        strokeWidth={STROKE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 export function MinusGlyph({ size = 16, color = colors.inkSoft }: IconProps) {
   useTheme();
   return (
@@ -260,7 +252,7 @@ export function PlusGlyph({ size = 16, color = colors.inkSoft }: IconProps) {
 export function ChevronGlyph({ size = 16, color = colors.inkFaint }: IconProps) {
   useTheme();
   return (
-    <Svg {...baseProps(size)}>
+    <Svg {...baseProps(size)} style={mirrorStyle()}>
       <Polyline
         points="9,5.5 15.5,12 9,18.5"
         stroke={color}
@@ -383,6 +375,11 @@ export function CloseGlyph({ size = 20, color = colors.ink }: IconProps) {
   return <Outline size={size} color={color} d="M6 6l12 12M18 6 6 18" />;
 }
 
+export function SearchGlyph({ size = 20, color = colors.inkSoft }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM15.5 15.5 20 20" />;
+}
+
 export function UndoGlyph({ size = 20, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />;
@@ -405,59 +402,14 @@ export function DiceGlyph({ size = 20, color = colors.ink }: IconProps) {
   );
 }
 
-export function BodyToggleGlyph({ size = 20, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 10.5l6 1 6-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
-}
-
 export function FaceGlyph({ size = 22, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M12 3c4.4 0 7 3.4 7 8 0 5-3.2 10-7 10s-7-5-7-10c0-4.6 2.6-8 7-8ZM9.5 11h.01M14.5 11h.01M9.5 15.5c1.4 1.2 3.6 1.2 5 0" />;
 }
 
-export function HairGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M5.2 14C4 7.5 7.4 3 12 3s8 4.5 6.8 11M5.2 14c2.4-1.2 3.8-3.6 4.3-6.4 2.2 2.6 5.6 4 9.3 6.4M7 14c.2 4.2 2.4 7 5 7s4.8-2.8 5-7" />;
-}
-
 export function EyeGlyph({ size = 22, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />;
-}
-
-export function LipsGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M2.5 12c2.6-3.2 5.2-4.6 7.3-3.6l2.2 1 2.2-1c2.1-1 4.7.4 7.3 3.6-2.6 3.6-5.7 5.2-9.5 5.2S5.1 15.6 2.5 12ZM2.5 12h19" />;
-}
-
-export function BeardGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M5 5v5c0 6 3 10 7 10s7-4 7-10V5M8.5 13.5c1.2-1.2 2.4-1.2 3.5-.3 1.1-.9 2.3-.9 3.5.3M10 16.5h4" />;
-}
-
-export function GlassesGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M2 10h2M20 10h2M4 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM13 11a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0ZM11 10.5c.7-.6 1.3-.6 2 0" />;
-}
-
-export function ShirtGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M8 3.5 3 6.5 5 11l2-1v10.5h10V10l2 1 2-4.5-5-3c-.5 1.5-2 2.5-4 2.5s-3.5-1-4-2.5Z" />;
-}
-
-export function PantsGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M6 3h12l1 18h-5l-2-11-2 11H5L6 3ZM6 6.5h12" />;
-}
-
-export function ShoeGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M3 17V8.5l4 .5c1 2 3 3.2 5.5 3.6L19 14c1.6.5 2.5 1.6 2.5 3v1H3v-1ZM3 15.5h18.5M10 11.5 11.5 10M13 12.5 14.5 11" />;
-}
-
-export function PersonGlyph({ size = 22, color = colors.ink }: IconProps) {
-  useTheme();
-  return <Outline size={size} color={color} d="M12 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM5 10.5l7 1 7-1M12 11.5V16M12 16l-3 5.5M12 16l3 5.5" />;
 }
 
 export function BackdropGlyph({ size = 22, color = colors.ink }: IconProps) {
@@ -524,7 +476,11 @@ export function EyeOffGlyph({ size = 22, color = colors.ink }: IconProps) {
 /** Right arrow for forward actions (sign in, continue). */
 export function ArrowRightGlyph({ size = 20, color = colors.onAccent }: IconProps) {
   useTheme();
-  return <Outline size={size} color={color} d="M4.5 12h15M13 5.5l6.5 6.5-6.5 6.5" />;
+  return (
+    <View style={mirrorStyle()}>
+      <Outline size={size} color={color} d="M4.5 12h15M13 5.5l6.5 6.5-6.5 6.5" />
+    </View>
+  );
 }
 
 /** Thumbs up for coach feedback. */
@@ -549,4 +505,37 @@ export function MailGlyph({ size = 20, color = colors.onAccent }: IconProps) {
 export function ClockGlyph({ size = 20, color = colors.ink }: IconProps) {
   useTheme();
   return <Outline size={size} color={color} d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM12 7.5V12l3 2" />;
+}
+
+export function RotateGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4.5h-4.5" />;
+}
+
+export function ZoomGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM15.5 15.5 20 20M8 10.5h5M10.5 8v5" />;
+}
+
+export function CompareGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M12 3v18M9 6H5.5A1.5 1.5 0 0 0 4 7.5v9A1.5 1.5 0 0 0 5.5 18H9M15 6h3.5A1.5 1.5 0 0 1 20 7.5v9a1.5 1.5 0 0 1-1.5 1.5H15" />;
+}
+
+export function ResetGlyph({ size = 18, color = colors.ink }: IconProps) {
+  useTheme();
+  return <Outline size={size} color={color} d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />;
+}
+
+
+/** Globe for the language setting. */
+export function GlobeGlyph({ size = 20, color = colors.ink }: IconProps) {
+  useTheme();
+  return (
+    <Outline
+      size={size}
+      color={color}
+      d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM3.5 12h17M12 3.5c2.3 2.3 3.5 5.2 3.5 8.5s-1.2 6.2-3.5 8.5c-2.3-2.3-3.5-5.2-3.5-8.5s1.2-6.2 3.5-8.5Z"
+    />
+  );
 }

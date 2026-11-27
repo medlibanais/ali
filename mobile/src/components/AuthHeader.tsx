@@ -58,7 +58,7 @@ const styles = themed(() =>
       shadowOffset: { width: 0, height: 0 },
     },
     wordmark: {
-      marginLeft: spacing.sm + 2,
+      marginStart: spacing.sm + 2,
       fontSize: 13,
       letterSpacing: 2.4,
     },

@@ -1,9 +1,19 @@
-// Avatar editor: a big live preview on top, a sheet below with one icon
-// tab per part of the avatar and a grid of choices, each drawn on the
-// avatar itself so you see the result before you tap it.
+// Avatar editor, laid out like a game's character creator: a live 3D
+// preview on a studio backdrop (drag to turn it, zoom from full body to
+// a close-up), a row of pill tabs from Presets to Style, and below them
+// picture grids to pick from. Basic edit shows presets and choices;
+// Detailed edit adds every shape slider. A preset moves a group of
+// sliders, and every slider stays free to fine-tune.
+//
+// It edits two avatars: Current You, the person you are today, and
+// Future You, the person you are becoming. Both are saved together in
+// profiles.avatar_config.
 
 import React, { useMemo, useRef, useState } from 'react';
+import i18n, { labelFor } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import {
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,41 +23,62 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import AvatarView from '../avatar/AvatarView';
+import Avatar3D from '../avatar/Avatar3D';
+import {
+  applyPreset,
+  matchingPreset,
+  sliderDef,
+  sv,
+  type Preset,
+  type SliderId,
+} from '../avatar/custom';
 import {
   categoryFor,
-  ACTIVE_EDITOR_GROUPS,
+  EDITOR_TABS,
+  fitToSex,
+  LOOKS,
   optionLocked,
+  optionsFor,
   randomAvatarConfig,
+  randomizeTab,
+  resetTab,
   VALID_OPTION_IDS,
-  type Category,
-  type EditorGroup,
+  type EditorSection,
+  type EditorTab,
+  type EditorView,
   type OptionItem,
 } from '../avatar/options';
-import { bgStyle } from '../avatar/palettes';
-import { sanitizeAvatarConfig, type AvatarConfig } from '../avatar/types';
+import { bgStyle, isHex } from '../avatar/palettes';
+import { wornOutfit } from '../avatar/shape';
+import {
+  DEFAULT_AVATAR,
+  MAX_LOOKS,
+  readAvatarDoc,
+  suggestFuture,
+  writeAvatarDoc,
+  type AvatarChoiceKey,
+  type AvatarConfig,
+  type SavedLook,
+} from '../avatar/types';
+import ColorPicker from '../components/ColorPicker';
+import PhotorealSheet from '../components/PhotorealSheet';
+import SelfieAvatarSheet from '../components/SelfieAvatarSheet';
 import {
   BackdropGlyph,
-  BeardGlyph,
-  BodyToggleGlyph,
-  CheckGlyph,
+  CameraGlyph,
   CloseGlyph,
+  CompareGlyph,
   DiceGlyph,
-  EyeGlyph,
   FaceGlyph,
-  GlassesGlyph,
-  HairGlyph,
-  LipsGlyph,
   LockGlyph,
-  PantsGlyph,
-  PersonGlyph,
   RedoGlyph,
-  ShirtGlyph,
-  ShoeGlyph,
+  ResetGlyph,
+  RotateGlyph,
   UndoGlyph,
-  type IconProps,
+  ZoomGlyph,
 } from '../components/icons';
 import { PressableScale } from '../components/Motion';
+import Slider from '../components/Slider';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import type {
@@ -65,25 +96,38 @@ type Props = NativeStackScreenProps<
   'AvatarCreator'
 >;
 
-const GROUP_ICONS: Record<string, (props: IconProps) => React.ReactElement> = {
-  face: FaceGlyph,
-  hair: HairGlyph,
-  eyes: EyeGlyph,
-  mouth: LipsGlyph,
-  beard: BeardGlyph,
-  extras: GlassesGlyph,
-  outfit: ShirtGlyph,
-  bottoms: PantsGlyph,
-  shoes: ShoeGlyph,
-  body: PersonGlyph,
-  bg: BackdropGlyph,
-};
+type Who = 'current' | 'future';
 
-const GAP = 10;
+/** Both avatars at one moment: what undo and redo step through. */
+interface Draft {
+  current: AvatarConfig;
+  future: AvatarConfig | null;
+}
+
 const SIDE = 16;
 const TOP_BAR = 64;
+// The camera turns in steps, so looks you come back to are already drawn.
+const YAW_STEP = Math.PI / 12;
+const FRONT = 0.3;
+const VIEWS: EditorView[] = ['full-body', 'head', 'face'];
+/** Avatar data labels are stored in English; this shows them in the app language. */
+const L = (label: string): string => labelFor('avatarText', label);
+
+const VIEW_LABEL: Readonly<Record<EditorView, string>> = {
+  get 'full-body'() {
+    return i18n.t('avatarCreator.fullBody');
+  },
+  get head() {
+    return i18n.t('avatarCreator.headAndShoulders');
+  },
+  get face() {
+    return i18n.t('avatarCreator.faceCloseUp');
+  },
+};
+const FACE_ZOOM = 1.7;
 
 export function AvatarCreatorScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -92,154 +136,302 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
   const existing = useAppSelector((state) => state.user.profile?.avatar_config);
   const level = useAppSelector((state) => state.gamification.level);
 
-  const initial = useMemo<AvatarConfig>(
-    () => sanitizeAvatarConfig(existing, VALID_OPTION_IDS),
+  const saved = useMemo(
+    () => readAvatarDoc(existing, VALID_OPTION_IDS),
+    // Read once: edits live in this screen until Save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
-  const [config, setConfig] = useState<AvatarConfig>(initial);
-  const [groupKey, setGroupKey] = useState<string>(ACTIVE_EDITOR_GROUPS[0].key);
-  const [view, setView] = useState<'head' | 'full-body'>(ACTIVE_EDITOR_GROUPS[0].view);
+  const [draft, setDraft] = useState<Draft>({ current: saved.current, future: saved.future });
+  const [looks, setLooks] = useState<SavedLook[]>(saved.looks);
+  const [who, setWho] = useState<Who>(route.params?.who ?? 'current');
+  const [tabKey, setTabKey] = useState<string>(EDITOR_TABS[0].key);
+  const [view, setView] = useState<EditorView>(EDITOR_TABS[0].view);
+  const [yawSteps, setYawSteps] = useState(0);
+  const [comparing, setComparing] = useState(false);
+  // Basic edit: presets and choices. Detailed edit: every slider too.
+  const [detailed, setDetailed] = useState(false);
+  const [customFor, setCustomFor] = useState<AvatarChoiceKey | null>(null);
   const [saving, setSaving] = useState(false);
-  const undoStack = useRef<AvatarConfig[]>([]);
-  const redoStack = useRef<AvatarConfig[]>([]);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [selfieOpen, setSelfieOpen] = useState(false);
+  const undoStack = useRef<Draft[]>([]);
+  const redoStack = useRef<Draft[]>([]);
+  // Where a slider drag started, so the whole drag is one undo step.
+  const dragFrom = useRef<Draft | null>(null);
   const [, setHistoryVersion] = useState(0);
 
-  const group: EditorGroup = ACTIVE_EDITOR_GROUPS.find((g) => g.key === groupKey) ?? ACTIVE_EDITOR_GROUPS[0];
+  const tab: EditorTab = EDITOR_TABS.find((t) => t.key === tabKey) ?? EDITOR_TABS[0];
+  const config = who === 'future' ? draft.future : draft.current;
+  const before = who === 'future' ? saved.future ?? saved.current : saved.current;
+  const shown = comparing ? before : config;
 
-  const commit = (next: AvatarConfig) => {
-    undoStack.current.push(config);
+  const pushHistory = (from: Draft) => {
+    undoStack.current.push(from);
+    if (undoStack.current.length > 60) undoStack.current.shift();
     redoStack.current = [];
     setHistoryVersion((v) => v + 1);
-    setConfig(next);
   };
 
-  const applyOption = (category: Category, option: OptionItem) => {
-    if (optionLocked(option, level)) {
-      toast.showToast({
-        message: `${option.label} unlocks at level ${option.minLevel}. Keep going.`,
-      });
-      return;
-    }
-    if (config[category.key] === option.id) return;
-    commit({ ...config, [category.key]: option.id });
+  const withConfig = (next: AvatarConfig): Draft =>
+    who === 'future' ? { ...draft, future: next } : { ...draft, current: next };
+
+  /** One finished change: goes on the undo stack. */
+  const commit = (next: AvatarConfig) => {
+    pushHistory(dragFrom.current ?? draft);
+    dragFrom.current = null;
+    setDraft(withConfig(next));
+  };
+
+  /** A change still in progress (a slider being dragged): preview only. */
+  const preview = (next: AvatarConfig) => {
+    if (!dragFrom.current) dragFrom.current = draft;
+    setDraft(withConfig(next));
   };
 
   const undo = () => {
     const prev = undoStack.current.pop();
     if (!prev) return;
-    redoStack.current.push(config);
+    redoStack.current.push(draft);
     setHistoryVersion((v) => v + 1);
-    setConfig(prev);
+    setDraft(prev);
   };
 
   const redo = () => {
     const next = redoStack.current.pop();
     if (!next) return;
-    undoStack.current.push(config);
+    undoStack.current.push(draft);
     setHistoryVersion((v) => v + 1);
-    setConfig(next);
+    setDraft(next);
   };
 
-  const selectGroup = (next: EditorGroup) => {
-    setGroupKey(next.key);
+  const selectTab = (next: EditorTab) => {
+    setTabKey(next.key);
     setView(next.view);
+    // Face tabs start from the front again.
+    if (next.view !== 'full-body') setYawSteps(0);
+    setCustomFor(null);
+  };
+
+  const setChoice = (key: AvatarChoiceKey, value: string, live = false) => {
+    if (!config || config[key] === value) return;
+    let next = { ...config, [key]: value } as AvatarConfig;
+    // A new body: swap what was cut for the other one.
+    if (key === 'sex') next = fitToSex(next);
+    if (live) preview(next);
+    else commit(next);
+  };
+
+  const pickOption = (key: AvatarChoiceKey, option: OptionItem) => {
+    if (optionLocked(option, level)) {
+      toast.showToast({ message: t('avatarCreator.unlocksAtLevelKeep', { label: L(option.label), minLevel: option.minLevel }) });
+      return;
+    }
+    setCustomFor(null);
+    setChoice(key, option.id);
+  };
+
+  const setSlider = (id: SliderId, value: number, live: boolean) => {
+    if (!config) return;
+    const sliders = { ...config.sliders };
+    if (value) sliders[id] = value;
+    else delete sliders[id];
+    const next = { ...config, sliders };
+    if (live) preview(next);
+    else commit(next);
+  };
+
+  const pickPreset = (owns: SliderId[], preset: Preset) => {
+    if (!config) return;
+    commit({ ...config, sliders: applyPreset(config.sliders, owns, preset) });
+  };
+
+  const startFuture = (suggest: boolean) => {
+    pushHistory(draft);
+    setDraft({ ...draft, future: suggest ? suggestFuture(draft.current) : { ...draft.current, sliders: { ...draft.current.sliders } } });
+  };
+
+  const saveLook = () => {
+    if (!config) return;
+    if (looks.length >= MAX_LOOKS) {
+      toast.showToast({ message: t('avatarCreator.youCanKeepLooks', { MAX_LOOKS }) });
+      return;
+    }
+    const used = new Set(looks.map((l) => l.name));
+    let n = looks.length + 1;
+    while (used.has(t('avatarCreator.look', { n }))) n++;
+    setLooks([...looks, { name: t('avatarCreator.look', { n }), config }]);
+    toast.showToast({ message: t('avatarCreator.savedAsLookTap', { n }) });
   };
 
   const save = async () => {
     setSaving(true);
-    const result = await dispatch(
-      saveAvatarConfig(config as unknown as Record<string, unknown>),
-    );
+    const result = await dispatch(saveAvatarConfig(writeAvatarDoc({ current: draft.current, future: draft.future, looks })));
     setSaving(false);
     if (saveAvatarConfig.fulfilled.match(result)) {
       if (fromOnboarding) {
         dispatch(onboardingCompletedLocally());
       } else {
-        toast.showToast({ message: 'Your avatar is saved.' });
+        toast.showToast({ message: t('avatarCreator.yourAvatarIsSaved') });
         navigation.goBack();
       }
     } else {
-      toast.showToast({
-        message: result.payload ?? 'Could not save your avatar.',
-      });
+      toast.showToast({ message: result.payload ?? t('avatarCreator.couldNotSaveYour') });
     }
   };
 
+  // Drag across the preview to turn the avatar.
+  const yawRef = useRef(0);
+  yawRef.current = yawSteps;
+  const turn = useMemo(() => {
+    let start = 0;
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderGrant: () => {
+        start = yawRef.current;
+      },
+      onPanResponderMove: (_e, g) => {
+        const next = start + Math.round(g.dx / 28);
+        if (next !== yawRef.current) setYawSteps(next);
+      },
+    });
+  }, []);
+
   // Layout: the preview takes a bit under half the screen.
   const contentW = Math.min(winW, 720);
-  const previewH = Math.max(260, Math.min(winH * 0.44, 420));
-  const shapeCell = Math.floor((contentW - SIDE * 2 - GAP * 3) / 4);
-  const colorCell = Math.floor((contentW - SIDE * 2 - GAP * 5) / 6);
-  const bg = bgStyle(config.bg);
+  const previewH = Math.max(280, Math.min(winH * 0.44, 440));
+  const colorCell = Math.floor((contentW - SIDE * 2 - 8 * 5) / 6);
+  const thumbCols = contentW > 560 ? 6 : 4;
+  const thumbCell = Math.floor((contentW - SIDE * 2 - 10 * (thumbCols - 1)) / thumbCols);
+  const bg = bgStyle((shown ?? draft.current).bg);
   const canUndo = undoStack.current.length > 0;
   const canRedo = redoStack.current.length > 0;
   // Room for the figure: below the top bar, above the sheet's rounded edge.
   const stageH = previewH - TOP_BAR - radius.lg;
-  const headSize = Math.min(stageH * 0.92, contentW * 0.7);
+  const headSize = Math.min(stageH * 0.98, contentW * 0.8);
+  const camera = useMemo(
+    () => ({ yaw: FRONT + yawSteps * YAW_STEP, zoom: view === 'face' ? FACE_ZOOM : 1 }),
+    [yawSteps, view],
+  );
+  const nextView = VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length];
 
   return (
     <View style={styles.root}>
       <View style={[styles.preview, { height: previewH }]}>
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 10 10">
           <Defs>
-            <LinearGradient id={`editorBg${config.bg}`} x1="0" y1="0" x2="0" y2="1">
+            <LinearGradient id={`editorBg${bg.id}`} x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={mix(bg.from, '#FFFFFF', 0.25)} />
               <Stop offset="1" stopColor={bg.to} />
             </LinearGradient>
           </Defs>
-          <Rect x={0} y={0} width={10} height={10} fill={`url(#editorBg${config.bg})`} />
+          <Rect x={0} y={0} width={10} height={10} fill={`url(#editorBg${bg.id})`} />
         </Svg>
         <SafeAreaView edges={['top']} style={styles.previewInner}>
-          <View style={styles.topBar}>
+          <View style={styles.stage} {...turn.panHandlers}>
+            {shown ? (
+              <View pointerEvents="none" style={view === 'full-body' ? null : styles.bust}>
+                <Avatar3D
+                  config={shown}
+                  size={view === 'full-body' ? stageH : headSize}
+                  mood="happy"
+                  mode={view === 'full-body' ? 'full-body' : 'head'}
+                  bare
+                  animated={false}
+                  camera={camera}
+                  live="editor"
+                />
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.topBar} pointerEvents="box-none">
             {navigation.canGoBack() ? (
-              <RoundButton label="Close without saving" onPress={() => navigation.goBack()}>
+              <RoundButton label={t('avatarCreator.closeWithoutSaving')} onPress={() => navigation.goBack()}>
                 <CloseGlyph />
               </RoundButton>
             ) : (
               <View style={styles.roundButtonSpacer} />
             )}
+            <View style={styles.who} accessibilityRole="tablist">
+              {(['current', 'future'] as const).map((w) => {
+                const on = who === w;
+                return (
+                  <Pressable
+                    key={w}
+                    accessibilityRole="tab"
+                    accessibilityLabel={w === 'current' ? t('avatarCreator.currentYouThePerson') : t('avatarCreator.futureYouThePerson')}
+                    accessibilityState={{ selected: on }}
+                    onPress={() => {
+                      setWho(w);
+                      setCustomFor(null);
+                    }}
+                    style={[styles.whoTab, on && styles.whoTabOn]}
+                  >
+                    <Txt variant="caption" color={on ? colors.onAccent : colors.ink} style={styles.whoText}>
+                      {w === 'current' ? t('avatarCreator.currentYou') : t('avatarCreator.futureYou')}
+                    </Txt>
+                  </Pressable>
+                );
+              })}
+            </View>
             <PressableScale
+              testID="avatar-save"
               accessibilityRole="button"
-              accessibilityLabel={fromOnboarding ? 'Save and continue' : 'Save avatar'}
+              accessibilityLabel={fromOnboarding ? t('avatarCreator.saveAndContinue') : t('avatarCreator.saveAvatar')}
               onPress={save}
               disabled={saving}
               style={[styles.savePill, saving && styles.dim]}
             >
               <Txt variant="bodySemi" color={colors.onAccent}>
-                {saving ? 'Saving…' : fromOnboarding ? 'Continue' : 'Save'}
+                {saving ? t('avatarCreator.saving') : fromOnboarding ? t('avatarCreator.continue') : t('avatarCreator.save')}
               </Txt>
             </PressableScale>
           </View>
-          <View style={styles.stage} pointerEvents="none">
-            {view === 'full-body' ? (
-              <AvatarView config={config} size={stageH} mood="happy" mode="full-body" bare animated={false} />
-            ) : (
-              <View style={styles.bust}>
-                <AvatarView config={config} size={headSize} mood="happy" mode="head" bare animated={false} />
-              </View>
-            )}
-          </View>
-          <View style={styles.bottomBar}>
+          {comparing ? (
+            <View style={styles.compareTag} pointerEvents="none">
+              <Txt variant="caption" color={colors.onAccent}>{t('avatarCreator.before')}</Txt>
+            </View>
+          ) : null}
+          <View style={styles.bottomBar} pointerEvents="box-none">
             <View style={styles.row}>
-              <RoundButton label="Undo" onPress={undo} disabled={!canUndo}>
+              <RoundButton label={t('avatarCreator.undo')} onPress={undo} disabled={!canUndo}>
                 <UndoGlyph color={canUndo ? colors.ink : colors.inkFaint} />
               </RoundButton>
-              <RoundButton label="Redo" onPress={redo} disabled={!canRedo}>
+              <RoundButton label={t('avatarCreator.redo')} onPress={redo} disabled={!canRedo}>
                 <RedoGlyph color={canRedo ? colors.ink : colors.inkFaint} />
               </RoundButton>
+              <RoundButton
+                label={t('avatarCreator.holdToSeeHow')}
+                onPress={() => undefined}
+                onPressIn={() => setComparing(true)}
+                onPressOut={() => setComparing(false)}
+                selected={comparing}
+                disabled={!config}
+              >
+                <CompareGlyph color={comparing ? colors.onAccent : colors.ink} />
+              </RoundButton>
+              <RoundButton label={t('avatarCreator.makeItLookLike')} onPress={() => setSelfieOpen(true)} disabled={!config}>
+                <FaceGlyph />
+              </RoundButton>
             </View>
-            <View style={styles.row}>
-              <RoundButton label="Surprise me" onPress={() => commit(randomAvatarConfig(level))}>
+            <View style={[styles.row, styles.rowEnd]}>
+              <RoundButton
+                label={t('avatarCreator.surpriseMeAWhole')}
+                testID="avatar-randomize"
+                onPress={() => config && commit(randomAvatarConfig(level))}
+                disabled={!config}
+              >
                 <DiceGlyph />
               </RoundButton>
-              <RoundButton
-                label={view === 'head' ? 'Show full body' : 'Show close-up'}
-                onPress={() => setView(view === 'head' ? 'full-body' : 'head')}
-                selected={view === 'full-body'}
-              >
-                <BodyToggleGlyph color={view === 'full-body' ? colors.onAccent : colors.ink} />
+              <RoundButton label={t('avatarCreator.turnTheAvatarYou')} onPress={() => setYawSteps(yawSteps + 3)}>
+                <RotateGlyph />
+              </RoundButton>
+              <RoundButton label={t('avatarCreator.zoomNowNext', { now: VIEW_LABEL[view], next: VIEW_LABEL[nextView] })} onPress={() => setView(nextView)}>
+                <ZoomGlyph />
+              </RoundButton>
+              <RoundButton label={t('avatarCreator.makeAPhotoOf')} onPress={() => setPhotoOpen(true)} disabled={!config}>
+                <CameraGlyph color={colors.ink} size={20} />
               </RoundButton>
             </View>
           </View>
@@ -247,154 +439,471 @@ export function AvatarCreatorScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.sheet}>
-        <Txt variant="label" color={colors.inkSoft} style={styles.sheetTitle}>
-          {`Avatar · ${group.label}`}
-        </Txt>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabs}
           style={styles.tabsBar}
         >
-          {ACTIVE_EDITOR_GROUPS.map((g) => {
-            const Icon = GROUP_ICONS[g.key];
-            const selected = g.key === group.key;
-            return (
-              <Pressable
-                key={g.key}
-                accessibilityRole="tab"
-                accessibilityLabel={g.label}
-                accessibilityState={{ selected }}
-                onPress={() => selectGroup(g)}
-                style={styles.tab}
-              >
-                <Icon size={24} color={selected ? colors.accent : colors.inkSoft} />
-                <View style={[styles.tabBar, selected && styles.tabBarOn]} />
-              </Pressable>
-            );
-          })}
+          <View style={styles.tabPills} accessibilityRole="tablist">
+            {EDITOR_TABS.map((editorTab) => {
+              const selected = editorTab.key === tab.key;
+              return (
+                <Pressable
+                  key={editorTab.key}
+                  accessibilityRole="tab"
+                  accessibilityLabel={L(editorTab.label)}
+                  accessibilityState={{ selected }}
+                  onPress={() => selectTab(editorTab)}
+                  style={[styles.tab, selected && styles.tabOn]}
+                >
+                  <Txt variant="caption" color={selected ? colors.onAccent : colors.ink} numberOfLines={1} style={styles.tabLabel}>
+                    {L(editorTab.label)}
+                  </Txt>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
 
-        <ScrollView
-          key={group.key}
-          style={styles.flex}
-          contentContainerStyle={styles.grid}
-          showsVerticalScrollIndicator={false}
-        >
-          {group.categories.map((key) => {
-            const category = categoryFor(key);
-            const color = category.kind === 'color';
-            return (
-              <View key={key} style={styles.section}>
-                {group.categories.length > 1 ? (
-                  <Txt variant="label" style={styles.sectionTitle}>
-                    {category.label}
-                  </Txt>
-                ) : null}
-                <View style={styles.cells}>
-                  {category.options.map((option) => {
-                    const selected = config[category.key] === option.id;
-                    const locked = optionLocked(option, level);
-                    const a11y = `${category.label}: ${option.label}${locked ? `, unlocks at level ${option.minLevel}` : ''}`;
-                    if (color) {
-                      return (
-                        <Pressable
-                          key={option.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={a11y}
-                          accessibilityState={{ selected, disabled: locked }}
-                          onPress={() => applyOption(category, option)}
-                          style={[
-                            styles.swatchRing,
-                            { width: colorCell, height: colorCell, borderRadius: colorCell / 2 },
-                            selected && styles.swatchRingOn,
-                            locked && styles.dim,
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.swatch,
-                              {
-                                width: colorCell - 10,
-                                height: colorCell - 10,
-                                borderRadius: (colorCell - 10) / 2,
-                                backgroundColor: option.swatch,
-                              },
-                            ]}
-                          />
-                        </Pressable>
-                      );
-                    }
-                    const body = group.view === 'full-body';
-                    return (
+        {config ? (
+          <ScrollView
+            key={`${who}-${tab.key}`}
+            style={styles.flex}
+            contentContainerStyle={styles.grid}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {tab.sections.some((x) => x.kind === 'sliders' && x.detail) ? (
+              <View style={styles.modes} accessibilityRole="tablist">
+                {([false, true] as const).map((d) => (
+                  <Pressable
+                    key={d ? 'detailed' : 'basic'}
+                    accessibilityRole="tab"
+                    accessibilityLabel={d ? t('avatarCreator.detailedEditModeEvery') : t('avatarCreator.basicEditModePresets')}
+                    accessibilityState={{ selected: detailed === d }}
+                    onPress={() => setDetailed(d)}
+                    style={[styles.mode, detailed === d && styles.modeOn]}
+                  >
+                    <Txt variant="caption" color={colors.ink} style={styles.whoText}>{d ? t('avatarCreator.detailedEdit') : t('avatarCreator.basicEdit')}</Txt>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.tabHead}>
+              <Txt variant="label" color={colors.inkSoft} style={styles.sheetTitle}>
+                {`${who === 'future' ? t('becoming.future') : t('becoming.current')} · ${L(tab.label)}`}
+              </Txt>
+              <View style={styles.row}>
+                <TextButton
+                  label={t('avatarCreator.randomize', { label: L(tab.label) })}
+                  text={t('avatarCreator.randomize2')}
+                  onPress={() => commit(randomizeTab(config, tab, level))}
+                  icon={<DiceGlyph size={16} color={colors.accent} />}
+                />
+                <TextButton
+                  label={t('avatarCreator.reset', { label: L(tab.label) })}
+                  text={t('avatarCreator.reset2')}
+                  onPress={() => commit(resetTab(config, tab, { ...DEFAULT_AVATAR, sliders: {} }))}
+                  icon={<ResetGlyph size={16} color={colors.accent} />}
+                />
+              </View>
+            </View>
+
+            {tab.sections.map((section) => (
+              <Section
+                key={`${section.kind}-${section.title}`}
+                section={section}
+                config={config}
+                level={level}
+                colorCell={colorCell}
+                thumbCell={thumbCell}
+                detailed={detailed}
+                onLook={(look) => commit({ ...look, expression: config.expression, pose: config.pose, bg: config.bg })}
+                customOpen={section.kind === 'color' && customFor === section.category}
+                onToggleCustom={(key) => setCustomFor(customFor === key ? null : key)}
+                onOption={pickOption}
+                onColor={setChoice}
+                onPreset={pickPreset}
+                onSlider={setSlider}
+              />
+            ))}
+
+            {tab.key === 'style' ? (
+              <View style={styles.section}>
+                <Txt variant="label" style={styles.sectionTitle}>{t('avatarCreator.savedLooks')}</Txt>
+                <View style={styles.chips}>
+                  {looks.map((look, i) => (
+                    <View key={look.name} style={styles.lookChip}>
                       <Pressable
-                        key={option.id}
                         accessibilityRole="button"
-                        accessibilityLabel={a11y}
-                        accessibilityState={{ selected, disabled: locked }}
-                        onPress={() => applyOption(category, option)}
-                        style={({ pressed }) => [
-                          styles.cell,
-                          { width: shapeCell, height: body ? shapeCell * 1.3 : shapeCell },
-                          selected && styles.cellOn,
-                          pressed && styles.pressed,
-                        ]}
+                        accessibilityLabel={t('avatarCreator.wear', { name: look.name })}
+                        onPress={() => commit(look.config)}
+                        style={styles.lookMain}
                       >
-                        <View style={[styles.thumb, locked && styles.dim]} pointerEvents="none">
-                          <AvatarView
-                            config={{ ...config, [category.key]: option.id }}
-                            size={body ? shapeCell * 1.22 : shapeCell - 4}
-                            mood="neutral"
-                            mode={body ? 'full-body' : 'head'}
-                            bare
-                            animated={false}
-                          />
-                        </View>
-                        <Txt variant="caption" color={colors.inkSoft} numberOfLines={1} style={styles.cellLabel}>
-                          {option.label}
-                        </Txt>
-                        {selected ? (
-                          <View style={styles.badge}>
-                            <CheckGlyph size={11} />
-                          </View>
-                        ) : null}
-                        {locked ? (
-                          <View style={[styles.badge, styles.lockBadge]}>
-                            <LockGlyph size={12} />
-                          </View>
-                        ) : null}
+                        <Txt variant="caption" color={colors.ink}>{look.name}</Txt>
                       </Pressable>
-                    );
-                  })}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('avatarCreator.remove', { name: look.name })}
+                        onPress={() => setLooks(looks.filter((_, j) => j !== i))}
+                        style={styles.lookRemove}
+                      >
+                        <CloseGlyph size={14} color={colors.inkSoft} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('avatarCreator.saveThisLookTo')}
+                    onPress={saveLook}
+                    style={[styles.chip, styles.chipDashed]}
+                  >
+                    <Txt variant="caption" color={colors.accent}>{t('avatarCreator.saveThisLook')}</Txt>
+                  </Pressable>
                 </View>
               </View>
+            ) : null}
+          </ScrollView>
+        ) : (
+          <ScrollView style={styles.flex} contentContainerStyle={styles.futureIntro}>
+            <BackdropGlyph size={28} color={colors.accent} />
+            <Txt variant="heading" style={styles.center}>{t('avatarCreator.whoAreYouBecoming')}</Txt>
+            <Txt variant="body" color={colors.inkSoft} style={styles.center}>
+              {t('avatarCreator.futureYouIsA')}
+            </Txt>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('avatarCreator.createFutureYouWith')}
+              onPress={() => startFuture(true)}
+              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+            >
+              <Txt variant="bodySemi" color={colors.onAccent}>{t('avatarCreator.suggestAFutureMe')}</Txt>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('avatarCreator.createFutureYouAs')}
+              onPress={() => startFuture(false)}
+              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+            >
+              <Txt variant="bodySemi" color={colors.ink}>{t('avatarCreator.startFromMyCurrent')}</Txt>
+            </Pressable>
+          </ScrollView>
+        )}
+      </View>
+      <PhotorealSheet visible={photoOpen} config={config} onClose={() => setPhotoOpen(false)} />
+      <SelfieAvatarSheet
+        visible={selfieOpen}
+        config={config}
+        level={level}
+        onClose={() => setSelfieOpen(false)}
+        onApply={(next, note) => {
+          setSelfieOpen(false);
+          commit(next);
+          toast.showToast({ message: t('avatarCreator.tapSaveToKeep', { note }) });
+        }}
+      />
+    </View>
+  );
+}
+
+interface SectionProps {
+  section: EditorSection;
+  config: AvatarConfig;
+  level: number;
+  colorCell: number;
+  thumbCell: number;
+  detailed: boolean;
+  onLook: (config: AvatarConfig) => void;
+  customOpen: boolean;
+  onToggleCustom: (key: AvatarChoiceKey) => void;
+  onOption: (key: AvatarChoiceKey, option: OptionItem) => void;
+  onColor: (key: AvatarChoiceKey, value: string, live?: boolean) => void;
+  onPreset: (owns: SliderId[], preset: Preset) => void;
+  onSlider: (id: SliderId, value: number, live: boolean) => void;
+}
+
+/** A picture of the avatar wearing one choice. */
+function Thumb({ config, shape, cell, label, text, selected, locked = false, channel, onPress }: {
+  config: AvatarConfig;
+  shape: 'head' | 'full-body';
+  cell: number;
+  label: string;
+  text: string;
+  selected: boolean;
+  locked?: boolean;
+  channel: string;
+  onPress: () => void;
+}) {
+  const h = shape === 'head' ? cell : Math.round(cell * 2.2);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected, disabled: locked }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.thumb, { width: cell }, locked && styles.dim, pressed && styles.pressed]}
+    >
+      <View style={[styles.thumbFrame, shape === 'head' ? { borderRadius: cell / 2 } : null, { width: cell, height: h }, selected && styles.thumbFrameOn]}>
+        <View pointerEvents="none" style={[styles.thumbClip, shape === 'head' ? { borderRadius: cell / 2 } : null]}>
+          <Avatar3D config={config} size={h - 6} mood="neutral" mode={shape === 'head' ? 'head-thumb' : 'body-thumb'} animated={false} live={channel} />
+        </View>
+      </View>
+      <Txt variant="caption" color={selected ? colors.accent : colors.inkSoft} numberOfLines={2} style={styles.thumbLabel}>{text}</Txt>
+    </Pressable>
+  );
+}
+
+function Section({ section, config, level, colorCell, thumbCell, detailed, onLook, customOpen, onToggleCustom, onOption, onColor, onPreset, onSlider }: SectionProps) {
+  const { t } = useTranslation();
+  useTheme();
+  if (section.kind === 'looks') {
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        <View style={styles.thumbs}>
+          {LOOKS.filter((l) => l.config.sex === config.sex).map((l) => (
+            <Thumb
+              key={l.id}
+              config={{ ...l.config, expression: 'neutral', pose: 'relaxed', bg: config.bg }}
+              shape="head"
+              cell={thumbCell}
+              label={t('avatarCreator.startFromTheLook', { label: L(l.label) })}
+              text={L(l.label)}
+              selected={false}
+              channel={`thumb:look:${l.id}`}
+              onPress={() => onLook(l.config)}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  }
+  if (section.kind === 'note') {
+    return (
+      <View style={styles.note}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        <Txt variant="caption" color={colors.inkSoft}>{section.text}</Txt>
+      </View>
+    );
+  }
+  if (section.kind === 'presets') {
+    const current = matchingPreset(section.presets, section.owns, config.sliders);
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        <View style={styles.chips}>
+          {section.presets.map((preset) => (
+            <Chip
+              key={preset.id}
+              label={`${L(section.title)}: ${L(preset.label)}`}
+              text={L(preset.label)}
+              selected={current === preset.id}
+              onPress={() => onPreset(section.owns, preset)}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  }
+  if (section.kind === 'sliders') {
+    if ((section.detail && !detailed) || (section.only && section.only !== config.sex)) return null;
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        {section.sliders.map((id) => {
+          const def = sliderDef(id);
+          return (
+            <Slider
+              key={id}
+              label={L(def.label)}
+              min={def.min}
+              max={1}
+              low={L(def.low)}
+              high={L(def.high)}
+              value={sv(config.sliders, id)}
+              onChange={(v) => onSlider(id, v, true)}
+              onCommit={(v) => onSlider(id, v, false)}
+            />
+          );
+        })}
+      </View>
+    );
+  }
+  const category = categoryFor(section.category);
+  const value = config[section.category];
+  const worn = wornOutfit(config);
+  if (section.when === 'separates' && worn.outfit) return null;
+  if (section.when === 'top' && !worn.top?.tint) return null;
+  if (section.when === 'bottom' && !worn.bottom?.tint) return null;
+  const options = optionsFor(section.category, config.sex);
+  if (section.kind === 'choice' && section.thumbs) {
+    const shape = section.thumbs;
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        <View style={styles.thumbs}>
+          {options.map((option) => {
+            const locked = optionLocked(option, level);
+            return (
+              <Thumb
+                key={option.id}
+                config={{ ...config, [section.category]: option.id, expression: 'neutral', pose: 'relaxed' } as AvatarConfig}
+                shape={shape}
+                cell={thumbCell}
+                label={`${L(section.title)}: ${L(option.label)}${locked ? t('avatarCreator.unlocksAtLevelSuffix', { level: option.minLevel }) : ''}`}
+                text={L(option.label)}
+                selected={value === option.id}
+                locked={locked}
+                channel={`thumb:${section.category}:${option.id}`}
+                onPress={() => onOption(section.category, option)}
+              />
             );
           })}
-        </ScrollView>
+        </View>
       </View>
+    );
+  }
+  if (section.kind === 'choice') {
+    return (
+      <View style={styles.section}>
+        <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+        <View style={styles.chips}>
+          {options.map((option) => {
+            const locked = optionLocked(option, level);
+            return (
+              <Chip
+                key={option.id}
+                label={`${L(section.title)}: ${L(option.label)}${locked ? t('avatarCreator.unlocksAtLevelSuffix', { level: option.minLevel }) : ''}`}
+                text={L(option.label)}
+                selected={value === option.id}
+                locked={locked}
+                onPress={() => onOption(section.category, option)}
+              />
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+  const custom = isHex(value);
+  return (
+    <View style={styles.section}>
+      <Txt variant="label" style={styles.sectionTitle}>{L(section.title)}</Txt>
+      <View style={styles.swatches}>
+        {category.options.map((option) => {
+          const selected = value === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${L(section.title)}: ${L(option.label)}`}
+              accessibilityState={{ selected }}
+              onPress={() => onOption(section.category, option)}
+              style={[
+                styles.swatchRing,
+                { width: colorCell, height: colorCell, borderRadius: colorCell / 2 },
+                selected && styles.swatchRingOn,
+              ]}
+            >
+              <View
+                style={[
+                  styles.swatch,
+                  { width: colorCell - 10, height: colorCell - 10, borderRadius: (colorCell - 10) / 2, backgroundColor: option.swatch },
+                ]}
+              />
+            </Pressable>
+          );
+        })}
+        {section.custom ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('avatarCreator.pickACustomColor', { title: L(section.title) })}
+            accessibilityState={{ selected: custom, expanded: customOpen }}
+            onPress={() => onToggleCustom(section.category)}
+            style={[
+              styles.swatchRing,
+              { width: colorCell, height: colorCell, borderRadius: colorCell / 2 },
+              (custom || customOpen) && styles.swatchRingOn,
+            ]}
+          >
+            <View
+              style={[
+                styles.swatch,
+                styles.customSwatch,
+                { width: colorCell - 10, height: colorCell - 10, borderRadius: (colorCell - 10) / 2 },
+                custom ? { backgroundColor: value } : null,
+              ]}
+            >
+              <Txt variant="caption" color={custom ? '#FFFFFF' : colors.ink} style={styles.customPlus}>+</Txt>
+            </View>
+          </Pressable>
+        ) : null}
+      </View>
+      {customOpen ? (
+        <ColorPicker
+          title={L(section.title)}
+          value={custom ? value : category.options.find((o) => o.id === value)?.swatch ?? '#808080'}
+          onChange={(hex) => onColor(section.category, hex, true)}
+          onCommit={(hex) => onColor(section.category, hex)}
+        />
+      ) : null}
     </View>
+  );
+}
+
+function Chip({ label, text, selected, locked = false, onPress }: { label: string; text: string; selected: boolean; locked?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected, disabled: locked }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, selected && styles.chipOn, locked && styles.dim, pressed && styles.pressed]}
+    >
+      {locked ? <LockGlyph size={12} /> : null}
+      <Txt variant="caption" color={selected ? colors.onAccent : colors.ink}>{text}</Txt>
+    </Pressable>
+  );
+}
+
+function TextButton({ label, text, icon, onPress }: { label: string; text: string; icon: React.ReactNode; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
+      {icon}
+      <Txt variant="caption" color={colors.accent}>{text}</Txt>
+    </Pressable>
   );
 }
 
 function RoundButton({
   label,
   onPress,
+  onPressIn,
+  onPressOut,
   disabled = false,
   selected = false,
+  testID,
   children,
 }: {
   label: string;
   onPress: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
   disabled?: boolean;
   selected?: boolean;
+  testID?: string;
   children: React.ReactNode;
 }) {
   return (
     <PressableScale
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled, selected }}
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled}
       pressedScale={0.92}
       hitSlop={4}
@@ -426,7 +935,28 @@ const styles = themed(() =>
       alignItems: 'center',
       paddingHorizontal: SIDE,
       paddingTop: spacing.sm,
-      zIndex: 2,
+      gap: spacing.sm,
+    },
+    who: {
+      flexDirection: 'row',
+      flexShrink: 1,
+      padding: 3,
+      borderRadius: radius.pill,
+      backgroundColor: mix(colors.card, colors.paper, 0.1),
+      ...softShadow(1),
+    },
+    whoTab: {
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    whoTabOn: {
+      backgroundColor: colors.accent,
+    },
+    whoText: {
+      fontFamily: fonts.bodySemi,
     },
     stage: {
       ...StyleSheet.absoluteFillObject,
@@ -438,6 +968,15 @@ const styles = themed(() =>
       // The close-up crop ends at the shoulders, right on the sheet's edge.
       marginBottom: -1,
     },
+    compareTag: {
+      position: 'absolute',
+      alignSelf: 'center',
+      top: TOP_BAR + spacing.xl,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.pill,
+      backgroundColor: colors.accent,
+    },
     bottomBar: {
       position: 'absolute',
       left: SIDE,
@@ -445,6 +984,13 @@ const styles = themed(() =>
       bottom: radius.lg + spacing.sm,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      // Narrow phones: the right-hand group moves up a line instead of
+      // running off the screen.
+      flexWrap: 'wrap',
+      rowGap: spacing.sm,
+    },
+    rowEnd: {
+      marginStart: 'auto',
     },
     row: {
       flexDirection: 'row',
@@ -468,7 +1014,7 @@ const styles = themed(() =>
     },
     savePill: {
       minHeight: 44,
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: spacing.lg,
       borderRadius: radius.pill,
       backgroundColor: colors.accent,
       alignItems: 'center',
@@ -481,42 +1027,103 @@ const styles = themed(() =>
       backgroundColor: colors.card,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
-      paddingTop: spacing.lg,
+      paddingTop: spacing.sm,
       ...softShadow(3),
     },
     sheetTitle: {
-      paddingHorizontal: SIDE + 4,
       fontFamily: fonts.bodySemi,
+      flexShrink: 1,
     },
     tabsBar: {
       flexGrow: 0,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.line,
     },
     tabs: {
-      paddingHorizontal: SIDE - 6,
-      paddingTop: spacing.sm,
+      paddingHorizontal: SIDE,
+      paddingBottom: spacing.sm,
+    },
+    tabPills: {
+      flexDirection: 'row',
+      padding: 3,
+      borderRadius: radius.pill,
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+      borderWidth: 1,
+      borderColor: colors.line,
     },
     tab: {
-      width: 52,
-      height: 48,
+      minWidth: 64,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    tabBar: {
-      position: 'absolute',
-      bottom: 0,
-      width: 26,
-      height: 3,
-      borderRadius: 2,
-      backgroundColor: 'transparent',
-    },
-    tabBarOn: {
+    tabOn: {
       backgroundColor: colors.accent,
+    },
+    tabLabel: {
+      fontFamily: fonts.bodySemi,
+    },
+    modes: {
+      flexDirection: 'row',
+      alignSelf: 'center',
+      gap: spacing.xs,
+    },
+    mode: {
+      minHeight: 44,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modeOn: {
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.2),
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    thumbs: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    thumb: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    thumbFrame: {
+      borderRadius: radius.sm,
+      borderWidth: 3,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    thumbFrameOn: {
+      borderColor: colors.accent,
+    },
+    thumbClip: {
+      borderRadius: radius.sm - 2,
+      overflow: 'hidden',
+    },
+    thumbLabel: {
+      textAlign: 'center',
+      fontSize: 11,
+      lineHeight: 14,
+    },
+    tabHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    textButton: {
+      minHeight: 44,
+      paddingHorizontal: spacing.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
     grid: {
       paddingHorizontal: SIDE,
-      paddingTop: spacing.md,
+      paddingTop: spacing.xs,
       paddingBottom: spacing.xxl,
       gap: spacing.lg,
     },
@@ -526,55 +1133,62 @@ const styles = themed(() =>
     sectionTitle: {
       color: colors.ink,
     },
-    cells: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: GAP,
-    },
-    cell: {
+    note: {
+      gap: spacing.xs,
+      padding: spacing.md,
       borderRadius: radius.sm,
       backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    chip: {
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-end',
-      overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: 'transparent',
+      justifyContent: 'center',
+      gap: 4,
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+      borderWidth: 1,
+      borderColor: colors.line,
     },
-    cellOn: {
-      borderColor: colors.accent,
-      backgroundColor: mix(colors.accent, colors.card, 0.88),
-    },
-    thumb: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-    },
-    cellLabel: {
-      fontSize: 10,
-      lineHeight: 13,
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-      marginBottom: 2,
-      borderRadius: radius.xs,
-      overflow: 'hidden',
-      backgroundColor: mix(colors.card, colors.paper, 0.2),
-      maxWidth: '94%',
-    },
-    badge: {
-      position: 'absolute',
-      top: 5,
-      right: 5,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+    chipOn: {
       backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    chipDashed: {
+      borderStyle: 'dashed',
+      borderColor: colors.accent,
+      backgroundColor: 'transparent',
+    },
+    lookChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: radius.pill,
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    lookMain: {
+      minHeight: 44,
+      paddingStart: spacing.md,
+      paddingEnd: spacing.xs,
+      justifyContent: 'center',
+    },
+    lookRemove: {
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    lockBadge: {
-      backgroundColor: colors.card,
-      left: 5,
-      right: undefined,
+    swatches: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
     },
     swatchRing: {
       alignItems: 'center',
@@ -589,11 +1203,47 @@ const styles = themed(() =>
       borderWidth: 1,
       borderColor: colors.line,
     },
+    customSwatch: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: mix(colors.paperAlt, colors.card, 0.35),
+      borderStyle: 'dashed',
+    },
+    customPlus: {
+      fontSize: 18,
+      lineHeight: 22,
+    },
+    futureIntro: {
+      padding: spacing.xl,
+      gap: spacing.md,
+      alignItems: 'center',
+    },
+    center: {
+      textAlign: 'center',
+    },
+    primary: {
+      minHeight: 48,
+      alignSelf: 'stretch',
+      borderRadius: radius.pill,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.sm,
+    },
+    secondary: {
+      minHeight: 48,
+      alignSelf: 'stretch',
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     dim: {
       opacity: 0.4,
     },
     pressed: {
-      opacity: 0.9,
+      opacity: 0.85,
     },
   }),
 );

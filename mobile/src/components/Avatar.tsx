@@ -1,4 +1,5 @@
 import React from 'react';
+import i18n from '../i18n';
 import { Image, StyleSheet, View } from 'react-native';
 import Txt from './Txt';
 import { borderWidth, colors, themed } from '../theme/tokens';
@@ -35,7 +36,7 @@ export function Avatar({ uri, size = 120, ringColor = colors.line, name }: Avata
   return (
     <View
       style={[styles.ring, ring]}
-      accessibilityLabel={name ? `Avatar of ${name}` : 'Avatar'}
+      accessibilityLabel={name ? i18n.t('avatar.avatarOf', { name }) : i18n.t('avatar.avatar')}
     >
       {uri ? (
         <Image source={{ uri }} style={image} resizeMode="cover" />

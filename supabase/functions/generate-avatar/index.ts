@@ -1,8 +1,10 @@
-// generate-avatar: turns the user's photo into their "Future Self" avatar.
+// generate-avatar: turns the user's photo into their "Future Self" avatar,
+// or (kind 'render') turns a 3D render of the character they built in the
+// avatar editor into a photograph of that same character.
 // Client sends a small square JPEG (base64). We call fal.ai's synchronous
 // image-edit endpoint (Flux Kontext by default, ~5-10 s), copy the result
 // into Storage, and point profiles.ai_avatar_url at it. Any failure leaves
-// the SVG avatar in place, so the client can always fall back.
+// the 3D avatar in place, so the client can always fall back.
 // Key comes ONLY from Edge Function env (FAL_KEY) — never from the client.
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
@@ -11,11 +13,13 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'retry-after',
 };
 
 const BUCKET = 'profile-photos';
 const DAILY_LIMIT = 5; // generations per rolling 24 h (cost control)
 const MAX_INPUT_CHARS = 1_400_000; // ~1 MB JPEG as base64
+const MAX_RENDER_CHARS = 4_500_000; // a large PNG render as base64
 const PROVIDER_TIMEOUT_MS = 55_000;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 // Overridable so local runs can point at a mock; production uses fal.ai.
@@ -53,32 +57,61 @@ Deno.serve(async (req: Request) => {
 
     let imageBase64 = '';
     let artStyle = '';
+    let kind: 'photo' | 'render' = 'photo';
+    let view: 'portrait' | 'full' = 'portrait';
+    let mime: 'jpeg' | 'png' = 'jpeg';
+    let details = '';
     try {
       const body = await req.json();
       imageBase64 =
         typeof body?.image_base64 === 'string' ? body.image_base64 : '';
       artStyle = typeof body?.art_style === 'string' ? body.art_style : '';
+      kind = body?.kind === 'render' ? 'render' : 'photo';
+      view = body?.view === 'full' ? 'full' : 'portrait';
+      mime = body?.mime === 'png' ? 'png' : 'jpeg';
+      details = typeof body?.details === 'string' ? body.details : '';
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
     imageBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '').trim();
     if (imageBase64.length === 0) return json({ error: 'missing_image' }, 400);
-    if (imageBase64.length > MAX_INPUT_CHARS) {
+    if (imageBase64.length > (kind === 'render' ? MAX_RENDER_CHARS : MAX_INPUT_CHARS)) {
       return json({ error: 'image_too_large' }, 413);
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
+    const started = Date.now();
 
-    // ---- daily limit (server-side, rolling 24 h) ----
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await admin
-      .from('avatar_generations')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', since);
-    if ((count ?? 0) >= DAILY_LIMIT) {
-      return json({ error: 'daily_limit', limit: DAILY_LIMIT }, 429);
+    // ---- daily limit (server-side, rolling 24 h), reserved atomically ----
+    // reserve_avatar_generation (migration 0045) counts and inserts the
+    // attempt under a per-account lock, before the paid provider call, so
+    // parallel requests cannot pass the limit.
+    const { data: reservation, error: reserveError } = await admin.rpc(
+      'reserve_avatar_generation',
+      { p_user: user.id, p_limit: DAILY_LIMIT },
+    );
+    if (reserveError || !reservation) {
+      console.error('generate-avatar reserve', reserveError?.message);
+      return json({ error: 'storage_failed' }, 500);
     }
+    const reserved = reservation as AvatarReservation;
+    if (!reserved.ok || reserved.id == null) {
+      const resetsAt = reserved.resets_at ? new Date(reserved.resets_at).toISOString() : null;
+      const retryAfter = resetsAt
+        ? Math.max(1, Math.ceil((Date.parse(resetsAt) - Date.now()) / 1000))
+        : 3600;
+      return json(
+        { error: 'daily_limit', limit: DAILY_LIMIT, remaining_today: 0, resets_at: resetsAt },
+        429,
+        { 'Retry-After': String(retryAfter) },
+      );
+    }
+    const attemptId = reserved.id;
+    const remainingToday = reserved.remaining_today;
+    // Every exit below records the outcome on the reserved row. `refund`
+    // releases the slot when the provider did no work for us.
+    const finish = (ok: boolean, error: string | null, refund = false) =>
+      finishAttempt(admin, attemptId, ok, started, error, refund);
 
     const { data: goals } = await admin
       .from('user_goals')
@@ -86,14 +119,15 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    const prompt = buildPrompt(
-      goals?.dream_body ?? null,
-      (goals?.dream_personality as string[] | null) ?? [],
-      artStyle,
-    );
+    const prompt = kind === 'render'
+      ? buildPhotoPrompt(view, details)
+      : buildPrompt(
+        goals?.dream_body ?? null,
+        (goals?.dream_personality as string[] | null) ?? [],
+        artStyle,
+      );
 
     // ---- provider call ----
-    const started = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
     let resultUrl = '';
@@ -106,17 +140,21 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           prompt,
-          image_url: `data:image/jpeg;base64,${imageBase64}`,
+          image_url: `data:image/${mime};base64,${imageBase64}`,
           num_images: 1,
           output_format: 'jpeg',
-          aspect_ratio: '1:1',
+          aspect_ratio: kind === 'render' && view === 'full' ? '9:16' : '1:1',
           safety_tolerance: '2',
         }),
         signal: controller.signal,
       });
       if (!response.ok) {
         const text = await response.text();
-        await logAttempt(admin, user.id, false, started, `fal_${response.status}: ${text.slice(0, 200)}`);
+        // The provider did no billable work for us when our key is wrong
+        // (401/403), it is rate limited (429) or it is down (5xx).
+        const providerDidNoWork = response.status === 401 || response.status === 403 ||
+          response.status === 429 || response.status >= 500;
+        await finish(false, `fal_${response.status}: ${text.slice(0, 200)}`, providerDidNoWork);
         console.error('generate-avatar provider error', response.status, text.slice(0, 200));
         // 401/403: the FAL_KEY is wrong or out of credit; 422: fal rejected
         // the input (often its content filter). Both are worth telling apart.
@@ -131,12 +169,14 @@ Deno.serve(async (req: Request) => {
       resultUrl = result?.images?.[0]?.url ?? '';
       // fal flags NSFW output with a black image instead of failing.
       if (result?.has_nsfw_concepts?.[0] === true) {
-        await logAttempt(admin, user.id, false, started, 'nsfw_filtered');
+        await finish(false, 'nsfw_filtered');
         return json({ error: 'rejected' }, 502);
       }
     } catch (e) {
       const aborted = e instanceof DOMException && e.name === 'AbortError';
-      await logAttempt(admin, user.id, false, started, aborted ? 'timeout' : String(e).slice(0, 200));
+      // A timeout may still be billed by the provider, so it counts. A
+      // network error before any response is released.
+      await finish(false, aborted ? 'timeout' : String(e).slice(0, 200), !aborted);
       return json(
         { error: aborted ? 'timeout' : 'generation_failed' },
         aborted ? 504 : 502,
@@ -145,7 +185,7 @@ Deno.serve(async (req: Request) => {
       clearTimeout(timer);
     }
     if (!resultUrl) {
-      await logAttempt(admin, user.id, false, started, 'empty_result');
+      await finish(false, 'empty_result');
       return json({ error: 'generation_failed' }, 502);
     }
 
@@ -156,20 +196,23 @@ Deno.serve(async (req: Request) => {
         signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
       });
       if (!imageResponse.ok) {
-        await logAttempt(admin, user.id, false, started, `download_${imageResponse.status}`);
+        await finish(false, `download_${imageResponse.status}`);
         return json({ error: 'generation_failed' }, 502);
       }
       bytes = new Uint8Array(await imageResponse.arrayBuffer());
     } catch (e) {
-      await logAttempt(admin, user.id, false, started, `download: ${String(e).slice(0, 180)}`);
+      await finish(false, `download: ${String(e).slice(0, 180)}`);
       return json({ error: 'generation_failed' }, 502);
     }
-    const path = `${user.id}/ai-avatar.jpg`;
+    // A photo of the built character is kept apart from the selfie-based one.
+    const path = kind === 'render'
+      ? `${user.id}/photoreal-${view}.jpg`
+      : `${user.id}/ai-avatar.jpg`;
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
       .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
     if (uploadError) {
-      await logAttempt(admin, user.id, false, started, `upload: ${uploadError.message}`);
+      await finish(false, `upload: ${uploadError.message}`);
       return json({ error: 'storage_failed' }, 500);
     }
     const {
@@ -177,22 +220,27 @@ Deno.serve(async (req: Request) => {
     } = admin.storage.from(BUCKET).getPublicUrl(path);
     const url = `${publicUrl}?t=${Date.now()}`;
 
+    // A selfie-based avatar becomes the picture at once. A photo of the
+    // built character is only saved: the person picks it in the editor.
+    const column = kind === 'render'
+      ? (view === 'full' ? { photoreal_body_url: url } : { photoreal_head_url: url })
+      : { ai_avatar_url: url, avatar_mode: 'ai' };
     const { error: updateError } = await admin
       .from('profiles')
-      .update({ ai_avatar_url: url, avatar_mode: 'ai' })
+      .update(column)
       .eq('id', user.id);
     if (updateError) {
-      await logAttempt(admin, user.id, false, started, `profile: ${updateError.message}`);
+      await finish(false, `profile: ${updateError.message}`);
       return json({ error: 'storage_failed' }, 500);
     }
 
     const latencyMs = Date.now() - started;
-    await logAttempt(admin, user.id, true, started, null);
+    await finish(true, null);
     return json(
       {
         url,
         latency_ms: latencyMs,
-        remaining_today: Math.max(0, DAILY_LIMIT - (count ?? 0) - 1),
+        remaining_today: remainingToday,
       },
       200,
     );
@@ -217,6 +265,26 @@ const STYLE_PROMPTS: Record<string, string> = {
     'Redraw this photo as a moody Japanese anime still of a lone warrior in heavy rain: cold blue-gray palette, sharp linework, flat cel shading, wet hair with white highlight streaks and water drops, overcast stormy sky and dark trees behind, subtle film grain.',
 };
 
+/** Allowed words for the optional detail line (hair, clothes...) so it cannot carry instructions. */
+function cleanDetails(raw: string): string {
+  return raw.replace(/[^\p{L}\p{N} ,.'-]/gu, '').slice(0, 200);
+}
+
+function buildPhotoPrompt(view: 'portrait' | 'full', details: string): string {
+  const framing = view === 'full'
+    ? 'Full-body standing photograph, the whole body visible from head to shoes, on a plain soft grey studio background.'
+    : 'Head-and-shoulders portrait photograph on a plain soft grey studio background.';
+  const extra = cleanDetails(details);
+  return [
+    'Turn this 3D character render into a real photograph of a real person.',
+    'Keep exactly the same face shape and features, skin tone, hairstyle and hair color, eye color, glasses, clothes and colors, body build, height and pose.',
+    'Natural skin with pores and fine detail, individual hair strands, real fabric texture, soft studio lighting, shot on an 85mm lens, sharp focus, photorealistic.',
+    framing,
+    extra ? `Details: ${extra}.` : '',
+    'No text, no logos, no extra people.',
+  ].filter(Boolean).join(' ');
+}
+
 function buildPrompt(
   dreamBody: string | null,
   personality: string[],
@@ -239,25 +307,43 @@ function buildPrompt(
   return parts.filter(Boolean).join(' ');
 }
 
-async function logAttempt(
+/** Result of the reserve_avatar_generation RPC (migration 0045). */
+interface AvatarReservation {
+  ok: boolean;
+  id?: number;
+  used: number;
+  remaining_today: number;
+  resets_at?: string | null;
+}
+
+async function finishAttempt(
   // deno-lint-ignore no-explicit-any
   admin: SupabaseClient<any, any, any>,
-  userId: string,
+  id: number,
   ok: boolean,
   started: number,
   error: string | null,
+  refund: boolean,
 ): Promise<void> {
-  await admin.from('avatar_generations').insert({
-    user_id: userId,
-    ok,
-    latency_ms: Date.now() - started,
-    error,
-  });
+  const { error: updateError } = await admin
+    .from('avatar_generations')
+    .update({
+      ok,
+      latency_ms: Date.now() - started,
+      error,
+      counted: !refund,
+    })
+    .eq('id', id);
+  if (updateError) console.error('generate-avatar finish', updateError.message);
 }
 
-function json(body: unknown, status: number): Response {
+function json(
+  body: unknown,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   });
 }

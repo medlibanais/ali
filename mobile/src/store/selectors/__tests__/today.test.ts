@@ -7,6 +7,7 @@ import {
   selectDayMood,
   selectPillarProgress,
   selectQuestById,
+  selectTodayList,
 } from '../today';
 
 jest.mock('../../../lib/supabase', () => ({ supabase: {} }));
@@ -65,6 +66,13 @@ describe('Today selectors', () => {
     expect(selectDayMood(root(quests))).toBe('neutral');
     const nudged = { ...quests, pillarScores: { ...quests.pillarScores, health: 45 } };
     expect(selectDayMood(root(nudged))).toBe('neutral');
+  });
+
+  it('reuses the ordered list when the quest array and pillar are unchanged', () => {
+    const unrelatedUpdate = { ...quests, loading: true };
+    expect(selectTodayList(root(unrelatedUpdate), 'health')).toBe(
+      selectTodayList(root(quests), 'health'),
+    );
   });
 
   it('lists open quests first, capped at four for all pillars', () => {

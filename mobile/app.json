@@ -2,6 +2,12 @@
   "expo": {
     "name": "GROW",
     "slug": "prayerlock",
+    "owner": "medlibanaiss-team",
+    "extra": {
+      "eas": {
+        "projectId": "80615719-47d8-4f20-92e3-6f38eebd0306"
+      }
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "prayerlock",

@@ -1,6 +1,8 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
 import {
+  DAILY_XP_CAP,
   cumulativeXpForLevel,
   levelForXp,
   titleForLevel,
@@ -22,6 +24,18 @@ export interface GamificationState {
   currentTitle: string | null;
   loading: boolean;
   error: string | null;
+  /** Server truth from the last fetch; displayed values add pending XP. */
+  serverTotalXp: number;
+  serverXpToday: number;
+  serverLevel: number;
+  /** Optimistic XP of completions still in the offline queue. */
+  pendingXp: number;
+  pendingXpToday: number;
+  /**
+   * The newest fetchGamification started. An older one that answers later
+   * may have read the row before a completion committed, so it is dropped.
+   */
+  latestFetchId: string | null;
 }
 
 const initialState: GamificationState = {
@@ -36,7 +50,30 @@ const initialState: GamificationState = {
   currentTitle: null,
   loading: false,
   error: null,
+  serverTotalXp: 0,
+  serverXpToday: 0,
+  serverLevel: 1,
+  pendingXp: 0,
+  pendingXpToday: 0,
+  latestFetchId: null,
 };
+
+/**
+ * Displayed XP = server XP + XP still waiting in the offline queue. When
+ * the queue drains, pending drops to 0 and the server's numbers (which
+ * include the real streak bonus, caps and badge XP) take over.
+ */
+function applyDisplay(state: GamificationState): void {
+  state.totalXp = state.serverTotalXp + state.pendingXp;
+  state.xpToday = Math.min(DAILY_XP_CAP, state.serverXpToday + state.pendingXpToday);
+  state.level =
+    state.pendingXp > 0
+      ? Math.max(state.serverLevel, levelForXp(state.totalXp))
+      : state.serverLevel;
+  state.xpToNextLevel = xpToNextLevel(state.totalXp);
+  state.nextLevel = Math.min(100, state.level + 1);
+  state.currentTitle = titleForLevel(state.level);
+}
 
 interface AchievementRow {
   badge_id: string;
@@ -65,6 +102,18 @@ function catalogOf(
   return Array.isArray(c) ? (c[0] ?? null) : c;
 }
 
+/**
+ * Why the progress is being refetched. 'sync' means the offline queue was
+ * just replayed or rolled back: the XP/level change is the server catching
+ * up with something the user already saw, so reward animations must not
+ * fire again. Middleware reads it from action.meta.arg.reason.
+ */
+export type GamificationRefreshReason = 'sync';
+
+export interface FetchGamificationArgs {
+  reason?: GamificationRefreshReason;
+}
+
 export const fetchGamification = createAsyncThunk<
   {
     level: number;
@@ -74,14 +123,14 @@ export const fetchGamification = createAsyncThunk<
     best_streak: number;
     achievements: Achievement[];
   },
-  void,
+  FetchGamificationArgs | void,
   { rejectValue: string }
 >('gamification/fetch', async (_, { rejectWithValue }) => {
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('errors.notSignedIn'));
 
     const [gamRes, achRes] = await Promise.all([
       supabase.from('gamification').select('*').eq('user_id', user.id).maybeSingle(),
@@ -123,7 +172,7 @@ export const fetchGamification = createAsyncThunk<
     };
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load your progress.',
+      error instanceof Error ? error.message : i18n.t('errors.loadProgress'),
     );
   }
 });
@@ -138,7 +187,7 @@ export const fetchAllBadges = createAsyncThunk<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in.');
+    if (!user) throw new Error(i18n.t('errors.notSignedIn'));
     const [catalogRes, unlockedRes] = await Promise.all([
       supabase.from('badge_catalog').select('*').order('sort'),
       supabase.from('achievements').select('badge_id, unlocked_at').eq('user_id', user.id),
@@ -168,10 +217,36 @@ export const fetchAllBadges = createAsyncThunk<
     );
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load achievements.',
+      error instanceof Error ? error.message : i18n.t('errors.loadAchievements'),
     );
   }
 });
+
+/**
+ * complete_quest answers with the new totals. Matched by type because
+ * questsSlice imports this file (a direct import would be circular).
+ */
+interface ServerCompletion {
+  type: 'quests/complete/fulfilled';
+  payload: {
+    xp_awarded: number;
+    total_xp: number;
+    level: number;
+    current_streak: number;
+    best_streak: number;
+    offline: boolean;
+  };
+}
+
+function isServerCompletion(action: { type: string; payload?: unknown }): action is ServerCompletion {
+  if (action.type !== 'quests/complete/fulfilled') return false;
+  const p = action.payload as Partial<ServerCompletion['payload']> | undefined;
+  return !!p && p.offline === false && typeof p.total_xp === 'number' && typeof p.level === 'number';
+}
+
+function isStale(state: GamificationState, requestId: string): boolean {
+  return state.latestFetchId !== null && state.latestFetchId !== requestId;
+}
 
 const gamificationSlice = createSlice({
   name: 'gamification',
@@ -180,34 +255,56 @@ const gamificationSlice = createSlice({
     clearGamification() {
       return initialState;
     },
+    pendingXpChanged(
+      state,
+      action: PayloadAction<{ total: number; today: number }>,
+    ) {
+      state.pendingXp = Math.max(0, action.payload.total);
+      state.pendingXpToday = Math.max(0, action.payload.today);
+      applyDisplay(state);
+    },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchGamification.pending, (state) => {
+      .addCase(fetchGamification.pending, (state, action) => {
+        state.latestFetchId = action.meta.requestId;
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchGamification.fulfilled, (state, action) => {
+        // A newer fetch is on its way: this answer may predate a completion.
+        if (isStale(state, action.meta.requestId)) return;
         state.loading = false;
         const d = action.payload;
-        state.level = d.level;
-        state.totalXp = d.total_xp;
-        state.xpToday = d.xp_today;
-        state.xpToNextLevel = xpToNextLevel(d.total_xp);
-        state.nextLevel = Math.min(100, d.level + 1);
+        state.serverLevel = d.level;
+        state.serverTotalXp = d.total_xp;
+        state.serverXpToday = d.xp_today;
         state.currentStreak = d.current_streak;
         state.bestStreak = d.best_streak;
         state.achievements = d.achievements;
-        state.currentTitle = titleForLevel(d.level);
+        applyDisplay(state);
       })
       .addCase(fetchGamification.rejected, (state, action) => {
+        if (isStale(state, action.meta.requestId)) return;
         state.loading = false;
-        state.error = action.payload ?? 'Could not load your progress.';
+        state.error = action.payload ?? i18n.t('errors.loadProgress');
+      })
+      // Show the server's new XP as soon as complete_quest answers, instead
+      // of after a second round trip. The fetch the completion starts still
+      // follows and brings XP today and badges.
+      .addMatcher(isServerCompletion, (state, action) => {
+        const d = action.payload;
+        state.serverTotalXp = d.total_xp;
+        state.serverLevel = d.level;
+        state.serverXpToday += Math.max(0, d.xp_awarded);
+        state.currentStreak = d.current_streak;
+        state.bestStreak = d.best_streak;
+        applyDisplay(state);
       });
   },
 });
 
-export const { clearGamification } = gamificationSlice.actions;
+export const { clearGamification, pendingXpChanged } = gamificationSlice.actions;
 
 // Re-exported for screens that showed progress math locally.
 export { cumulativeXpForLevel, levelForXp, xpToNextLevel };

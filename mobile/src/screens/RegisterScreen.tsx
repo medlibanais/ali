@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
@@ -25,25 +26,34 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function RegisterScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { busy, error } = useAppSelector((state) => state.auth);
+  // Opened from a friend's invite link: the code is already known.
+  const pendingInvite = useAppSelector((state) => state.auth.pendingInviteCode);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(
-    route.params?.showInvite ?? false,
+    (route.params?.showInvite ?? false) || pendingInvite !== null,
   );
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(pendingInvite ?? '');
+
+  useEffect(() => {
+    if (!pendingInvite) return;
+    setInviteVisible(true);
+    setInviteCode((current) => current || pendingInvite);
+  }, [pendingInvite]);
 
   const allRulesMet = passwordRulesMet(password);
 
   const submit = async () => {
     dispatch(clearAuthError());
     if (!EMAIL_RE.test(email.trim())) {
-      setEmailError('Enter a valid email address.');
+      setEmailError(t('register.enterAValidEmail'));
       return;
     }
     setEmailError(null);
@@ -58,21 +68,25 @@ export function RegisterScreen({ navigation, route }: Props) {
       const code = inviteCode.trim().toUpperCase();
       if (code.length >= 4) {
         dispatch(setPendingInviteCode(code));
+      } else if (pendingInvite) {
+        // They cleared the code from the link on purpose.
+        dispatch(setPendingInviteCode(null));
       }
       navigation.navigate('VerifyEmail', { email: email.trim() });
     }
   };
 
   return (
-    <Screen scroll keyboardAvoiding>
+    <Screen scroll keyboardAvoiding testID="register-scroll">
       <AuthHeader
-        title="Create account"
-        subtitle="One account for your whole life, across five pillars."
+        title={t('register.createAccount')}
+        subtitle={t('register.oneAccountForYour')}
       />
 
       <Card style={styles.form}>
         <Field
-          label="Email"
+          label={t('register.email')}
+          testID="register-email"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -85,7 +99,8 @@ export function RegisterScreen({ navigation, route }: Props) {
           placeholder="you@example.com"
         />
         <Field
-          label="Password"
+          label={t('register.password')}
+          testID="register-password"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -93,13 +108,15 @@ export function RegisterScreen({ navigation, route }: Props) {
           }}
           secureTextEntry
           autoCapitalize="none"
-          placeholder="Choose a password"
+          returnKeyType="go"
+          onSubmitEditing={submit}
+          placeholder={t('register.chooseAPassword')}
         />
 
         <PasswordStrengthMeter password={password} />
         {passwordTouched && password.length > 0 && !allRulesMet ? (
           <Txt variant="caption" color={colors.danger} style={styles.rulesHint}>
-            Your password does not meet every rule yet.
+            {t('register.yourPasswordDoesNot')}
           </Txt>
         ) : null}
 
@@ -111,7 +128,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
         {inviteVisible ? (
           <Field
-            label="Invite code (optional)"
+            label={t('register.inviteCodeOptional')}
             value={inviteCode}
             onChangeText={(t) => setInviteCode(t.toUpperCase())}
             placeholder="ABC12345"
@@ -120,7 +137,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           />
         ) : (
           <Button
-            title="Have an invite code?"
+            title={t('register.haveAnInviteCode')}
             variant="ghost"
             onPress={() => setInviteVisible(true)}
             style={styles.inviteToggle}
@@ -128,15 +145,16 @@ export function RegisterScreen({ navigation, route }: Props) {
         )}
 
         <Button
-          title="Create account"
-          winTitle="Start growing"
+          title={t('register.createAccount')}
+          testID="register-submit"
+          winTitle={t('register.startGrowing')}
           icon={ArrowRightGlyph}
           onPress={submit}
           loading={busy}
         />
       </Card>
       <Button
-        title="Back to sign in"
+        title={t('register.backToSignIn')}
         variant="ghost"
         onPress={() => navigation.goBack()}
         style={styles.backButton}

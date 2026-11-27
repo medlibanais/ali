@@ -9,7 +9,9 @@
 // number, a row of pillar tiles, two stat tiles, and a sign-off line.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import i18n, { appLocale } from '../../i18n';
+import { StyleSheet, Text, TextProps, View } from 'react-native';
+import { arabicFontFor } from '../../theme/fonts';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import ProfileAvatar, { type ProfileAvatarProps } from '../../components/ProfileAvatar';
 import { FlameGlyph, PillarGlyph, SparklesGlyph } from '../../components/icons';
@@ -49,8 +51,8 @@ function clamp(v: number | undefined): number {
 export function StoryCard({ data, width }: { data: StoryCardData; width: number }) {
   const u = width / 360; // design unit: layout is drawn on a 360x640 grid
   const height = width * STORY_ASPECT;
-  const name = data.firstName?.trim() || 'Me';
-  const today = new Date().toLocaleDateString(undefined, {
+  const name = data.firstName?.trim() || i18n.t('story.me');
+  const today = new Date().toLocaleDateString(appLocale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -104,13 +106,13 @@ export function StoryCard({ data, width }: { data: StoryCardData; width: number 
           >
             <SparklesGlyph size={13 * u} color={C.onAccent} />
           </View>
-          <Text style={[styles.mono, { fontSize: 11 * u, letterSpacing: 3 * u, marginLeft: 8 * u, color: C.ink }]}>
+          <StoryText style={[styles.mono, { fontSize: 11 * u, letterSpacing: 3 * u, marginStart: 8 * u, color: C.ink }]}>
             GROW
-          </Text>
+          </StoryText>
         </View>
-        <Text style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 1.2 * u, color: C.inkSoft }]}>
+        <StoryText style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 1.2 * u, color: C.inkSoft }]}>
           {today.toUpperCase()}
-        </Text>
+        </StoryText>
       </View>
 
       {/* Avatar inside the pillar ring */}
@@ -169,35 +171,35 @@ export function StoryCard({ data, width }: { data: StoryCardData; width: number 
               backgroundColor: C.accent,
             }}
           >
-            <Text style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 1 * u, color: C.onAccent }]}>
-              {`LV ${data.level}`}
-            </Text>
+            <StoryText style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 1 * u, color: C.onAccent }]}>
+              {i18n.t('story.lv', { level: data.level })}
+            </StoryText>
           </View>
         </View>
 
-        <Text
+        <StoryText
           style={[styles.display, { fontSize: 22 * u, lineHeight: 28 * u, marginTop: 10 * u, color: C.ink }]}
           numberOfLines={1}
         >
           {name.toUpperCase()}
-        </Text>
-        <Text style={[styles.body, { fontSize: 12 * u, color: C.inkSoft }]}>
-          {`${data.levelTitle} · Level ${data.level}`}
-        </Text>
+        </StoryText>
+        <StoryText style={[styles.body, { fontSize: 12 * u, color: C.inkSoft }]}>
+          {i18n.t('story.titleLevel', { title: data.levelTitle, level: data.level })}
+        </StoryText>
       </View>
 
       {/* Hero number */}
       <View style={[styles.center, { marginTop: 10 * u }]}>
-        <Text style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 2 * u, color: C.accent }]}>
-          LIFE SCORE TODAY
-        </Text>
+        <StoryText style={[styles.mono, { fontSize: 9.5 * u, letterSpacing: 2 * u, color: C.accent }]}>
+          {i18n.t('story.lifeScoreToday')}
+        </StoryText>
         <View style={styles.scoreRow}>
-          <Text style={[styles.display, { fontSize: 76 * u, lineHeight: 82 * u, color: C.ink }]}>
+          <StoryText style={[styles.display, { fontSize: 76 * u, lineHeight: 82 * u, color: C.ink }]}>
             {`${clamp(data.score)}`}
-          </Text>
-          <Text style={[styles.display, { fontSize: 20 * u, lineHeight: 26 * u, marginLeft: 4 * u, marginBottom: 14 * u, color: C.inkFaint }]}>
+          </StoryText>
+          <StoryText style={[styles.display, { fontSize: 20 * u, lineHeight: 26 * u, marginStart: 4 * u, marginBottom: 14 * u, color: C.inkFaint }]}>
             /100
-          </Text>
+          </StoryText>
         </View>
       </View>
 
@@ -217,15 +219,15 @@ export function StoryCard({ data, width }: { data: StoryCardData; width: number 
             }}
           >
             <PillarGlyph pillar={p} size={15 * u} color={C.pillar[p]} />
-            <Text style={[styles.statNum, { fontSize: 15 * u, lineHeight: 19 * u, marginTop: 4 * u, color: C.ink }]}>
+            <StoryText style={[styles.statNum, { fontSize: 15 * u, lineHeight: 19 * u, marginTop: 4 * u, color: C.ink }]}>
               {`${clamp(data.pillars[p])}`}
-            </Text>
-            <Text
+            </StoryText>
+            <StoryText
               style={[styles.body, { fontSize: 7.5 * u, lineHeight: 10 * u, color: C.inkSoft }]}
               numberOfLines={1}
             >
               {PILLAR_LABELS[p]}
-            </Text>
+            </StoryText>
           </View>
         ))}
       </View>
@@ -236,24 +238,24 @@ export function StoryCard({ data, width }: { data: StoryCardData; width: number 
           u={u}
           icon={<FlameGlyph size={16 * u} color={C.gold} />}
           value={`${data.streak}`}
-          label="day streak"
+          label={i18n.t('story.dayStreak')}
         />
         <StatTile
           u={u}
           icon={<SparklesGlyph size={15 * u} color={C.accent} />}
           value={data.weekAvg === null ? '–' : `${data.weekAvg}`}
-          label="avg this week"
+          label={i18n.t('story.avgWeek')}
         />
       </View>
 
       {/* Sign-off */}
       <View style={styles.footer}>
-        <Text style={[styles.display, { fontSize: 17 * u, lineHeight: 22 * u, color: C.ink }]}>
-          WHO ARE YOU BECOMING?
-        </Text>
-        <Text style={[styles.mono, { fontSize: 8.5 * u, letterSpacing: 1.6 * u, marginTop: 4 * u, color: C.inkSoft }]}>
-          BUILT DAY BY DAY WITH GROW
-        </Text>
+        <StoryText style={[styles.display, { fontSize: 17 * u, lineHeight: 22 * u, color: C.ink }]}>
+          {i18n.t('story.question')}
+        </StoryText>
+        <StoryText style={[styles.mono, { fontSize: 8.5 * u, letterSpacing: 1.6 * u, marginTop: 4 * u, color: C.inkSoft }]}>
+          {i18n.t('story.builtWith')}
+        </StoryText>
       </View>
     </View>
   );
@@ -285,13 +287,25 @@ function StatTile({
       }}
     >
       {icon}
-      <Text style={[styles.statNum, { fontSize: 20 * u, lineHeight: 24 * u, marginLeft: 8 * u, color: C.ink }]}>
+      <StoryText style={[styles.statNum, { fontSize: 20 * u, lineHeight: 24 * u, marginStart: 8 * u, color: C.ink }]}>
         {value}
-      </Text>
-      <Text style={[styles.body, { fontSize: 10 * u, marginLeft: 6 * u, color: C.inkSoft, flexShrink: 1 }]} numberOfLines={1}>
+      </StoryText>
+      <StoryText style={[styles.body, { fontSize: 10 * u, marginStart: 6 * u, color: C.inkSoft, flexShrink: 1 }]} numberOfLines={1}>
         {label}
-      </Text>
+      </StoryText>
     </View>
+  );
+}
+
+/** Text that switches to the Arabic face (and no letter spacing) in Arabic. */
+function StoryText({ style, ...rest }: TextProps) {
+  const arabic = i18n.language === 'ar';
+  const flat = StyleSheet.flatten(style);
+  return (
+    <Text
+      {...rest}
+      style={arabic ? [flat, { fontFamily: arabicFontFor(flat?.fontFamily), letterSpacing: 0 }] : flat}
+    />
   );
 }
 

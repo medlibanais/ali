@@ -1,5 +1,8 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { rememberOnboardingCompleted } from '../../lib/onboardingCache';
 import { supabase } from '../../lib/supabase';
+import { isLanguage, Language } from '../../i18n/languages';
 
 // Shapes consumed by the screens (kept stable while the backend changed).
 export interface UserProfile {
@@ -10,10 +13,16 @@ export interface UserProfile {
   avatar_config: Record<string, unknown> | null;
   avatar_mode: 'avatar' | 'photo' | 'ai';
   ai_avatar_url: string | null;
+  /** Photographs of the avatar built in the editor. */
+  photoreal_head_url: string | null;
+  photoreal_body_url: string | null;
   timezone: string;
   invite_code: string | null;
   stats_visibility: 'friends' | 'private';
-  theme_id: string;
+  /** Theme picked by the user, synced across devices. Null until they pick one. */
+  theme_preference: string | null;
+  /** null until the user (or this device) picks one. */
+  language: Language | null;
   dream_body: string | null;
   dream_personality: string[];
   career_goal: string | null;
@@ -63,7 +72,7 @@ async function requireUserId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  if (!user) throw new Error(i18n.t('errors.notSignedIn'));
   return user.id;
 }
 
@@ -89,10 +98,13 @@ export const fetchProfile = createAsyncThunk<
       avatar_config: (p?.avatar_config as Record<string, unknown>) ?? null,
       avatar_mode: (p?.avatar_mode as UserProfile['avatar_mode']) ?? 'avatar',
       ai_avatar_url: p?.ai_avatar_url ?? null,
+      photoreal_head_url: p?.photoreal_head_url ?? null,
+      photoreal_body_url: p?.photoreal_body_url ?? null,
       timezone: p?.timezone ?? 'UTC',
       invite_code: p?.invite_code ?? null,
       stats_visibility: (p?.stats_visibility as 'friends' | 'private') ?? 'friends',
-      theme_id: p?.theme_id ?? 'parchment',
+      theme_preference: p?.theme_preference ?? null,
+      language: isLanguage(p?.language) ? p.language : null,
       dream_body: g?.dream_body ?? null,
       dream_personality: g?.dream_personality ?? [],
       career_goal: g?.career_goal ?? null,
@@ -100,7 +112,7 @@ export const fetchProfile = createAsyncThunk<
     return { profile, goals: (g as UserGoals | null) ?? null };
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not load your profile.',
+      error instanceof Error ? error.message : i18n.t('errors.loadProfile'),
     );
   }
 });
@@ -115,42 +127,61 @@ export const submitOnboarding = createAsyncThunk<
     const username = payload.username.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,20}$/.test(username)) {
       throw new Error(
-        'Username must be 3-20 chars: lowercase letters, numbers, underscore.',
+        i18n.t('errors.usernameRules'),
       );
     }
 
-    const { error: profileError } = await supabase
+    // Three idempotent steps, safe to retry after any failure. Onboarding
+    // is marked complete only in the last one, after the profile and the
+    // goals are both saved, so a half-saved account is never treated as
+    // finished (and is asked again on the next launch).
+    const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
       .update({
         username,
         first_name: payload.first_name.trim(),
         timezone: payload.timezone,
-        onboarding_completed: true,
       })
-      .eq('id', userId);
+      .eq('id', userId)
+      .select('id');
     if (profileError) {
       if (profileError.message.toLowerCase().includes('duplicate') ||
           profileError.code === '23505') {
-        throw new Error('That username is taken. Try another one.');
+        throw new Error(i18n.t('errors.usernameTaken'));
       }
       throw profileError;
     }
+    if (!profileRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
 
     const { dream_body, dream_personality, ...goals } = payload.goals;
-    const { error: goalsError } = await supabase
+    const { data: goalRows, error: goalsError } = await supabase
       .from('user_goals')
-      .update({
-        ...goals,
-        ...(dream_body !== undefined ? { dream_body } : {}),
-        ...(dream_personality !== undefined
-          ? { dream_personality }
-          : {}),
-      })
-      .eq('user_id', userId);
+      .upsert(
+        {
+          user_id: userId,
+          ...goals,
+          ...(dream_body !== undefined ? { dream_body } : {}),
+          ...(dream_personality !== undefined
+            ? { dream_personality }
+            : {}),
+        },
+        { onConflict: 'user_id' },
+      )
+      .select('user_id');
     if (goalsError) throw goalsError;
+    if (!goalRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
+
+    const { data: doneRows, error: doneError } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', userId)
+      .select('id');
+    if (doneError) throw doneError;
+    if (!doneRows?.length) throw new Error(i18n.t('errors.saveAnswers'));
+    rememberOnboardingCompleted(userId);
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not save your answers.',
+      error instanceof Error ? error.message : i18n.t('errors.saveAnswers'),
     );
   }
 });
@@ -170,7 +201,7 @@ export const saveAvatarConfig = createAsyncThunk<
     return config;
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : 'Could not save your avatar.',
+      error instanceof Error ? error.message : i18n.t('errors.saveAvatar'),
     );
   }
 });
@@ -203,7 +234,7 @@ const userSlice = createSlice({
       })
       .addCase(fetchProfile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? 'Could not load your profile.';
+        state.error = action.payload ?? i18n.t('errors.loadProfile');
       })
       .addCase(saveAvatarConfig.fulfilled, (state, action) => {
         if (state.profile) {

@@ -1,11 +1,20 @@
+import i18n from '../../i18n';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { unregisterDeviceForPush } from '../../lib/notifications';
+import { clearPortraits } from '../../avatar/renderCache';
+import {
+  rememberOnboardingCompleted,
+  wasOnboardingCompleted,
+} from '../../lib/onboardingCache';
 
 export type AuthStatus =
   | 'restoring'
   | 'unauthenticated'
   | 'needsOnboarding'
+  /** Signed in, but the profile could not be read and nothing is cached. */
+  | 'profileUnavailable'
   | 'ready';
 
 export interface AuthState {
@@ -27,24 +36,36 @@ const initialState: AuthState = {
   pendingInviteCode: null,
 };
 
-async function getOnboardingCompleted(userId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('profiles')
-    .select('onboarding_completed')
-    .eq('id', userId)
-    .maybeSingle();
-  return data?.onboarding_completed ?? false;
+/**
+ * Whether this account finished onboarding. A failed read (offline, server
+ * error) is NOT "unfinished": a returning user who finished on this device
+ * goes on to Today with cached data, anyone else gets a retry screen.
+ */
+async function getOnboardingCompleted(userId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    const completed = data?.onboarding_completed ?? false;
+    if (completed) rememberOnboardingCompleted(userId);
+    return completed;
+  } catch {
+    return wasOnboardingCompleted(userId) ? true : null;
+  }
 }
 
 function authErrorMessage(error: { message?: string } | null, fallback: string): string {
   const msg = error?.message?.toLowerCase() ?? '';
-  if (msg.includes('invalid login credentials')) return 'Email or password incorrect.';
-  if (msg.includes('email not confirmed')) return 'Please verify your email first. Check your inbox.';
+  if (msg.includes('invalid login credentials')) return i18n.t('authErrors.badCredentials');
+  if (msg.includes('email not confirmed')) return i18n.t('authErrors.verifyFirst');
   if (msg.includes('rate limit') || msg.includes('too many requests')) {
-    return 'Too many attempts. Please wait a minute and try again.';
+    return i18n.t('authErrors.tooMany');
   }
   if (msg.includes('already registered') || msg.includes('already been registered')) {
-    return 'An account with this email already exists.';
+    return i18n.t('authErrors.emailExists');
   }
   return error?.message ?? fallback;
 }
@@ -58,7 +79,7 @@ export function emailRedirect(path: 'verify-email' | 'reset-password'): string {
 }
 
 export const restoreSession = createAsyncThunk<
-  { userId: string; email: string | null; onboardingCompleted: boolean } | null,
+  { userId: string; email: string | null; onboardingCompleted: boolean | null } | null,
   void
 >('auth/restoreSession', async () => {
   const {
@@ -71,7 +92,7 @@ export const restoreSession = createAsyncThunk<
 });
 
 export const login = createAsyncThunk<
-  { userId: string; email: string | null; onboardingCompleted: boolean },
+  { userId: string; email: string | null; onboardingCompleted: boolean | null },
   { email: string; password: string },
   { rejectValue: string }
 >('auth/login', async ({ email, password }, { rejectWithValue }) => {
@@ -80,7 +101,7 @@ export const login = createAsyncThunk<
     password,
   });
   if (error || !data.user) {
-    return rejectWithValue(authErrorMessage(error, 'Sign in failed.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.signInFailed')));
   }
   const onboardingCompleted = await getOnboardingCompleted(data.user.id);
   return {
@@ -101,7 +122,7 @@ export const register = createAsyncThunk<
     options: { emailRedirectTo: emailRedirect('verify-email') },
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not create the account.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.createFailed')));
   }
   // Supabase returns a user with no session when email confirmation is on.
   return {
@@ -119,7 +140,7 @@ export const sendPasswordReset = createAsyncThunk<
     redirectTo: emailRedirect('reset-password'),
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not send the reset email.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.resetFailed')));
   }
 });
 
@@ -130,7 +151,7 @@ export const updatePassword = createAsyncThunk<
 >('auth/updatePassword', async ({ password }, { rejectWithValue }) => {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not update the password.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.updatePasswordFailed')));
   }
 });
 
@@ -145,12 +166,24 @@ export const resendVerification = createAsyncThunk<
     options: { emailRedirectTo: emailRedirect('verify-email') },
   });
   if (error) {
-    return rejectWithValue(authErrorMessage(error, 'Could not resend the email.'));
+    return rejectWithValue(authErrorMessage(error, i18n.t('authErrors.resendFailed')));
   }
 });
 
 export const logout = createAsyncThunk<void, void>('auth/logout', async () => {
-  await supabase.auth.signOut();
+  // Stop this phone getting the signed-out user's pushes (never throws).
+  await unregisterDeviceForPush();
+  // The next person must not see this one's avatar while theirs draws.
+  await clearPortraits();
+  // Signing out must always work, even offline or with an expired token.
+  // A global sign-out that fails keeps the local session, so fall back to
+  // clearing it on this device only.
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  }
 });
 
 const authSlice = createSlice({
@@ -164,6 +197,7 @@ const authSlice = createSlice({
     },
     onboardingCompletedLocally(state) {
       state.status = 'ready';
+      if (state.userId) rememberOnboardingCompleted(state.userId);
     },
     clearAuthError(state) {
       state.error = null;
@@ -178,15 +212,18 @@ const authSlice = createSlice({
       action: PayloadAction<{
         userId: string;
         email: string | null;
-        onboardingCompleted: boolean;
+        onboardingCompleted: boolean | null;
       } | null>,
     ) => {
       if (action.payload) {
         state.userId = action.payload.userId;
         state.email = action.payload.email;
-        state.status = action.payload.onboardingCompleted
-          ? 'ready'
-          : 'needsOnboarding';
+        const done = action.payload.onboardingCompleted;
+        state.status = done === null
+          ? 'profileUnavailable'
+          : done
+            ? 'ready'
+            : 'needsOnboarding';
       } else {
         state.status = 'unauthenticated';
       }
@@ -207,7 +244,7 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.busy = false;
-        state.error = action.payload ?? 'Sign in failed.';
+        state.error = action.payload ?? i18n.t('authErrors.signInFailed');
       })
       .addCase(register.pending, (state) => {
         state.busy = true;
@@ -218,7 +255,13 @@ const authSlice = createSlice({
       })
       .addCase(register.rejected, (state, action) => {
         state.busy = false;
-        state.error = action.payload ?? 'Registration failed.';
+        state.error = action.payload ?? i18n.t('authErrors.registerFailed');
+      })
+      .addCase(logout.rejected, (state) => {
+        state.status = 'unauthenticated';
+        state.userId = null;
+        state.email = null;
+        state.busy = false;
       })
       .addCase(logout.fulfilled, (state) => {
         state.status = 'unauthenticated';

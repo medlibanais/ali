@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View, ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Animated, Easing, Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { colors, radius, softShadow, spacing, themed, withAlpha } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { playHaptic } from '../lib/haptics';
 import type { IconProps } from './icons';
+import LoadingDots from './LoadingDots';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -22,6 +25,8 @@ export interface ButtonProps {
   icon?: (props: IconProps) => React.ReactElement;
   /** Label shown while hovered or pressed: a small "you're winning" beat. */
   winTitle?: string;
+  /** Stable id for end-to-end tests (Detox `by.id`). */
+  testID?: string;
 }
 
 const useNative = Platform.OS !== 'web';
@@ -35,7 +40,9 @@ export function Button({
   style,
   icon: Icon,
   winTitle,
+  testID,
 }: ButtonProps) {
+  const { t } = useTranslation();
   useTheme();
   const isDisabled = disabled || loading;
   const [engaged, setEngaged] = useState(false);
@@ -104,10 +111,18 @@ export function Button({
 
   return (
     <PressableScale
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      onPress={isDisabled ? undefined : onPress}
+      onPress={
+        isDisabled
+          ? undefined
+          : () => {
+              playHaptic('tap');
+              onPress();
+            }
+      }
       onHoverIn={engage}
       onHoverOut={release}
       onPressIn={engage}
@@ -123,7 +138,10 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.onAccent : colors.accent} />
+        <LoadingDots
+          color={variant === 'primary' ? colors.onAccent : colors.accent}
+          accessibilityLabel={t('common.loading2', { title })}
+        />
       ) : (
         <View style={styles.content}>
           <View style={styles.labelBox}>
@@ -218,7 +236,7 @@ const styles = themed(() =>
       fontSize: 15,
     },
     icon: {
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
     },
   }),
 );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Linking, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthHeader from '../components/AuthHeader';
 import Button from '../components/Button';
@@ -39,6 +40,7 @@ function paramsFromUrl(url: string): URLSearchParams | null {
 }
 
 export function ResetPasswordScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const { busy } = useAppSelector((state) => state.auth);
@@ -103,7 +105,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
     setTouched(true);
     if (!passwordRulesMet(password)) return;
     if (password !== confirm) {
-      setError('The two passwords do not match.');
+      setError(t('resetPassword.theTwoPasswordsDo'));
       return;
     }
     const result = await dispatch(updatePassword({ password }));
@@ -112,27 +114,27 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
       // End the recovery session so the app returns to the signed-out state.
       await supabase.auth.signOut();
     } else {
-      setError(result.payload ?? 'Could not update the password.');
+      setError(result.payload ?? t('resetPassword.couldNotUpdateThe'));
     }
   };
 
   return (
     <Screen scroll keyboardAvoiding>
       <AuthHeader
-        title="Set a new password"
+        title={t('resetPassword.setANewPassword')}
         subtitle={
           linkState === 'invalid'
-            ? 'This reset link is invalid or has expired.'
+            ? t('resetPassword.thisResetLinkIs')
             : doneState === 'done'
-              ? 'Your password was updated. Sign in with the new one.'
-              : 'Choose a strong password you do not use anywhere else.'
+              ? t('resetPassword.yourPasswordWasUpdated')
+              : t('resetPassword.chooseAStrongPassword')
         }
       />
 
       {linkState === 'ready' && doneState === 'form' ? (
         <Card style={styles.form}>
           <Field
-            label="New password"
+            label={t('resetPassword.newPassword')}
             value={password}
             onChangeText={(text) => {
               setPassword(text);
@@ -140,25 +142,25 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
             }}
             secureTextEntry
             autoCapitalize="none"
-            placeholder="New password"
+            placeholder={t('resetPassword.newPassword')}
           />
           <PasswordStrengthMeter password={password} />
           <Field
-            label="Confirm password"
+            label={t('resetPassword.confirmPassword')}
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry
             autoCapitalize="none"
-            placeholder="Repeat the new password"
+            placeholder={t('resetPassword.repeatTheNewPassword')}
             error={
               touched && confirm.length > 0 && password !== confirm
-                ? 'Passwords do not match.'
+                ? t('resetPassword.passwordsDoNotMatch')
                 : null
             }
           />
           {touched && !passwordRulesMet(password) ? (
             <Txt variant="caption" color={colors.danger} style={styles.formError}>
-              Your password does not meet every rule yet.
+              {t('resetPassword.yourPasswordDoesNot')}
             </Txt>
           ) : null}
           {error ? (
@@ -167,8 +169,8 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
             </Txt>
           ) : null}
           <Button
-            title="Update password"
-            winTitle="Locked in"
+            title={t('resetPassword.updatePassword')}
+            winTitle={t('resetPassword.lockedIn')}
             icon={ArrowRightGlyph}
             onPress={submit}
             loading={busy}
@@ -178,19 +180,19 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
 
       {linkState === 'invalid' ? (
         <Button
-          title="Request a new link"
+          title={t('resetPassword.requestANewLink')}
           onPress={() => navigation.navigate('ForgotPassword')}
         />
       ) : null}
       {doneState === 'done' ? (
         <Button
-          title="Back to sign in"
+          title={t('resetPassword.backToSignIn')}
           onPress={() => navigation.navigate('Login')}
         />
       ) : null}
       {doneState === 'form' ? (
         <Button
-          title="Back to sign in"
+          title={t('resetPassword.backToSignIn')}
           variant="ghost"
           onPress={() => navigation.navigate('Login')}
           style={styles.backButton}

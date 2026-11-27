@@ -402,6 +402,34 @@ verify_jwt = false
 [functions.generate-avatar]
 verify_jwt = false
 
+# Called only by pg_cron, which sends x-cron-secret and no user JWT.
+[functions.predict-streak]
+verify_jwt = false
+
+[functions.coach-nudges]
+verify_jwt = false
+
+[functions.smart-notify]
+verify_jwt = false
+
+# Scheduled calls use the configured cron secret. App calls check the user JWT.
+[functions.generate-quests]
+verify_jwt = false
+
+[functions.weekly-insights]
+verify_jwt = false
+
+[functions.notify-friend]
+verify_jwt = false
+
+[functions.generate-insights]
+verify_jwt = false
+
+# Called by the database webhook (x-webhook-secret) or by the job's owner,
+# both checked inside the function.
+[functions.generate-avatar-config]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

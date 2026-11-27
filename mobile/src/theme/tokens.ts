@@ -4,6 +4,7 @@
 // render-time reads (inline styles, props) pick up theme changes as soon
 // as components re-render.
 
+import i18n from '../i18n';
 import { DEFAULT_THEME_ID, THEMES, ThemeColors } from './themes';
 
 let activeColors: ThemeColors = THEMES[DEFAULT_THEME_ID].colors;
@@ -76,12 +77,23 @@ export const PILLARS: readonly Pillar[] = [
   'spirituality',
 ] as const;
 
-export const PILLAR_LABELS: Record<Pillar, string> = {
-  health: 'Health',
-  family: 'Family',
-  work: 'Work',
-  fun: 'Fun',
-  spirituality: 'Spirituality',
+// Getters so every read returns the label in the current language.
+export const PILLAR_LABELS: Readonly<Record<Pillar, string>> = {
+  get health() {
+    return i18n.t('pillars.health');
+  },
+  get family() {
+    return i18n.t('pillars.family');
+  },
+  get work() {
+    return i18n.t('pillars.work');
+  },
+  get fun() {
+    return i18n.t('pillars.fun');
+  },
+  get spirituality() {
+    return i18n.t('pillars.spirituality');
+  },
 };
 
 export const spacing = {
@@ -100,7 +112,6 @@ export const radius = {
   sm: 12,
   md: 20,
   lg: 28,
-  xl: 36,
   pill: 999,
 } as const;
 

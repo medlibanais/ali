@@ -1,0 +1,305 @@
+// Full new-user journey, run in order on one fresh install:
+// register -> confirm email -> sign in -> onboarding -> avatar -> Today ->
+// complete a quest -> XP went up (on screen and in the database).
+//
+// Runs against the local Supabase (`npm run db:start`); see e2e/README.md.
+import { expect as jestExpect } from '@jest/globals';
+import { by, device, element, expect, waitFor } from 'detox';
+import { ensureAppFocus, logDeviceLoad, logJsConsole, prepareEmulator } from './support/android';
+import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
+
+const RUN = Date.now().toString(36);
+const EMAIL = `e2e-${RUN}@grow.test`;
+// Meets the app's rules: 8+ chars, an uppercase letter, a number, a symbol.
+const PASSWORD = `Grow-${RUN}-9!`;
+const USERNAME = `e2e_${RUN}`.slice(0, 20);
+const FIRST_NAME = 'Detox';
+
+const LONG = 30000;
+
+/** Taps an element, scrolling its screen until it is on screen first. */
+async function tapInScroll(id: string, scrollId: string, index = 0): Promise<void> {
+  await revealInScroll(id, scrollId, index);
+  await element(by.id(id)).atIndex(index).tap();
+}
+
+/** Scrolls a screen until the element is on screen (at least 75 percent visible). */
+async function revealInScroll(id: string, scrollId: string, index = 0): Promise<void> {
+  if (device.getPlatform() === 'android') ensureAppFocus();
+  const target = element(by.id(id)).atIndex(index);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await waitFor(target).toBeVisible().withTimeout(attempt === 0 ? 8000 : 2000);
+      break;
+    } catch (e) {
+      if (attempt >= 8) {
+        await logScreen(`#${id} never became visible`);
+        throw e;
+      }
+      try {
+        // A new step keeps the old scroll offset, so its content may sit
+        // above the view: start from the top, then work downwards.
+        if (attempt === 0) await element(by.id(scrollId)).scrollTo('top');
+        else await element(by.id(scrollId)).scroll(200, 'down');
+      } catch {
+        // Nothing to scroll (screen fits); the next check decides.
+      }
+    }
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** One sample of the top screen's accessibility label (diagnostic). */
+async function logTop(why: string): Promise<void> {
+  try {
+    const xml = await device.generateViewHierarchyXml();
+    const m = /ReactRootView[^>]*label="([^"]*)"/.exec(xml);
+    const label = m ? m[1] : '(no root label)';
+    // Start of the label names the screen; the end holds any toast text.
+    const shown = label.length > 360 ? `${label.slice(0, 120)} ... ${label.slice(-220)}` : label;
+    console.warn(`[top ${why}] ${shown}`);
+  } catch {
+    console.warn(`[top ${why}] (hierarchy unavailable)`);
+  }
+}
+
+/** Logs the top screen's accessibility label each time it changes. */
+async function traceTopScreen(why: string, seconds: number): Promise<void> {
+  let last = '';
+  for (let i = 0; i < seconds; i += 1) {
+    try {
+      const xml = await device.generateViewHierarchyXml();
+      const m = /ReactRootView[^>]*label="([^"]{0,80})/.exec(xml);
+      const top = m ? m[1] : '(no root label)';
+      if (top !== last) {
+        console.warn(`[trace ${why}] t+${i}s top: ${top}`);
+        last = top;
+      }
+    } catch {
+      // Keep going; the hierarchy can be busy during a transition.
+    }
+    await sleep(1000);
+  }
+}
+
+/** Failure diagnostic: which test ids are on screen right now. */
+async function logScreen(why: string): Promise<void> {
+  try {
+    const xml = await device.generateViewHierarchyXml();
+    const ids = Array.from(xml.matchAll(/(?:tag|resource-id|testid|id)="([^"]+)"/gi), (m) => m[1]);
+    console.warn(xml.slice(0, 1500));
+    console.warn(`${why}. On screen: ${Array.from(new Set(ids)).join(', ')}`);
+  } catch (err) {
+    console.warn(`${why}. (view hierarchy unavailable: ${(err as Error).message.split('\n')[0]})`);
+  }
+}
+
+async function textOf(id: string): Promise<string> {
+  const attrs = await element(by.id(id)).getAttributes();
+  if ('text' in attrs && typeof attrs.text === 'string') return attrs.text;
+  throw new Error(`#${id} has no text`);
+}
+
+function parseXp(text: string): number {
+  // The app shows digits in the device language (Arabic uses ٠-٩).
+  const latin = text.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+  return Number(latin.replace(/[^0-9]/g, ''));
+}
+
+/** XP on Today before the quest tap (step 4), compared in step 5. */
+let xpBefore = 0;
+
+describe('New user journey', () => {
+
+  // A system window (permission or save-password prompt) can appear at any
+  // point; check before every step.
+  beforeEach(() => {
+    if (device.getPlatform() === 'android') ensureAppFocus();
+  });
+
+  beforeAll(async () => {
+    await device.uninstallApp();
+    await device.installApp();
+    if (device.getPlatform() === 'android') prepareEmulator();
+    await device.launchApp({
+      newInstance: true,
+      permissions: { notifications: 'YES' },
+      // The app has never-ending animations (ambient blobs, the breathing
+      // avatar), so Detox would wait forever for it to go idle. Every step
+      // below waits for its own element instead.
+      launchArgs: { detoxEnableSynchronization: 0 },
+    });
+    await device.disableSynchronization();
+  });
+
+  it('1. registers a new account', async () => {
+    await waitFor(element(by.id('login-create-account'))).toBeVisible().withTimeout(LONG);
+    await element(by.id('login-create-account')).tap();
+
+    await waitFor(element(by.id('register-email'))).toBeVisible().withTimeout(LONG);
+    await element(by.id('register-email')).replaceText(EMAIL);
+    await element(by.id('register-password')).replaceText(PASSWORD);
+    // The keyboard and the password hint push the button off the small CI
+    // screen, so submit with the keyboard's Go key (same as tapping it).
+    await element(by.id('register-password')).tapReturnKey();
+
+    // Email confirmation is on, so the app asks the user to check their inbox.
+    await waitFor(element(by.id('verify-title'))).toBeVisible().withTimeout(LONG);
+  });
+
+  it('confirms the email and signs in', async () => {
+    await confirmEmail(EMAIL);
+
+    await element(by.id('verify-back-to-sign-in')).tap();
+    await waitFor(element(by.id('login-email'))).toBeVisible().withTimeout(LONG);
+    await element(by.id('login-email')).replaceText(EMAIL);
+    await element(by.id('login-password')).replaceText(PASSWORD);
+    await element(by.id('login-password')).tapReturnKey();
+
+    await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
+  });
+
+  it('2. completes the onboarding', async () => {
+    // Steps 1-6 have usable defaults; step 7 needs a name and a username.
+    for (let step = 1; step <= 6; step += 1) {
+      await waitFor(element(by.id(`onboarding-step-${step}`))).toExist().withTimeout(LONG);
+      await tapInScroll('onboarding-continue', 'onboarding-scroll');
+    }
+    await revealInScroll('onboarding-first-name', 'onboarding-scroll');
+    await element(by.id('onboarding-first-name')).replaceText(FIRST_NAME);
+    await revealInScroll('onboarding-username', 'onboarding-scroll');
+    await element(by.id('onboarding-username')).replaceText(USERNAME);
+    // The last Continue saves the profile. If the first tap does not take
+    // (keyboard, focus), tap again while still on step 7, and log what the
+    // screen says so a failure explains itself.
+    let reachedAvatar = false;
+    for (let attempt = 0; attempt < 3 && !reachedAvatar; attempt += 1) {
+      await tapInScroll('onboarding-continue', 'onboarding-scroll');
+      try {
+        await waitFor(element(by.id('ai-avatar-design-by-hand'))).toExist().withTimeout(15000);
+        reachedAvatar = true;
+      } catch {
+        await logTop(`onboarding Continue attempt ${attempt + 1}`);
+      }
+    }
+
+    // Next stop is the avatar. Skip the photo/AI path and build it by hand.
+    await waitFor(element(by.id('ai-avatar-design-by-hand'))).toExist().withTimeout(LONG);
+
+    const client = await signInAs(EMAIL, PASSWORD);
+    const profile = await readProfile(client);
+    jestExpect(profile.onboarding_completed).toBe(true);
+    jestExpect(profile.username).toBe(USERNAME);
+  });
+
+  it('3. creates a custom avatar and saves it', async () => {
+    // The button sits below the fold on the small CI screen.
+    await logTop('before design-by-hand');
+    await tapInScroll('ai-avatar-design-by-hand', 'ai-avatar-scroll');
+    await waitFor(element(by.id('avatar-randomize'))).toBeVisible().withTimeout(LONG);
+
+    await logTop('avatar editor open');
+    // Customize: a few rolls of the dice so the look differs from the default.
+    for (let i = 0; i < 3; i += 1) {
+      await element(by.id('avatar-randomize')).tap();
+      await logTop(`after roll ${i + 1}`);
+    }
+    // Saving at the end of onboarding opens the app on Today. If the first
+    // tap does not take, tap again while the editor is still up, and log
+    // what the screen says (the end of the label holds any error toast).
+    let onToday = false;
+    for (let attempt = 0; attempt < 3 && !onToday; attempt += 1) {
+      await element(by.id('avatar-save')).tap();
+      try {
+        await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(12000);
+        onToday = true;
+      } catch {
+        await logTop(`after save tap ${attempt + 1}`);
+      }
+    }
+    if (!onToday) {
+      // Did the save reach the database? Tells a stuck request from a stuck screen.
+      try {
+        const c = await signInAs(EMAIL, PASSWORD);
+        const p = await readProfile(c);
+        console.warn(
+          `[db after save] onboarding_completed=${String(p.onboarding_completed)} avatar_config_keys=${Object.keys(p.avatar_config ?? {}).length}`,
+        );
+      } catch (err) {
+        console.warn(`[db after save] unreadable: ${(err as Error).message.split('\n')[0]}`);
+      }
+      if (device.getPlatform() === 'android') logJsConsole('after avatar save');
+      await logScreen('Avatar saved but Today did not show');
+      await waitFor(element(by.id('today-scroll'))).toBeVisible().withTimeout(1000);
+    }
+
+    const client = await signInAs(EMAIL, PASSWORD);
+    const profile = await readProfile(client);
+    jestExpect(profile.avatar_config).not.toBeNull();
+    jestExpect(Object.keys(profile.avatar_config ?? {}).length).toBeGreaterThan(0);
+  });
+
+  it('4. completes a quest on the Today screen', async () => {
+    // Note the XP before, from the progress strip under the quests.
+    await waitFor(element(by.id('today-total-xp')))
+      .toBeVisible()
+      .whileElement(by.id('today-scroll'))
+      .scroll(250, 'down', 0.5, 0.5);
+    xpBefore = parseXp(await textOf('today-total-xp'));
+
+    await element(by.id('today-scroll')).scrollTo('top');
+    await waitFor(element(by.id('quest-complete')).atIndex(0)).toExist().withTimeout(LONG);
+    await tapInScroll('quest-complete', 'today-scroll');
+  });
+
+  it('5. shows more XP than before', async () => {
+    try {
+      await checkXpWentUp();
+    } catch (e) {
+      // Works even when the app never idles (every Detox call then waits).
+      try {
+        console.warn(`[xp] database=${await readTotalXp(await signInAs(EMAIL, PASSWORD))}`);
+      } catch {
+        console.warn('[xp] database unreadable');
+      }
+      if (device.getPlatform() === 'android') {
+        logDeviceLoad('step 5 failed');
+        logJsConsole('step 5 failed');
+      }
+      throw e;
+    }
+  });
+});
+
+async function checkXpWentUp(): Promise<void> {
+  await waitFor(element(by.id('today-total-xp')))
+    .toBeVisible()
+    .whileElement(by.id('today-scroll'))
+    .scroll(250, 'down', 0.5, 0.5);
+  // The XP refreshes once the server confirms the completion.
+  let xpAfter = xpBefore;
+  const deadline = Date.now() + LONG;
+  while (xpAfter <= xpBefore && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    xpAfter = parseXp(await textOf('today-total-xp'));
+  }
+  if (xpAfter <= xpBefore) {
+    // Tells "the server never got the completion" (tap missed, queued,
+    // refused: the toast text is at the end of the label) from "the
+    // server has it but the screen did not catch up".
+    try {
+      const c = await signInAs(EMAIL, PASSWORD);
+      console.warn(`[xp] screen=${xpAfter} database=${await readTotalXp(c)}`);
+    } catch (err) {
+      console.warn(`[xp] database unreadable: ${(err as Error).message.split('\n')[0]}`);
+    }
+    await logTop('XP did not go up');
+  }
+  jestExpect(xpAfter).toBeGreaterThan(xpBefore);
+
+  // The server (complete_quest RPC) is the only writer of XP; check it too.
+  const client = await signInAs(EMAIL, PASSWORD);
+  jestExpect(await readTotalXp(client)).toBe(xpAfter);
+  await expect(element(by.id('today-total-xp'))).toBeVisible();
+}

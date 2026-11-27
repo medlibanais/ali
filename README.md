@@ -6,20 +6,46 @@ life pillars (Health, Family, Work, Fun, Spirituality); an AI-generated
 
 ```
 PrayerLock/
-├── mobile/            Expo React Native + TypeScript (iOS, Android, Web)
-│   ├── src/avatar/    Layered-SVG avatar system (original art, JSON config)
-│   ├── src/features/  React Query data layers (friends, analytics)
-│   ├── src/screens/   20 screens
-│   └── src/store/     Redux Toolkit (auth/theme/session state)
+├── mobile/            Expo SDK 51 React Native + TypeScript (Android + web)
+│   ├── src/avatar/    Realistic 3D avatar (MakeHuman-based, three.js in a
+│   │                  hidden WebView) + its JSON config and editor catalogs
+│   ├── avatar3d/      Source of the WebView viewer (built to assets/avatar3d)
+│   ├── src/features/  React Query data layers (friends, analytics, offline,
+│   │                  quest search, celebrations, notifications, share)
+│   ├── src/screens/   23 screens
+│   └── src/store/     Redux Toolkit slices + XState offline-sync machine
 ├── supabase/
-│   ├── migrations/    10 versioned SQL migrations (schema, RLS, RPCs, cron)
-│   ├── functions/     Edge Functions (coach, coach-nudges, generate-quests,
-│   │                  notify-friend, weekly-insights, delete-account)
+│   ├── migrations/    Versioned SQL migrations (schema, RLS, RPCs, cron)
+│   ├── functions/     13 Deno Edge Functions (coach, generate-quests,
+│   │                  weekly-insights, generate-insights, predict-streak,
+│   │                  smart-notify, coach-nudges, notify-friend,
+│   │                  generate-avatar, generate-avatar-config,
+│   │                  search-quests, generate-embeddings, delete-account)
 │   └── seed.sql       100 predefined quests + 15-badge catalog
 ├── tests/e2e.ps1      16-assertion end-to-end suite (3 flows + RLS proofs)
-├── preview.html       Static avatar art preview (open in a browser)
+├── docs/              CI/CD, anti-cheat and security-hardening notes
+├── preview.html       LEGACY: preview of the old 2D SVG avatar (not used)
+├── docker-compose.yml LEGACY: old FastAPI/Ollama stack (does not run)
 └── SECURITY.md        npm audit posture + app security model
 ```
+
+## Architecture today (and how it differs from the SRS)
+
+The SRS (v1.0, Aug 2026) planned React Native + a Python/FastAPI REST API on
+AWS, Redis, a local Ollama/LLaMA 2 coach and Google Imagen for the avatar.
+**None of that exists in this repo.** What runs instead:
+
+- **No REST API.** The app talks to Supabase directly (tables and RPCs, all
+  behind RLS) and to Supabase Edge Functions. The OpenAPI file in the SRS
+  package describes endpoints that were never built.
+- **Business rules in Postgres.** XP, streaks, badges, skips, undo and rate
+  limits are SQL functions in `supabase/migrations`.
+- **AI through Edge Functions only.** Groq (`openai/gpt-oss-120b`, fallback
+  `llama-3.3-70b-versatile`) for the coach, quests and insights; fal.ai for
+  images. Keys live only in Supabase function secrets.
+- **Avatar.** A realistic 3D human rendered on device, plus optional photo
+  modes (real photo, AI photo from a selfie, photoreal render). The earlier
+  2D SVG, toon, anime and VRM avatars were removed.
 
 ## Stack
 
@@ -54,7 +80,8 @@ npx expo start            # or: npx expo start --web
 
 Local services: API `http://127.0.0.1:54321`, Studio `http://127.0.0.1:54323`,
 email testing (Mailpit) `http://127.0.0.1:54324`.
-Android emulator reaches them automatically (client rewrites to `10.0.2.2`).
+On the Android emulator use `http://10.0.2.2:54321` as the URL in
+`mobile/.env` (a phone needs your laptop's LAN IP).
 
 ## Verify everything
 
@@ -83,13 +110,15 @@ powershell -File tests\e2e.ps1
   app, sessions in expo-secure-store.
 - **Onboarding:** 5-pillar questionnaire, unique username, auto-detected
   timezone, ends in the avatar creator.
-- **Avatar:** original layered-SVG system (8 faces, 12 skins, 20 hairstyles
-  incl. hijab/cap, 20 colors, 10 eyes, 8 brows/mouths, 6 outfits,
-  accessories, backgrounds), mood reacts to Daily Life Score, idle
-  breathing/blink, level-locked items, randomize + undo/redo.
-  Optional real photo (crop/compress/upload to Storage) with mode toggle.
-  AI "Future Self" avatar from a selfie (`generate-avatar` Edge Function,
-  fal.ai Flux Kontext, 5/day); the SVG avatar is the fallback.
+- **Avatar:** realistic 3D human (MakeHuman-based, male/female) shaped by
+  sliders, with hairstyles, outfits, colors and poses; it breathes and
+  blinks at a pace set by the Daily Life Score. Rendered by three.js in a
+  hidden WebView and cached as images (`mobile/src/avatar/Avatar3D.tsx`).
+  Optional picture modes: real photo (crop/compress/upload to Storage),
+  AI "Future Self" photo from a selfie (`generate-avatar`, fal.ai, 5/day),
+  photoreal render of the 3D look, and "Make it look like me" (selfie read
+  by AI into editor settings, `generate-avatar-config`). The 3D avatar is
+  the fallback for all of them.
 - **Quests:** 15/day (10 predefined + 5 AI "Coach picks" personalized by
   goals/hobbies/religion), no consecutive-day repeats, 3 skips/day (a
   skipped quest returns the next day), 10-second undo (server allows 15 s
@@ -102,7 +131,7 @@ powershell -File tests\e2e.ps1
   out-of-scope (medical/legal/financial) are deterministic safety paths;
   everything else gets your real goals/scores/streak/missed quests
   injected, plus the last 20 messages. 20 msgs/day server-side, 500-char
-  input, 200-char replies, thumbs feedback, regenerate, quick replies.
+  input, 420-char replies (SRS said 200), thumbs feedback, regenerate, quick replies.
 - **Notifications:** in-app notification center (bell on Today, 3 s
   banner, mark read, clear all) + push. Hourly coach nudges: missed quest
   at 6 PM, streak at risk, neglected pillar (<30% over 3 days), repeated
@@ -111,13 +140,15 @@ powershell -File tests\e2e.ps1
 - **Friends:** username search, requests with realtime inbox, accept/decline,
   unfriend/block, invite links with auto-connect, weekly XP leaderboard,
   privacy toggle, push via Expo (quiet hours + opt-outs enforced).
-- **Insights:** 12 charts (radar overlays, trend lines, XP bars w/ cap,
-  stacked pillars, donut, 12-week heatmap, weekday performance, hour
-  histogram, streak timeline, funnel, level journey) + weekly AI pattern
-  insights and report (Sunday cron): best/worst pillar, change vs the
-  previous week, streak, next-week score forecast and focus pillars.
+- **Insights:** week/month view with a plain-language headline and
+  takeaways, streak-probability gauge (`predict-streak`), pillar bars,
+  score trend line, time-of-day histogram, year XP heatmap, and 2 AI
+  pattern insights (`generate-insights`, cached 24 h). The weekly report
+  (Sunday cron, `weekly-insights`) stores best/worst pillar, change vs the
+  previous week, streak, next-week forecast and focus pillars. The SRS
+  radar chart was dropped when Insights was simplified.
 - **Gamification:** level curve `500·N` per level (one shared TS+SQL formula,
-  23 unit tests), 5 level titles + 5 pillar titles (Fitness Warrior, Family
+  unit tested in levels.test.ts), 5 level titles + 5 pillar titles (Fitness Warrior, Family
   First, Deep Worker, Adventurer, Prayer Master) with unlock dates and
   progress, all 15 badges evaluated server-side (AI quests are classified
   by title for prayer/workout/parents/deep-work badges), streak freeze
@@ -158,6 +189,27 @@ something is missing:
 | "The AI image service refused our key" | the fal key is wrong or out of credit |
 | "The AI could not be reached, so that reply came from your saved plan" | Groq was down or slow; the key is set |
 
+### "Make it look like me" (selfie to avatar)
+
+The editor's face button takes a selfie, uploads it to the private `selfies`
+bucket and queues a row in `avatar_generation_jobs` (migration 0030). The
+insert calls `generate-avatar-config` through a database webhook made in SQL.
+It reads the selfie with Groq's vision model (`GROQ_API_KEY`, the coach's
+key), then fal.ai (`FAL_KEY`) if Groq fails, and falls back to a random look.
+
+```bash
+npx supabase db push
+npx supabase functions deploy generate-avatar-config
+# webhook target and secret (once, in the SQL editor of the dashboard):
+#   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+#   select vault.create_secret('<long random string>', 'avatar_webhook_secret');
+npx supabase secrets set AVATAR_WEBHOOK_SECRET=<the same long random string>
+```
+
+Without the two Vault secrets the app still works: it calls the function
+itself for its own job after 6 seconds. Optional: `AVATAR_VISION_MODEL`
+(Groq model id), `AVATAR_FAL_VISION_ENDPOINT` / `AVATAR_FAL_VISION_MODEL`.
+
 ### What the coach remembers
 
 Each coach request carries today's quests, yesterday's quests per pillar
@@ -172,8 +224,41 @@ tier. When a prompt is trimmed, the function logs `coach prompt trimmed`.
 Locally, put the same names in `supabase/.env.local`. `GROQ_BASE_URL` and
 `FAL_BASE_URL` can point the functions at a mock server for offline tests.
 
+### Scheduled jobs
+
+For scheduled jobs, configure `project_url` and a randomly generated
+`cron_secret` in Supabase Vault. Set the matching `CRON_SECRET` in Edge
+Function secrets. Use the local gateway URL and a separate secret for
+development. Configure the Vault values before deploying the hardened
+functions. Apply migration 0044 before deploying `search-quests`.
+
+## Languages (English, French, Arabic)
+
+The app follows the phone's language on first launch, and Profile →
+Preferences → Language switches it instantly. The pick is saved on the
+device and in `profiles.language` (migration `0040_profile_language.sql`,
+run `npx supabase db push`), so it follows the account to a new phone.
+
+- Strings live in `mobile/src/i18n/locales/{en,fr,ar}.json`. `en.json` is
+  the source of truth: `tsc` fails on a key that is not in it, and
+  `src/i18n/__tests__/locales.test.ts` fails when French or Arabic misses a
+  key or uses a variable English does not pass.
+- Arabic is right to left. Layout flips at once (the root view sets
+  `direction: 'rtl'`); Android's own RTL flag (`I18nManager.forceRTL`)
+  takes effect after the app is closed and reopened, which mostly affects
+  system parts such as the keyboard and back gesture. Arabic text uses the
+  Cairo font, because Anton, Inter and JetBrains Mono have no Arabic letters.
+- Use `marginStart`/`marginEnd` (not Left/Right) in new styles so they flip.
+- Text written by the server stays in English for now: coach replies,
+  generated and predefined quests, push notifications, weekly insights and
+  badge names.
+
 ## Security
 
 RLS on every table (privacy matrix proven in `tests/e2e.ps1`), no secrets in
 the client bundle, server-side rate limiting (auth, coach 20/day, quest
 limits), no PII in logs. See `SECURITY.md` for the dependency audit posture.
+
+## CI/CD
+
+GitHub Actions runs typecheck, unit tests, the API E2E script and Detox on every push to `main`, and deploys the web app to Netlify when all of it passes. Setup and secrets: [docs/ci-cd.md](docs/ci-cd.md).

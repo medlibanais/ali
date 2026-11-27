@@ -1,5 +1,21 @@
-import React, { memo } from 'react';
+// Motion (frequent action, so it stays small and under 300 ms):
+// - the empty checkbox squashes under the finger (anticipation) and the
+//   drawn tick pops in slightly too big, then settles (squash and stretch);
+// - a beat later the XP pill bumps (secondary action, follow-through);
+// - the sparks start from the finger (origin awareness, XpParticles).
+import React, { memo, useEffect, useRef } from 'react';
+import i18n from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import type { Quest } from '../api/types';
 import {
   blockTiles,
@@ -13,7 +29,11 @@ import {
   withAlpha,
 } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
-import { CheckGlyph, SparklesGlyph, StarGlyph } from './icons';
+import { rememberCompletionOrigin } from '../features/celebrations/anchors';
+import { playHaptic } from '../lib/haptics';
+import { DURATION, SPRING } from '../lib/motion';
+import DrawnCheck from './DrawnCheck';
+import { SparklesGlyph, StarGlyph } from './icons';
 import { PressableScale } from './Motion';
 import Txt from './Txt';
 
@@ -25,10 +45,27 @@ export interface QuestRowProps {
   showPillarLabel?: boolean;
 }
 
-const DIFFICULTY_LABELS: Record<Quest['difficulty'], string> = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
+/** Pops its child in a little too big, then settles. Plays once on mount. */
+function PopIn({ play, children }: { play: boolean; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(play && !reduceMotion ? 0.6 : 1);
+  useEffect(() => {
+    if (scale.value !== 1) scale.value = withSpring(1, SPRING.pop);
+  }, [scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+export const DIFFICULTY_LABELS: Readonly<Record<Quest['difficulty'], string>> = {
+  get easy() {
+    return i18n.t('difficulty.easy');
+  },
+  get medium() {
+    return i18n.t('difficulty.medium');
+  },
+  get hard() {
+    return i18n.t('difficulty.hard');
+  },
 };
 
 export function QuestRow({
@@ -38,9 +75,30 @@ export function QuestRow({
   showPillarLabel = false,
 }: QuestRowProps) {
   useTheme();
+  const { t } = useTranslation();
   const pillarColor = colors.pillar[quest.pillar];
   const pastel = pillarPastels(quest.pillar);
   const dimmed = quest.skipped === true;
+  // Done while this row is on screen: the tick draws itself.
+  const wasDone = useRef(quest.completed);
+  const justDone = quest.completed && !wasDone.current;
+  useEffect(() => {
+    wasDone.current = quest.completed;
+  }, [quest.completed]);
+  const reduceMotion = useReducedMotion();
+  const press = useSharedValue(1);
+  const xpBump = useSharedValue(1);
+  useEffect(() => {
+    if (!justDone || reduceMotion) return;
+    xpBump.value = withDelay(
+      DURATION.instant,
+      withSequence(withTiming(1.16, { duration: 110 }), withSpring(1, SPRING.settle)),
+    );
+    // Only a fresh completion bumps; justDone is derived from props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justDone]);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+  const xpStyle = useAnimatedStyle(() => ({ transform: [{ scale: xpBump.value }] }));
   // Block tiles: the whole row takes the pillar color with black text.
   const block = blockTiles();
   const tileInk = colors.onAccent;
@@ -57,12 +115,29 @@ export function QuestRow({
       style={[styles.row, blockRow, dimmed && styles.dimmed]}
     >
       {onComplete && !quest.completed && !dimmed ? (
+        <Animated.View style={pressStyle}>
         <Pressable
+          testID="quest-complete"
           accessibilityRole="checkbox"
           accessibilityState={{ checked: false }}
-          accessibilityLabel={`Complete ${quest.title}`}
-          onPress={() => onComplete(quest)}
+          accessibilityLabel={t('questRow.complete', { title: quest.title })}
+          onPress={(e) => {
+            playHaptic('questComplete');
+            // XP particles start where the finger was.
+            const { pageX, pageY } = e.nativeEvent;
+            if (Number.isFinite(pageX) && Number.isFinite(pageY)) {
+              rememberCompletionOrigin(quest.quest_id, { x: pageX, y: pageY });
+            }
+            onComplete(quest);
+          }}
           hitSlop={11}
+          onPressIn={() => {
+            if (!reduceMotion) press.value = withSpring(0.8, SPRING.press);
+          }}
+          onPressOut={() => {
+            // Springs from wherever it is: a cancelled press just lets go.
+            press.value = withSpring(1, SPRING.pop);
+          }}
           style={({ pressed }) => [
             styles.check,
             block
@@ -71,17 +146,26 @@ export function QuestRow({
             pressed && { backgroundColor: block ? withAlpha(tileInk, 0.15) : pastel.tint },
           ]}
         />
+        </Animated.View>
+      ) : quest.completed ? (
+        <PopIn play={justDone}>
+        <DrawnCheck
+          animate={justDone}
+          color={block ? pillarColor : colors.onAccent}
+          style={[
+            styles.check,
+            styles.checkDone,
+            block && { backgroundColor: tileInk, borderColor: tileInk },
+          ]}
+        />
+        </PopIn>
       ) : (
         <View
           style={[
             styles.check,
             block && { borderColor: tileInk, backgroundColor: 'transparent' },
-            quest.completed && styles.checkDone,
-            quest.completed && block && { backgroundColor: tileInk, borderColor: tileInk },
           ]}
-        >
-          {quest.completed ? <CheckGlyph size={14} /> : null}
-        </View>
+        />
       )}
       <View style={styles.body}>
         <Txt
@@ -101,7 +185,7 @@ export function QuestRow({
             {showPillarLabel
               ? `${PILLAR_LABELS[quest.pillar]} · ${DIFFICULTY_LABELS[quest.difficulty]}`
               : DIFFICULTY_LABELS[quest.difficulty]}
-            {quest.time_estimate_minutes ? ` · ${quest.time_estimate_minutes} min` : ''}
+            {quest.time_estimate_minutes ? ` · ${t('questRow.minutes', { count: quest.time_estimate_minutes })}` : ''}
           </Txt>
           {quest.is_ai_generated ? (
             <View style={[styles.coachTag, block && { backgroundColor: withAlpha(tileInk, 0.12) }]}>
@@ -111,23 +195,23 @@ export function QuestRow({
                 color={block ? tileInk : colors.accent}
                 style={styles.coachText}
               >
-                Coach pick
+                {t('questRow.coachPick')}
               </Txt>
             </View>
           ) : null}
           {dimmed ? (
             <Txt variant="caption" color={block ? tileInk : colors.inkFaint} style={styles.metaText}>
-              {' · Skipped'}
+              {` · ${t('questRow.skipped')}`}
             </Txt>
           ) : null}
         </View>
       </View>
-      <View style={[styles.xpPill, block && { backgroundColor: tileInk }]}>
+      <Animated.View style={[styles.xpPill, block && { backgroundColor: tileInk }, xpStyle]}>
         <StarGlyph size={13} />
         <Txt variant="bodySemi" color={block ? colors.ink : colors.ink} style={styles.xp}>
-          {`+${quest.xp_reward} XP`}
+          {t('common.xpPlus', { count: quest.xp_reward })}
         </Txt>
-      </View>
+      </Animated.View>
     </PressableScale>
   );
 }
@@ -154,7 +238,7 @@ const styles = themed(() =>
       borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.md,
+      marginEnd: spacing.md,
       backgroundColor: colors.card,
     },
     checkDone: {
@@ -177,7 +261,7 @@ const styles = themed(() =>
     coachTag: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.sm,
+      marginStart: spacing.sm,
       paddingHorizontal: spacing.sm - 1,
       paddingVertical: 1,
       borderRadius: radius.pill,
@@ -186,19 +270,19 @@ const styles = themed(() =>
     coachText: {
       fontSize: 12,
       lineHeight: 16,
-      marginLeft: 4,
+      marginStart: 4,
     },
     xpPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: spacing.md,
+      marginStart: spacing.md,
       paddingHorizontal: spacing.sm + 2,
       paddingVertical: 5,
       borderRadius: radius.pill,
       backgroundColor: colors.paper,
     },
     xp: {
-      marginLeft: 4,
+      marginStart: 4,
       fontSize: 13,
       lineHeight: 17,
     },

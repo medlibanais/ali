@@ -1,12 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { StyleSheet, View } from 'react-native';
+import { markFirstScreenPainted } from '../lib/bootSplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
+import { useLanguageSync } from '../i18n/useLanguageSync';
 import { supabase } from '../lib/supabase';
+import { createQueryClient } from '../lib/queryClient';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { restoreSession, sessionExpired } from '../store/slices/authSlice';
+import { logout, restoreSession, sessionExpired } from '../store/slices/authSlice';
 import { colors, themed } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 
-import SplashScreen from '../screens/SplashScreen';
+import SplashScreen, { ProfileUnavailableScreen } from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -23,9 +29,13 @@ import QuestDetailScreen from '../screens/QuestDetailScreen';
 import TimezonePickerScreen from '../screens/TimezonePickerScreen';
 import EditPhotoScreen from '../screens/EditPhotoScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import PartyQuestsScreen from '../screens/PartyQuestsScreen';
+import PartyQuestScreen from '../screens/PartyQuestScreen';
+import PartyInviteScreen from '../screens/PartyInviteScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
 import AppLockGate from '../features/appLock/AppLockGate';
+import { useRedeemPendingInvite } from '../features/friends/useInviteLinks';
 import MainTabs from './MainTabs';
 import type {
   AppStackParamList,
@@ -51,34 +61,42 @@ const titledOptions = themed(() => ({
   headerBackTitleVisible: false,
 }));
 
+// Pushed screens slide in from the right like game menus (the Android
+// default is a plain fade). Runs natively in react-native-screens.
+const appStackOptions = themed(() => ({
+  ...titledOptions,
+  animation: 'slide_from_right' as const,
+}));
+
 function AuthNavigator() {
   useTheme();
+  const { t } = useTranslation();
   return (
     <AuthStack.Navigator screenOptions={hiddenOptions}>
       <AuthStack.Screen
         name="Login"
         component={LoginScreen}
-        options={{ title: 'PrayerLock' }}
+        options={{ title: t('common.appName') }}
       />
       <AuthStack.Screen
         name="Register"
         component={RegisterScreen}
-        options={{ title: 'Create account' }}
+        options={{ title: t('nav.createAccount') }}
       />
       <AuthStack.Screen
         name="ForgotPassword"
         component={ForgotPasswordScreen}
-        options={{ title: 'Reset password' }}
+        options={{ title: t('nav.resetPassword') }}
       />
       <AuthStack.Screen
         name="ResetPassword"
         component={ResetPasswordScreen}
-        options={{ title: 'New password' }}
+        options={{ title: t('nav.newPassword') }}
       />
       <AuthStack.Screen
         name="VerifyEmail"
         component={VerifyEmailScreen}
-        options={{ title: 'Verify email' }}
+        options={{ title: t('nav.verifyEmail') }}
       />
     </AuthStack.Navigator>
   );
@@ -86,22 +104,23 @@ function AuthNavigator() {
 
 function OnboardingNavigator() {
   useTheme();
+  const { t } = useTranslation();
   return (
     <OnboardingStack.Navigator screenOptions={hiddenOptions}>
       <OnboardingStack.Screen
         name="Onboarding"
         component={OnboardingScreen}
-        options={{ title: 'About you' }}
+        options={{ title: t('nav.aboutYou') }}
       />
       <OnboardingStack.Screen
         name="AiAvatar"
         component={AiAvatarScreen}
-        options={{ ...titledOptions, headerShown: true, title: 'Your future self' }}
+        options={{ ...titledOptions, headerShown: true, title: t('nav.futureSelf') }}
       />
       <OnboardingStack.Screen
         name="AvatarCreator"
         component={AvatarCreatorScreen}
-        options={{ title: 'Your future self', headerShown: false }}
+        options={{ title: t('nav.futureSelf'), headerShown: false }}
       />
     </OnboardingStack.Navigator>
   );
@@ -110,75 +129,103 @@ function OnboardingNavigator() {
 function AppNavigator() {
   useTheme();
   useNotificationBanner();
+  useLanguageSync();
+  useRedeemPendingInvite();
+  const { t } = useTranslation();
   return (
-    <AppStack.Navigator screenOptions={titledOptions}>
+    <AppStack.Navigator screenOptions={appStackOptions}>
       <AppStack.Screen
         name="MainTabs"
         component={MainTabs}
-        options={{ headerShown: false, title: 'PrayerLock' }}
+        options={{ headerShown: false, title: t('common.appName') }}
       />
       <AppStack.Screen
         name="Achievements"
         component={AchievementsScreen}
-        options={{ title: 'Achievements' }}
+        options={{ title: t('nav.achievements') }}
       />
       <AppStack.Screen
         name="Notifications"
         component={NotificationsScreen}
-        options={{ title: 'Notifications' }}
+        options={{ title: t('nav.notifications') }}
       />
       <AppStack.Screen
         name="NotificationSettings"
         component={NotificationSettingsScreen}
-        options={{ title: 'Notification settings' }}
+        options={{ title: t('nav.notificationSettings') }}
       />
       <AppStack.Screen
         name="TermsOfService"
         component={TermsOfServiceScreen}
-        options={{ title: 'Terms of Service' }}
+        options={{ title: t('nav.terms') }}
       />
       <AppStack.Screen
         name="PrivacyPolicy"
         component={PrivacyPolicyScreen}
-        options={{ title: 'Privacy Policy' }}
+        options={{ title: t('nav.privacy') }}
       />
       <AppStack.Screen
         name="QuestDetail"
         component={QuestDetailScreen}
-        options={{ presentation: 'modal', title: 'Quest' }}
+        options={{ presentation: 'modal', title: t('nav.quest') }}
       />
       <AppStack.Screen
         name="TimezonePicker"
         component={TimezonePickerScreen}
-        options={{ title: 'Timezone' }}
+        options={{ title: t('nav.timezone') }}
       />
       <AppStack.Screen
         name="AvatarCreator"
         component={AvatarCreatorScreen}
-        options={{ title: 'Your avatar', headerShown: false }}
+        options={{ title: t('nav.yourAvatar'), headerShown: false }}
       />
       <AppStack.Screen
         name="AiAvatar"
         component={AiAvatarScreen}
-        options={{ title: 'AI avatar' }}
+        options={{ title: t('nav.aiAvatar') }}
       />
       <AppStack.Screen
         name="EditPhoto"
         component={EditPhotoScreen}
-        options={{ title: 'Profile photo' }}
+        options={{ title: t('nav.profilePhoto') }}
       />
       <AppStack.Screen
         name="Friends"
         component={FriendsScreen}
-        options={{ title: 'Friends' }}
+        options={{ title: t('nav.friends') }}
+      />
+      <AppStack.Screen
+        name="PartyQuests"
+        component={PartyQuestsScreen}
+        options={{ title: 'Party quests' }}
+      />
+      <AppStack.Screen
+        name="PartyQuest"
+        component={PartyQuestScreen}
+        options={{ title: 'Party' }}
+      />
+      <AppStack.Screen
+        name="PartyInvite"
+        component={PartyInviteScreen}
+        options={{ title: 'Party invite' }}
       />
     </AppStack.Navigator>
+  );
+}
+
+function AccountNavigator() {
+  const [queryClient] = useState(createQueryClient);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppNavigator />
+    </QueryClientProvider>
   );
 }
 
 export function RootNavigator() {
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
+  const userId = useAppSelector((state) => state.auth.userId);
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -202,16 +249,42 @@ export function RootNavigator() {
     case 'restoring':
       return <SplashScreen />;
     case 'unauthenticated':
-      return <AuthNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <AuthNavigator />
+        </View>
+      );
+    case 'profileUnavailable':
+      return (
+        <View style={styles.fill} onLayout={onAuthPainted}>
+          <ProfileUnavailableScreen
+            onRetry={() => dispatch(restoreSession())}
+            onSignOut={() => dispatch(logout())}
+          />
+        </View>
+      );
     case 'needsOnboarding':
-      return <OnboardingNavigator />;
+      return (
+        <View style={styles.fill} onLayout={onOnboardingPainted}>
+          <OnboardingNavigator />
+        </View>
+      );
     case 'ready':
       return (
-        <AppLockGate>
-          <AppNavigator />
+        <AppLockGate key={userId}>
+          <AccountNavigator />
         </AppLockGate>
       );
   }
 }
 
 export default RootNavigator;
+
+// Signed-out and onboarding launches hide the native splash once their
+// first screen is laid out; signed-in launches wait for Today instead.
+const onAuthPainted = () => markFirstScreenPainted('auth');
+const onOnboardingPainted = () => markFirstScreenPainted('onboarding');
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

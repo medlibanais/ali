@@ -1,4 +1,6 @@
 import React from 'react';
+import i18n, { appLocale } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -20,11 +22,11 @@ import { useTheme } from '../theme/useTheme';
 function timeAgo(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return i18n.t('notifications.justNow');
+  if (minutes < 60) return i18n.t('notifications.mAgo', { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(iso).toLocaleDateString(undefined, {
+  if (hours < 24) return i18n.t('notifications.hAgo', { hours });
+  return new Date(iso).toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',
   });
@@ -72,6 +74,7 @@ function Row({
 }
 
 export function NotificationsScreen() {
+  const { t } = useTranslation();
   useTheme();
   const { data, isLoading } = useNotifications();
   const markRead = useMarkRead();
@@ -81,7 +84,7 @@ export function NotificationsScreen() {
   return (
     <Screen scroll>
       <Txt variant="title" style={styles.title}>
-        Notifications
+        {t('notifications.notifications')}
       </Txt>
 
       {isLoading ? (
@@ -92,8 +95,8 @@ export function NotificationsScreen() {
         </View>
       ) : items.length === 0 ? (
         <EmptyState
-          title="All quiet"
-          body="Nudges from your Future Self, badges and friend news show up here."
+          title={t('notifications.allQuiet')}
+          body={t('notifications.nudgesFromYourFuture')}
         />
       ) : (
         <>
@@ -111,7 +114,7 @@ export function NotificationsScreen() {
             ))}
           </Card>
           <Button
-            title="Clear all"
+            title={t('notifications.clearAll')}
             variant="ghost"
             loading={clearAll.isPending}
             onPress={() => clearAll.mutate()}
@@ -150,7 +153,7 @@ const styles = themed(() =>
   },
   rowBody: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginStart: spacing.md,
   },
   rowHeader: {
     flexDirection: 'row',
@@ -159,7 +162,7 @@ const styles = themed(() =>
   },
   rowTitle: {
     flex: 1,
-    marginRight: spacing.sm,
+    marginEnd: spacing.sm,
   },
   rowDetail: {
     marginTop: spacing.xs,

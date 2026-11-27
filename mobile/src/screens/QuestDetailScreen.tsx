@@ -1,4 +1,6 @@
 import React from 'react';
+import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -8,6 +10,7 @@ import Screen from '../components/Screen';
 import Txt from '../components/Txt';
 import { useToast } from '../components/Toast';
 import { CheckGlyph, PillarGlyph } from '../components/icons';
+import { playHaptic } from '../lib/haptics';
 import type { AppStackParamList } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -28,9 +31,15 @@ import { useTheme } from '../theme/useTheme';
 type Props = NativeStackScreenProps<AppStackParamList, 'QuestDetail'>;
 
 const DIFFICULTY_LABELS: Record<string, string> = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
+  get easy() {
+    return i18n.t('questDetail.easy');
+  },
+  get medium() {
+    return i18n.t('questDetail.medium');
+  },
+  get hard() {
+    return i18n.t('questDetail.hard');
+  },
 };
 
 function MetaRow({ label, value }: { label: string; value: string }) {
@@ -45,6 +54,7 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 }
 
 export function QuestDetailScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   useTheme();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -61,23 +71,28 @@ export function QuestDetailScreen({ navigation, route }: Props) {
   const busy = completingId === quest.quest_id;
 
   const markComplete = async () => {
+    playHaptic('questComplete');
     const result = await dispatch(completeQuest(quest));
     if (completeQuest.fulfilled.match(result)) {
       const xp = result.payload.xp_awarded;
       const questId = result.payload.quest_id;
       toast.showToast({
-        message: `+${xp} XP. ${quest.title} is done.`,
-        actionLabel: 'Undo',
+        message: result.payload.offline
+          ? t('questDetail.savedOffline', { xp, title: quest.title })
+          : t('questDetail.xpIsDone', { xp, title: quest.title }),
+        actionLabel: t('questDetail.undo'),
         countdownSeconds: 10,
         durationMs: 10000,
         onAction: () => {
+          playHaptic('questUndo');
           dispatch(undoQuest(questId));
         },
       });
       navigation.goBack();
     } else {
+      playHaptic('error');
       toast.showToast({
-        message: result.payload?.message ?? 'Could not complete this quest.',
+        message: result.payload?.message ?? t('questDetail.couldNotCompleteThis'),
       });
     }
   };
@@ -85,21 +100,21 @@ export function QuestDetailScreen({ navigation, route }: Props) {
   const skip = async () => {
     if (skipsLeft <= 0) {
       toast.showToast({
-        message: 'You have used all 3 skips for today.',
+        message: t('questDetail.youHaveUsedAll'),
       });
       return;
     }
     const result = await dispatch(skipQuest(quest.quest_id));
     if (skipQuest.fulfilled.match(result)) {
       toast.showToast({
-        message: `${quest.title} skipped. It returns in a future set.`,
+        message: t('questDetail.skippedItReturnsIn', { title: quest.title }),
       });
       navigation.goBack();
     } else {
       toast.showToast({
         message:
           (result.payload as string | undefined) ??
-          'Could not skip this quest.',
+          t('questDetail.couldNotSkipThis'),
       });
     }
   };
@@ -136,24 +151,24 @@ export function QuestDetailScreen({ navigation, route }: Props) {
 
       <Card padded={false} style={styles.metaCard}>
         <View style={styles.metaCell}>
-          <MetaRow label="Reward" value={`${quest.xp_reward} XP`} />
+          <MetaRow label={t('questDetail.reward')} value={`${quest.xp_reward} XP`} />
         </View>
         <Hairline />
         <View style={styles.metaCell}>
           <MetaRow
-            label="Time"
+            label={t('questDetail.time')}
             value={
               quest.time_estimate_minutes
-                ? `About ${quest.time_estimate_minutes} minutes`
-                : 'Fits in a spare moment'
+                ? t('questDetail.aboutMinutes', { time_estimate_minutes: quest.time_estimate_minutes })
+                : t('questDetail.fitsInASpare')
             }
           />
         </View>
         <Hairline />
         <View style={styles.metaCell}>
           <MetaRow
-            label="Source"
-            value={quest.is_ai_generated ? 'Coach pick' : 'Daily practice'}
+            label={t('questDetail.source')}
+            value={quest.is_ai_generated ? t('questDetail.coachPick') : t('questDetail.dailyPractice')}
           />
         </View>
       </Card>
@@ -161,7 +176,7 @@ export function QuestDetailScreen({ navigation, route }: Props) {
       {quest.why_this_matters ? (
         <View style={styles.whySection}>
           <Txt variant="label" style={styles.whyLabel}>
-            Why it matters
+            {t('questDetail.whyItMatters')}
           </Txt>
           <Txt variant="body" color={colors.inkSoft}>
             {quest.why_this_matters}
@@ -172,19 +187,19 @@ export function QuestDetailScreen({ navigation, route }: Props) {
       <View style={styles.actions}>
         {quest.completed ? (
           <Txt variant="body" color={colors.accent} align="center">
-            Completed. Well done.
+            {t('questDetail.completedWellDone')}
           </Txt>
         ) : (
           <>
             <Button
-              title="Mark complete"
-              winTitle={`Claim +${quest.xp_reward} XP`}
+              title={t('questDetail.markComplete')}
+              winTitle={t('questDetail.claimXp', { xp_reward: quest.xp_reward })}
               icon={CheckGlyph}
               onPress={markComplete}
               loading={busy}
             />
             <Button
-              title="Skip this quest"
+              title={t('questDetail.skipThisQuest')}
               variant="ghost"
               onPress={skip}
               disabled={skipsLeft <= 0}
@@ -197,8 +212,8 @@ export function QuestDetailScreen({ navigation, route }: Props) {
               style={styles.skipNote}
             >
               {skipsLeft > 0
-                ? `You have ${skipsLeft} of ${DAILY_SKIP_LIMIT} skips left today. Skipped quests return tomorrow with no penalty.`
-                : 'No skips left today. Skips reset at midnight.'}
+                ? t('questDetail.youHaveOfSkips', { skipsLeft, DAILY_SKIP_LIMIT })
+                : t('questDetail.noSkipsLeftToday')}
             </Txt>
           </>
         )}
@@ -216,7 +231,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillarLabel: {
-    marginLeft: spacing.sm,
+    marginStart: spacing.sm,
     textTransform: 'uppercase',
   },
   title: {
