@@ -23,6 +23,7 @@ export interface GamificationState {
   achievements: Achievement[];
   currentTitle: string | null;
   loading: boolean;
+  requestId: string | null;
   error: string | null;
   /** Server truth from the last fetch; displayed values add pending XP. */
   serverTotalXp: number;
@@ -44,6 +45,7 @@ const initialState: GamificationState = {
   achievements: [],
   currentTitle: null,
   loading: false,
+  requestId: null,
   error: null,
   serverTotalXp: 0,
   serverXpToday: 0,
@@ -234,12 +236,15 @@ const gamificationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchGamification.pending, (state) => {
+      .addCase(fetchGamification.pending, (state, action) => {
         state.loading = true;
+        state.requestId = action.meta.requestId;
         state.error = null;
       })
       .addCase(fetchGamification.fulfilled, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return;
         state.loading = false;
+        state.requestId = null;
         const d = action.payload;
         state.serverLevel = d.level;
         state.serverTotalXp = d.total_xp;
@@ -250,7 +255,9 @@ const gamificationSlice = createSlice({
         applyDisplay(state);
       })
       .addCase(fetchGamification.rejected, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return;
         state.loading = false;
+        state.requestId = null;
         state.error = action.payload ?? i18n.t('errors.loadProgress');
       });
   },
