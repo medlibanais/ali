@@ -203,6 +203,37 @@ export function renderKey(config: AvatarConfig, mood: Mood, mode: Mode, bare: bo
   return JSON.stringify([mode, commandFor(config, mood, mode, bare, camera)]);
 }
 
+/** Cache a neutral portrait when someone explicitly saves a look in the editor. */
+export function cacheAvatarPortrait(config: AvatarConfig): void {
+  const key = renderKey(config, 'neutral', 'head', false);
+  const ready = images.get(key);
+  if (ready) {
+    void saveCachedRender(key, ready);
+    return;
+  }
+  requestRender({ key, mode: 'head', command: commandFor(config, 'neutral', 'head', false, {}), persist: true });
+}
+
+/** Read-only snapshot for Today. A cache miss never starts the 3D renderer. */
+export function useAvatarPortrait(config: AvatarConfig, mood: Mood, enabled: boolean): string | null {
+  const key = enabled ? renderKey(config, mood, 'head', false) : '';
+  const neutral = enabled && mood !== 'neutral' ? renderKey(config, 'neutral', 'head', false) : key;
+  const version = `${key}:${neutral}`;
+  const [disk, setDisk] = useState<{ version: string; uri: string | null } | null>(null);
+  const readMemory = () => enabled ? images.get(key) || images.get(neutral) : null;
+  const memory = useSyncExternalStore(subscribe, readMemory, () => null);
+  useEffect(() => {
+    if (!enabled || memory) return;
+    let active = true;
+    void (async () => {
+      const uri = await loadCachedRender(key) ?? (key === neutral ? null : await loadCachedRender(neutral));
+      if (active) setDisk({ version, uri });
+    })();
+    return () => { active = false; };
+  }, [enabled, key, memory, neutral, version]);
+  return enabled ? memory || (disk?.version === version ? disk.uri : null) : null;
+}
+
 /**
  * One finished picture of this look, as a data URL, for sending to the
  * photo maker. Rejects if the renderer cannot draw it.

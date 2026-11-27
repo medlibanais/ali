@@ -26,6 +26,7 @@ export const ACCOUNT_SLICES = [
   'gamification',
   'chat',
   'analytics',
+  'planning',
   'celebrations',
 ] as const;
 

@@ -1,4 +1,5 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import planningReducer from '../features/planning/store';
 import { accountScopeMiddleware, withAccountReset } from './accountScope';
 import authReducer from './slices/authSlice';
 import userReducer from './slices/userSlice';
@@ -22,6 +23,7 @@ const rootReducer = combineReducers({
     gamification: gamificationReducer,
     chat: chatReducer,
     analytics: analyticsReducer,
+    planning: planningReducer,
     theme: themeReducer,
     language: languageReducer,
     sync: syncReducer,

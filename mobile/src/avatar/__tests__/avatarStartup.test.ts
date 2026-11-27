@@ -21,7 +21,10 @@ jest.mock('../../../assets/avatar3d/viewer.html', () => 1, { virtual: true });
 jest.mock('../../../assets/avatar3d/models/core.bin', () => 2, { virtual: true });
 
 // eslint-disable-next-line import/first
-import { __avatar3dInternals, requestRender } from '../Avatar3D';
+import React from 'react';
+import { act, create } from 'react-test-renderer';
+import { __avatar3dInternals, renderKey, requestRender, useAvatarPortrait } from '../Avatar3D';
+import { DEFAULT_AVATAR } from '../types';
 const { hashKey } = jest.requireActual<typeof import('../renderCache')>('../renderCache');
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -46,6 +49,27 @@ describe('3D avatar startup', () => {
     expect(__avatar3dInternals.isHostWanted()).toBe(false); // still checking disk
     await flush();
     expect(__avatar3dInternals.isHostWanted()).toBe(true);
+  });
+
+  it('uses the neutral portrait on a mood cache miss without starting the renderer', async () => {
+    const uri = 'file:///cache/avatar3d/portrait.png';
+    let result: string | null;
+    function Probe() {
+      result = useAvatarPortrait(DEFAULT_AVATAR, 'happy', true);
+      return null;
+    }
+
+    let renderer: ReturnType<typeof create>;
+    await act(async () => { renderer = create(React.createElement(Probe)); });
+    expect(result!).toBeNull();
+    expect(__avatar3dInternals.isHostWanted()).toBe(false);
+    act(() => renderer.unmount());
+
+    mockCached.set(renderKey(DEFAULT_AVATAR, 'neutral', 'head', false), uri);
+    await act(async () => { renderer = create(React.createElement(Probe)); });
+    expect(result!).toBe(uri);
+    expect(__avatar3dInternals.isHostWanted()).toBe(false);
+    act(() => renderer.unmount());
   });
 
   it('never looks on disk for editor previews', () => {

@@ -1,3 +1,8 @@
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { MainTabParamList } from '../navigation/types';
+import { CoachTimePlanner } from '../features/planning/CoachTimePlanner';
+import { minutesFromCoachMessage } from '../features/planning/logic';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import TypingDots from '../components/TypingDots';
@@ -299,6 +304,8 @@ const ESTIMATED_BUBBLE = 96;
 
 export function CoachScreen() {
   useTheme();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+  const [planMinutes, setPlanMinutes] = useState<number | null>(null);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -345,10 +352,15 @@ export function CoachScreen() {
 
   const send = async (text?: string, turn?: { turnId: string; retry?: boolean }) => {
     const toSend = (text ?? draft).trim();
-    // A resent turn is already counted, so it may go out at the limit.
-    if (!toSend || chat.sending || (remaining <= 0 && !turn)) {
+    if (!toSend || chat.sending || planMinutes !== null) return;
+    const availableMinutes = turn ? null : minutesFromCoachMessage(toSend);
+    if (availableMinutes !== null) {
+      voice.cancel();
+      setPlanMinutes(availableMinutes);
       return;
     }
+    // A resent turn is already counted, so it may go out at the limit.
+    if (remaining <= 0 && !turn) return;
     // Drop any late dictation so it can't refill the cleared input.
     voice.cancel();
     if (!turn) setDraft('');
@@ -653,18 +665,12 @@ export function CoachScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {remaining > 0 ? (
-          <View style={styles.quickReplies}>
-            {quickReplies.map((reply) => (
-              <Chip
-                key={reply}
-                label={reply}
-                selected={false}
-                onPress={() => send(reply)}
-              />
-            ))}
-          </View>
-        ) : null}
+        <View style={styles.quickReplies}>
+          <Chip label={t('planning.planMyTime')} selected={false} onPress={() => setPlanMinutes(10)} />
+          {remaining > 0 ? quickReplies.map((reply) => (
+            <Chip key={reply} label={reply} selected={false} onPress={() => send(reply)} />
+          )) : null}
+        </View>
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
@@ -730,6 +736,14 @@ export function CoachScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+      {planMinutes !== null ? (
+        <CoachTimePlanner minutes={planMinutes} onChoose={setPlanMinutes}
+          onClose={() => setPlanMinutes(null)} onApplied={() => {
+            setPlanMinutes(null);
+            if (minutesFromCoachMessage(draft) !== null) setDraft('');
+            navigation.navigate('Today', { pillar: undefined });
+          }} />
+      ) : null}
     </Screen>
   );
 }

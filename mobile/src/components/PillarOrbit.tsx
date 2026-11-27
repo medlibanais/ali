@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { Animated, Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Ellipse } from 'react-native-svg';
 import AvatarView from '../avatar/AvatarView';
+import { useAvatarPortrait } from '../avatar/Avatar3D';
+import Avatar from './Avatar';
 import type { AvatarConfig, Mood } from '../avatar/types';
 import { useAppSelector } from '../store/hooks';
 import { useLifeScoreValue } from '../store/useLifeScoreValue';
@@ -58,6 +60,7 @@ export interface PillarOrbitProps {
   avatarConfig: AvatarConfig;
   /** Real or AI photo. When set it replaces the drawn avatar in the center. */
   photoUrl?: string | null;
+  portraitOnly?: boolean;
   name?: string | null;
   level?: number;
   /** The avatar's expression (selectDayMood). */
@@ -104,6 +107,7 @@ const LivePillarBubble = memo(function LivePillarBubble({
 const OrbitAvatar = memo(function OrbitAvatar({
   avatarConfig,
   photoUrl,
+  portraitOnly,
   name,
   level,
   mood,
@@ -111,6 +115,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
 }: {
   avatarConfig: AvatarConfig;
   photoUrl?: string | null;
+  portraitOnly?: boolean;
   name?: string | null;
   level?: number;
   mood: Mood;
@@ -122,6 +127,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
   const lifeScore = useLifeScoreValue();
   const userId = useAppSelector((state) => state.auth?.userId ?? null);
   const { t } = useTranslation();
+  const portrait = useAvatarPortrait(avatarConfig, mood, Boolean(portraitOnly && !photoUrl));
   return (
     <>
       <View style={[styles.avatarClip, { borderRadius: size / 2 }]}>
@@ -132,6 +138,8 @@ const OrbitAvatar = memo(function OrbitAvatar({
             resizeMode="cover"
             accessibilityLabel={name ? t('avatar.avatarOf', { name }) : t('avatar.yours')}
           />
+        ) : portraitOnly ? (
+          <Avatar uri={portrait} size={size} name={name} />
         ) : (
           <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} portrait={userId ? `${userId}:today` : undefined} />
         )}
@@ -173,6 +181,7 @@ function FloatingOrb({
 function PillarOrbitBase({
   avatarConfig,
   photoUrl,
+  portraitOnly,
   name,
   level,
   mood,
@@ -236,6 +245,7 @@ function PillarOrbitBase({
           <OrbitAvatar
             avatarConfig={avatarConfig}
             photoUrl={photoUrl}
+            portraitOnly={portraitOnly}
             name={name}
             level={level}
             mood={mood}

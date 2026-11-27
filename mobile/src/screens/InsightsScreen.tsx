@@ -44,6 +44,8 @@ import {
   type PatternInsight,
 } from '../features/analytics/patterns';
 import { addDays, todayInTimezone, useYearXp } from '../features/analytics/yearHeatmap';
+import { WeeklyExperiment } from '../features/planning/WeeklyExperiment';
+import { localDateOf } from '../lib/offlineQueue';
 import ShareStorySheet from '../features/share/ShareStorySheet';
 import { titleForLevel } from '../lib/levels';
 import { useAppSelector } from '../store/hooks';
@@ -465,6 +467,7 @@ export function InsightsScreen() {
         <View style={styles.section}>
           <Headline s={summary} period={period} />
           <Takeaways items={items} />
+          <WeeklyExperiment userId={userId} today={localDateOf(new Date())} />
 
           <StreakOutlook />
 
