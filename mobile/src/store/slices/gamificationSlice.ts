@@ -23,7 +23,6 @@ export interface GamificationState {
   achievements: Achievement[];
   currentTitle: string | null;
   loading: boolean;
-  requestId: string | null;
   error: string | null;
   /** Server truth from the last fetch; displayed values add pending XP. */
   serverTotalXp: number;
@@ -32,6 +31,11 @@ export interface GamificationState {
   /** Optimistic XP of completions still in the offline queue. */
   pendingXp: number;
   pendingXpToday: number;
+  /**
+   * The newest fetchGamification started. An older one that answers later
+   * may have read the row before a completion committed, so it is dropped.
+   */
+  latestFetchId: string | null;
 }
 
 const initialState: GamificationState = {
@@ -45,13 +49,13 @@ const initialState: GamificationState = {
   achievements: [],
   currentTitle: null,
   loading: false,
-  requestId: null,
   error: null,
   serverTotalXp: 0,
   serverXpToday: 0,
   serverLevel: 1,
   pendingXp: 0,
   pendingXpToday: 0,
+  latestFetchId: null,
 };
 
 /**
@@ -218,6 +222,32 @@ export const fetchAllBadges = createAsyncThunk<
   }
 });
 
+/**
+ * complete_quest answers with the new totals. Matched by type because
+ * questsSlice imports this file (a direct import would be circular).
+ */
+interface ServerCompletion {
+  type: 'quests/complete/fulfilled';
+  payload: {
+    xp_awarded: number;
+    total_xp: number;
+    level: number;
+    current_streak: number;
+    best_streak: number;
+    offline: boolean;
+  };
+}
+
+function isServerCompletion(action: { type: string; payload?: unknown }): action is ServerCompletion {
+  if (action.type !== 'quests/complete/fulfilled') return false;
+  const p = action.payload as Partial<ServerCompletion['payload']> | undefined;
+  return !!p && p.offline === false && typeof p.total_xp === 'number' && typeof p.level === 'number';
+}
+
+function isStale(state: GamificationState, requestId: string): boolean {
+  return state.latestFetchId !== null && state.latestFetchId !== requestId;
+}
+
 const gamificationSlice = createSlice({
   name: 'gamification',
   initialState,
@@ -237,14 +267,14 @@ const gamificationSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchGamification.pending, (state, action) => {
+        state.latestFetchId = action.meta.requestId;
         state.loading = true;
-        state.requestId = action.meta.requestId;
         state.error = null;
       })
       .addCase(fetchGamification.fulfilled, (state, action) => {
-        if (state.requestId !== action.meta.requestId) return;
+        // A newer fetch is on its way: this answer may predate a completion.
+        if (isStale(state, action.meta.requestId)) return;
         state.loading = false;
-        state.requestId = null;
         const d = action.payload;
         state.serverLevel = d.level;
         state.serverTotalXp = d.total_xp;
@@ -255,10 +285,21 @@ const gamificationSlice = createSlice({
         applyDisplay(state);
       })
       .addCase(fetchGamification.rejected, (state, action) => {
-        if (state.requestId !== action.meta.requestId) return;
+        if (isStale(state, action.meta.requestId)) return;
         state.loading = false;
-        state.requestId = null;
         state.error = action.payload ?? i18n.t('errors.loadProgress');
+      })
+      // Show the server's new XP as soon as complete_quest answers, instead
+      // of after a second round trip. The fetch the completion starts still
+      // follows and brings XP today and badges.
+      .addMatcher(isServerCompletion, (state, action) => {
+        const d = action.payload;
+        state.serverTotalXp = d.total_xp;
+        state.serverLevel = d.level;
+        state.serverXpToday += Math.max(0, d.xp_awarded);
+        state.currentStreak = d.current_streak;
+        state.bestStreak = d.best_streak;
+        applyDisplay(state);
       });
   },
 });

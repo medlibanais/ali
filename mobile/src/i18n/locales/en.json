@@ -286,7 +286,10 @@
     "ratingFailed": "Could not save that rating.",
     "sendFailed": "Could not send that message.",
     "couldNotRefreshThe": "Could not refresh the daily count.",
-    "theConnectionDroppedBefore": "The connection dropped before the reply arrived. Tap retry to ask again."
+    "theConnectionDroppedBefore": "The connection dropped before the reply arrived. Tap retry to ask again.",
+    "replyUncertain": "Your coach didn't answer in time. Try again won't use another message.",
+    "replyPending": "Your message was sent. The reply will show here as soon as it's saved.",
+    "notSentYet": "This message was not sent. Tap retry to send it."
   },
   "friendErrors": {
     "ownAccount": "That is your own account.",
@@ -632,7 +635,13 @@
     "limitReachedA11y": "Daily limit reached. Your coach is back in {{time}}",
     "usedAll": "You've used all {{limit}} messages today. Your coach is back at midnight.",
     "youHaveLeft_one": "You have {{count}} message left today.",
-    "youHaveLeft_other": "You have {{count}} messages left today."
+    "youHaveLeft_other": "You have {{count}} messages left today.",
+    "tryAgain": "Try again",
+    "tryAgainLabel": "Ask the coach again for this message",
+    "checkAgain": "Check again",
+    "checkAgainLabel": "Check if the reply was saved",
+    "dismiss": "Dismiss",
+    "dismissLabel": "Hide this notice"
   },
   "insights": {
     "thisWeek": "This week",

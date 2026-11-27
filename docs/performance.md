@@ -65,3 +65,85 @@ adb logcat -c && adb shell am start -W -n com.prayerlock.app/.MainActivity   # T
 adb logcat | grep "\[startup\]"        # dev builds: "first screen after N ms"
 adb shell du -sh /data/data/com.prayerlock.app/cache/avatar3d    # render cache (run-as on debug builds)
 ```
+
+## Avatar asset budget (2026-11-25, branch `claude/project-thread-ilke51`)
+
+Builds on the model split above; the split itself is unchanged. Run
+`cd mobile && node scripts/avatar-assets.mjs` for the breakdown below.
+
+### What the 46.2 MB model is made of
+
+| What | In core.bin | In packs | Items |
+| --- | ---: | ---: | ---: |
+| Clothes meshes | 0 | 15,254,186 | 55 |
+| Clothes textures | 0 | 10,379,579 | 55 |
+| Morph targets (shape deltas) | 5,747,832 | 0 | 329 |
+| Hair textures | 0 | 5,718,114 | 26 |
+| Hair meshes | 0 | 4,645,763 | 26 |
+| Skin textures | 0 | 2,033,608 | 6 |
+| Glasses meshes + textures | 0 | 580,963 | 5 |
+| Base body mesh | 535,602 | 0 | |
+| Brows (mesh + texture) | 574,726 | 0 | 12 |
+| Teeth, eyes, tongue, lashes | 458,217 | 0 | |
+| Skeleton + skin weights | 158,992 | 0 | |
+| JSON header | 123,608 | 0 | |
+
+Morph targets are 76% of the core (each full-body target is about 153 KB).
+Clothes are 66% of the packs. core.bin gzips from 7.60 MB to 4.79 MB; the
+packs from 38.61 MB to 31.13 MB (mostly JPEG/WebP already).
+
+When each platform loads it: **web** fetches core.bin and the worn packs
+over HTTP only when the hidden renderer starts (a look missing from the
+picture cache), after the first screen has settled. **Android** bundles
+every file in the app; the renderer reads core.bin and the worn packs from
+the app's assets only in the same situation. A launch whose pictures are
+cached loads no model bytes at all.
+
+### The three numbers, separately
+
+| | Old (one file) | Now | Change in this branch |
+| --- | --- | --- | --- |
+| Initial transfer: model bytes for the first full render | 46.20 MB | built-in looks 8.70 to 9.52 MB; worst random mix 11.91 MB | none (retries add bytes only when a download failed) |
+| Initial transfer: JS bundle | 3,405,147 B | 3,417,779 B | +12,632 B (the manifest of 93 sizes and hashes) |
+| Initial transfer: viewer page | 500,192 B | 501,175 B | +983 B (download checks) |
+| Total avatar asset size | 46.20 MB | 46.21 MB (core 7.60 + 92 packs 38.61) | none |
+| Cache growth, Android pictures | 48 files / 8 MB cap | same cap; portrait slots live inside it, index file under 1 KB | none |
+| Cache growth, web pictures | 10 localStorage entries | same; plus one small slot index | under 1 KB |
+| Cache growth, renderer memory | 24 packs kept | same | none |
+
+### What this branch adds
+
+- `src/avatar/modelManifest.ts` (generated): byte size and SHA-256 of
+  core.bin and every pack, with a version. The viewer checks each file it
+  downloads; a cut-off or corrupted file is fetched again, skipping the
+  HTTP cache (3 tries). If it still fails, the app re-resolves the named
+  files (Android: copies them out of the app again, for a cleared cache
+  folder) and retries the look twice more before giving up.
+- Portrait slots: the Today avatar's newest picture is remembered per
+  account. After an app update (new model, so every cached key misses), an
+  edit on another phone, or a failed download, that picture shows at once
+  while the new one draws. Never evicted while pointed at; cleared on
+  sign-out.
+- CI: `node scripts/avatar-assets.mjs --check` fails when a model file
+  changes without the manifest, or the viewer, core, any pack or all packs
+  grow past `assets/avatar3d/budget.json` (sizes on 2026-11-25 + about 2%).
+  Jest (`assetBudget.test.ts`) checks first-render bytes of the default and
+  built-in looks (9.8 MB), of 400 random looks (12.3 MB), and of avatars
+  saved by older app versions.
+
+### Checks run
+
+- Old single-file renderer (viewer before 1a05f8b with the original
+  `human.bin`) against the split renderer, headless Chromium: 100 looks
+  (24 skin tones, 12 built-in looks, 30 outfits, 21 expressions, 2 moods,
+  6 poses, 5 saved configs from v1 to v3). All 100 pixel-identical when
+  drawn fresh. In one long batch, one look differed by 3 pixels (at most
+  7/255); that came from the old renderer reusing state from earlier
+  renders, and the new renderer matched a fresh old render exactly.
+- Download handling, headless Chromium: a pack cut off at half, a
+  connection dropped mid-file, both drawn correctly on the second fetch; a
+  pack that stays corrupted is reported by name after 3 fetches.
+- Not measured: anything on an Android device (no device here). Also, the
+  web startup script `scripts/measure-web-startup.js` no longer gets past
+  the sign-in screen on current main (same on main without this branch),
+  so first-launch timings were not re-measured.

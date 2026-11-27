@@ -124,7 +124,11 @@ export const accountScopeMiddleware: Middleware<object, AuthLike> = (api) => (ne
   // The Coach stream reports progress with plain actions that name the
   // request that started it; drop those from a previous account too.
   const streamRequest = (a.payload as { requestId?: unknown } | undefined)?.requestId;
-  if (a.type === 'chat/streamMeta' && typeof streamRequest === 'string') {
+  if (
+    typeof a.type === 'string' &&
+    a.type.startsWith('chat/stream') &&
+    typeof streamRequest === 'string'
+  ) {
     const began = startedIn.get(streamRequest);
     if (began !== undefined && began !== epoch) return action;
   }

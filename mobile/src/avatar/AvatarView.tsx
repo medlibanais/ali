@@ -22,6 +22,8 @@ export interface AvatarViewProps {
    * screen, so the pace follows it without re-rendering the avatar.
    */
   score?: number | SharedValue<number>;
+  /** The person's own avatar: a slot unique to account and place (see Avatar3D). */
+  portrait?: string;
 }
 
 export const AvatarView = memo(function AvatarView(props: AvatarViewProps) {

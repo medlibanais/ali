@@ -291,7 +291,10 @@
     "ratingFailed": "Impossible d'enregistrer cette note.",
     "sendFailed": "Impossible d'envoyer ce message.",
     "couldNotRefreshThe": "Impossible d'actualiser le compteur du jour.",
-    "theConnectionDroppedBefore": "La connexion a coupé avant la réponse. Touche Réessayer pour redemander."
+    "theConnectionDroppedBefore": "La connexion a coupé avant la réponse. Touche Réessayer pour redemander.",
+    "replyUncertain": "Ton coach n'a pas répondu à temps. Réessayer n'utilise pas un autre message.",
+    "replyPending": "Ton message est envoyé. La réponse s'affichera ici dès qu'elle sera enregistrée.",
+    "notSentYet": "Ce message n'a pas été envoyé. Touche Réessayer pour l'envoyer."
   },
   "friendErrors": {
     "ownAccount": "C'est ton propre compte.",
@@ -643,7 +646,13 @@
     "usedAll": "Tu as utilisé tes {{limit}} messages du jour. Ton coach revient à minuit.",
     "youHaveLeft_one": "Il te reste {{count}} message aujourd'hui.",
     "youHaveLeft_many": "Il te reste {{count}} messages aujourd'hui.",
-    "youHaveLeft_other": "Il te reste {{count}} messages aujourd'hui."
+    "youHaveLeft_other": "Il te reste {{count}} messages aujourd'hui.",
+    "tryAgain": "Réessayer",
+    "tryAgainLabel": "Redemander au coach pour ce message",
+    "checkAgain": "Vérifier",
+    "checkAgainLabel": "Vérifier si la réponse a été enregistrée",
+    "dismiss": "Masquer",
+    "dismissLabel": "Masquer cet avis"
   },
   "insights": {
     "thisWeek": "Cette semaine",

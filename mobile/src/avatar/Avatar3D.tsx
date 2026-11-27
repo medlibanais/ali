@@ -27,10 +27,11 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 import { useAliveMotion } from './alive';
 import { Asset } from 'expo-asset';
 import { bgStyle } from './palettes';
-import { loadCachedRender, saveCachedRender, setCacheVersion } from './renderCache';
+import { loadCachedRender, loadPortrait, pointPortrait, saveCachedRender, setCacheVersion } from './renderCache';
 import { irisFor, partsFor, skinFor, targetsFor } from './shape';
 import type { AvatarConfig, Mood } from './types';
 import { MODEL_PARTS_VERSION, PACK_ASSETS, PART_PACKS } from './modelParts';
+import { MODEL_MANIFEST, type ModelFile } from './modelManifest';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const VIEWER = require('../../assets/avatar3d/viewer.html');
@@ -68,6 +69,12 @@ export interface RenderRequest {
   channel?: string;
   /** Save the picture to disk and look there first (everyday looks only). */
   persist?: boolean;
+  /**
+   * With `persist`: also remember this picture as the newest one for this
+   * slot (e.g. '<user id>:today'), shown at once next launch even if the
+   * look or the model changed meanwhile, until the new picture is drawn.
+   */
+  portrait?: string;
 }
 
 // ---------------------------------------------------------------- store
@@ -144,6 +151,7 @@ export function requestRender(req: RenderRequest) {
     if (uri) {
       remember(req.key, uri);
       emit();
+      if (req.portrait) void pointPortrait(req.portrait, req.key);
     } else {
       enqueue(req);
     }
@@ -253,11 +261,44 @@ export function renderOnce(config: AvatarConfig, mood: Mood, mode: Mode, camera:
 
 // ---------------------------------------------------------------- host
 
-async function assetUri(module: number): Promise<string> {
+/**
+ * Where the viewer can read a bundled asset. Android copies it out of the
+ * app into the cache folder once; `fresh` copies it again, for when the
+ * system has cleared that folder (or the copy was cut off) since.
+ */
+async function assetUri(module: number, fresh = false): Promise<string> {
   const asset = Asset.fromModule(module);
-  if (Platform.OS !== 'web') await asset.downloadAsync();
+  if (Platform.OS !== 'web') {
+    if (fresh) {
+      asset.downloaded = false;
+      asset.localUri = null;
+    }
+    await asset.downloadAsync();
+  }
   return asset.localUri ?? asset.uri;
 }
+
+/** Size and hash the viewer checks each model file against. */
+export function expectedFiles(packs: string[]): Record<string, ModelFile> {
+  const out: Record<string, ModelFile> = { core: MODEL_MANIFEST.core };
+  for (const name of packs) {
+    const f = MODEL_MANIFEST.packs[name];
+    if (f) out[name] = f;
+  }
+  return out;
+}
+
+/** Forget where these packs are, so the next render resolves them afresh. */
+function forgetPacks(names: string[]) {
+  for (const name of names) packUris.delete(name);
+  for (const name of names) freshPacks.add(name);
+}
+const freshPacks = new Set<string>();
+
+/** A look whose model files failed is tried this many more times. */
+export const RENDER_RETRIES = 2;
+const RETRY_DELAY_MS = 1_000;
+const retries = new Map<string, number>();
 
 /** Model packs a render command needs (see modelParts.ts). */
 export function packsFor(command: Record<string, unknown>): string[] {
@@ -278,7 +319,8 @@ export function packUrls(names: string[]): Promise<Record<string, string>> {
       let p = packUris.get(name);
       if (!p) {
         const module = PACK_ASSETS[name];
-        p = module === undefined ? Promise.reject(new Error(`unknown pack ${name}`)) : assetUri(module);
+        const fresh = freshPacks.delete(name);
+        p = module === undefined ? Promise.reject(new Error(`unknown pack ${name}`)) : assetUri(module, fresh);
         packUris.set(name, p);
         p.catch(() => packUris.delete(name));
       }
@@ -356,16 +398,18 @@ function RendererHost() {
     setMode(req.mode);
     // Resolve only the packs this look wears, then give the view a frame
     // to take the mode's size before rendering.
-    packUrls(packsFor(req.command))
+    const names = packsFor(req.command);
+    packUrls(names)
       .then((packs) => {
-        setTimeout(() => send.current(JSON.stringify({ ...req.command, model: modelUri, packs })), 60);
+        const expect = expectedFiles(names);
+        setTimeout(() => send.current(JSON.stringify({ ...req.command, model: modelUri, packs, expect })), 60);
       })
       .catch(() => onMessage(JSON.stringify({ type: 'error' })));
   };
   pump = next;
 
   const onMessage = (data: string) => {
-    let msg: { type?: string; data?: string } = {};
+    let msg: { type?: string; data?: string; files?: unknown } = {};
     try {
       msg = JSON.parse(data);
     } catch {
@@ -375,14 +419,33 @@ function RendererHost() {
       ready.current = true;
       next();
     } else if (msg.type === 'snapshot' && busy.current && msg.data) {
-      if (busy.current.persist) void saveCachedRender(busy.current.key, msg.data);
+      retries.delete(busy.current.key);
+      if (busy.current.persist) void saveCachedRender(busy.current.key, msg.data, busy.current.portrait);
       remember(busy.current.key, msg.data);
       busy.current = null;
       emit();
       next();
     } else if (msg.type === 'error' && busy.current) {
-      remember(busy.current.key, '');
+      const req = busy.current;
       busy.current = null;
+      const files = Array.isArray(msg.files) ? msg.files.filter((f): f is string => typeof f === 'string') : [];
+      const tried = retries.get(req.key) ?? 0;
+      if (files.length && tried < RENDER_RETRIES) {
+        // A model file was missing or damaged (a cut-off download, or the
+        // system cleared the cache folder): look it up again and retry.
+        retries.set(req.key, tried + 1);
+        forgetPacks(files.filter((f) => f !== 'core'));
+        const core = files.includes('core') ? assetUri(MODEL, true).then(setModelUri) : Promise.resolve();
+        void core
+          .catch(() => undefined)
+          .then(() => setTimeout(() => {
+            queue.unshift(req);
+            pump?.();
+          }, RETRY_DELAY_MS * (tried + 1)));
+        return;
+      }
+      retries.delete(req.key);
+      remember(req.key, '');
       emit();
       next();
     }
@@ -471,6 +534,13 @@ export interface Avatar3DProps {
   camera?: Camera;
   /** Editor only: a live preview that drops looks it no longer needs. */
   live?: string;
+  /**
+   * The person's own everyday avatar: a slot name unique to the account
+   * and place (e.g. '<user id>:today'). The last picture drawn for it is
+   * shown at once on launch, even after an app update or an edit on
+   * another phone, while the current look renders.
+   */
+  portrait?: string;
 }
 
 const NO_CAMERA: Camera = {};
@@ -478,7 +548,7 @@ const NO_CAMERA: Camera = {};
 /** Breath scale of the whole image, anchored at its bottom edge. */
 const BREATH_SCALE: Record<Mode, number> = { head: 0.012, 'full-body': 0.008, 'head-thumb': 0, 'body-thumb': 0, 'head-hd': 0, 'body-hd': 0 };
 
-export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live }: Avatar3DProps) {
+export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', bare = false, animated = true, score, camera = NO_CAMERA, live, portrait }: Avatar3DProps) {
   const { t } = useTranslation();
   const key = renderKey(config, mood, mode, bare, camera);
   const blinkKey = `${key}:blink`;
@@ -500,10 +570,25 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
   // showing the previous image instead of dropping back to the 2D avatar.
   const lastShown = useRef<{ uri: string; mode: Mode } | null>(null);
   if (ready) lastShown.current = { uri: ready, mode };
-  const uri =
-    ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined);
   // The everyday looks (Today, Profile) are kept on disk across launches.
   const persist = !live && (mode === 'head' || mode === 'full-body');
+  const slot = persist && portrait ? `${portrait}|${mode}|${bare ? 1 : 0}` : undefined;
+  // The last picture of this slot from an earlier launch, if the exact
+  // look is not on disk (an app update changed the model, or the look was
+  // edited elsewhere): better than an empty disc while the new one draws.
+  const [stale, setStale] = useState<string | null>(null);
+  useEffect(() => {
+    if (!slot) return;
+    let alive = true;
+    void loadPortrait(slot).then((u) => {
+      if (alive && u) setStale(u);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [slot]);
+  const uri =
+    ready || (lastShown.current?.mode === mode ? lastShown.current.uri : undefined) || stale || undefined;
   useEffect(() => {
     if (!live) return;
     liveUsers += 1;
@@ -512,7 +597,7 @@ export function Avatar3D({ config, size = 120, mood = 'neutral', mode = 'head', 
     };
   }, [live]);
   useEffect(() => {
-    requestRender({ key, mode, command: commandFor(config, mood, mode, bare, camera), channel: live, persist });
+    requestRender({ key, mode, command: commandFor(config, mood, mode, bare, camera), channel: live, persist, portrait: slot });
     // Queued after the open-eyes image, so the avatar shows up first.
     if (animated) requestRender({ key: blinkKey, mode, command: commandFor(config, mood, mode, bare, camera, true), persist });
     // config fields are all in the key
