@@ -3,6 +3,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { unregisterDeviceForPush } from '../../lib/notifications';
+import { clearPortraits } from '../../avatar/renderCache';
 import {
   rememberOnboardingCompleted,
   wasOnboardingCompleted,
@@ -172,6 +173,8 @@ export const resendVerification = createAsyncThunk<
 export const logout = createAsyncThunk<void, void>('auth/logout', async () => {
   // Stop this phone getting the signed-out user's pushes (never throws).
   await unregisterDeviceForPush();
+  // The next person must not see this one's avatar while theirs draws.
+  await clearPortraits();
   // Signing out must always work, even offline or with an expired token.
   // A global sign-out that fails keeps the local session, so fall back to
   // clearing it on this device only.

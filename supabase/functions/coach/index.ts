@@ -9,10 +9,20 @@
 // starting a new chat does not reset it.
 //
 // Request modes (POST JSON):
-//   { message, conversation_id?, stream: true }  -> text/event-stream
-//       events: meta, delta, replace, done, error (see streamReply below)
-//   { message, conversation_id? }                 -> one JSON reply (older apps)
+//   { message, conversation_id?, turn_id?, retry?, stream: true }
+//       -> text/event-stream; events: meta, delta, turn, done, error
+//          (see streamReply below)
+//   { message, conversation_id?, turn_id? }       -> one JSON reply (older apps)
 //   { status: true }                              -> today's count + reset time
+//   { turn_status: <turn id> }                    -> one turn's state, no AI call
+//   { stop_turn: <turn id> }                      -> the person tapped Stop
+//
+// Durable turns (migration 0046): the app makes a turn id per message and
+// keeps it until the turn ends. Sending the same turn id again never saves,
+// counts or pays twice: a saved reply is replayed, a running one is waited
+// for, and an uncertain one (provider timeout) needs `retry: true`, which the
+// app sends only when the person taps "Try again". Requests without a turn id
+// (older apps) get one made here.
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -20,8 +30,15 @@ import {
   isDeterministic,
   safetyResponse,
 } from '../_shared/intents.ts';
-import { callGroq, type ChatTurn, hasGroqKey, streamGroq } from '../_shared/llm.ts';
-import { ReplyShaper, sseFrame } from '../_shared/coachStream.ts';
+import { type ChatTurn, hasGroqKey, streamGroq } from '../_shared/llm.ts';
+import { sseFrame } from '../_shared/coachStream.ts';
+import {
+  type Provider,
+  runTurn,
+  type TurnSink,
+  type TurnStore,
+  type TurnView,
+} from '../_shared/coachTurn.ts';
 import {
   buildCompactSystemPrompt,
   buildSystemPrompt,
@@ -32,7 +49,6 @@ import {
   pillarAverages,
   type PillarDay,
   PILLARS,
-  postFilter,
   type RecentCompletion,
   suggestions,
   type TodayQuest,
@@ -40,7 +56,6 @@ import {
 import { fitToBudget, promptBudget } from '../_shared/tokenBudget.ts';
 import {
   INPUT_MAX_CHARS,
-  leaksSystemPrompt,
   sanitizeGoals,
   sanitizeUserInput,
   wrapSystemPrompt,
@@ -83,15 +98,31 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser();
     if (userError || !user) return json({ error: 'invalid_session' }, 401);
 
+    const requestStarted = Date.now();
     let message = '';
     let requestedConversation: string | null = null;
     let wantsStream = false;
     let wantsStatus = false;
+    let clientTurn: string | null = null;
+    let explicitRetry = false;
+    let turnStatusId: string | null = null;
+    let stopTurnId: string | null = null;
     try {
       const body = await req.json();
       message = typeof body?.message === 'string' ? body.message.trim() : '';
       wantsStream = body?.stream === true;
       wantsStatus = body?.status === true;
+      explicitRetry = body?.retry === true;
+      for (const key of ['turn_id', 'turn_status', 'stop_turn'] as const) {
+        const v = body?.[key];
+        if (v == null) continue;
+        if (typeof v !== 'string' || !UUID_RE.test(v)) {
+          return json({ error: 'invalid_turn' }, 400);
+        }
+      }
+      clientTurn = body?.turn_id ?? null;
+      turnStatusId = body?.turn_status ?? null;
+      stopTurnId = body?.stop_turn ?? null;
       if (body?.conversation_id != null) {
         if (
           typeof body.conversation_id !== 'string' ||
@@ -106,6 +137,19 @@ Deno.serve(async (req: Request) => {
     }
     // Service client for rate limiting + writes (user already authenticated).
     const admin = createClient(supabaseUrl, serviceKey);
+    const store = turnStore(admin, user.id);
+
+    // ---- turn status / Stop: no AI call, no quota ----
+    if (turnStatusId) {
+      const view = await store.get(turnStatusId);
+      return view ? json({ turn: view }, 200) : json({ error: 'turn_not_found' }, 404);
+    }
+    if (stopTurnId) {
+      const view = await store.get(stopTurnId);
+      if (!view) return json({ error: 'turn_not_found' }, 404);
+      if (view.status === 'saved') return json({ turn: view }, 200);
+      return json({ turn: await store.settle(stopTurnId, 'stopped', 'stopped_by_user') }, 200);
+    }
 
     // ---- daily limit (user's timezone, server-side) ----
     // The day ends at midnight in profiles.timezone (day_bounds_in_tz), so
@@ -174,6 +218,9 @@ Deno.serve(async (req: Request) => {
     // bypasses RLS.
     const ownConversations = () =>
       admin.from('conversations').select('id').eq('user_id', user.id);
+    // A resent turn stays in the chat it was first sent to.
+    const knownTurn = clientTurn ? await store.get(clientTurn) : null;
+    if (knownTurn) requestedConversation = knownTurn.conversation_id;
     const { data: conversation, error: conversationError } =
       requestedConversation
         ? await ownConversations().eq('id', requestedConversation).maybeSingle()
@@ -203,28 +250,30 @@ Deno.serve(async (req: Request) => {
       conversationId = created.id as string;
     }
 
-    // ---- reserve the quota (atomic, before any provider call) ----
-    // coach_reserve_message counts today's messages and saves this one under
-    // a per-account lock (migration 0045), so parallel sends cannot pass the
-    // daily limit. The saved message is what counts.
-    const { data: reservation, error: reserveError } = await admin.rpc(
-      'coach_reserve_message',
-      {
-        p_user: user.id,
-        p_conversation: conversationId,
-        p_content: safeMessage,
-        p_limit: DAILY_LIMIT,
-      },
-    );
-    if (reserveError || !reservation) {
-      console.error('coach reserve', reserveError?.message);
+    // ---- begin the turn: quota + user message, once per turn id ----
+    // coach_begin_turn (migration 0046) counts today's messages and saves this
+    // one under the same per-account lock as 0045, so parallel sends cannot
+    // pass the daily limit, and a resend of the same turn id counts once.
+    const turnId = clientTurn ?? crypto.randomUUID();
+    const { data: begun, error: beginError } = await admin.rpc('coach_begin_turn', {
+      p_user: user.id,
+      p_conversation: conversationId,
+      p_turn: turnId,
+      p_content: safeMessage,
+      p_limit: DAILY_LIMIT,
+    });
+    if (beginError || !begun) {
+      if (beginError?.message?.includes('turn_conflict')) {
+        return json({ error: 'turn_conflict' }, 409);
+      }
+      console.error('coach begin turn', beginError?.message);
       return json({ error: 'storage_failed' }, 500);
     }
-    const reserved = reservation as CoachReservation;
+    const reserved = begun as CoachReservation;
     const quotaResetsAt = reserved.resets_at
       ? new Date(reserved.resets_at).toISOString()
       : resetsAt;
-    if (!reserved.ok || !reserved.message) {
+    if (!reserved.ok || !reserved.turn?.user_message) {
       const retryAfter = Math.max(
         1,
         Math.ceil((Date.parse(quotaResetsAt) - Date.now()) / 1000),
@@ -241,7 +290,8 @@ Deno.serve(async (req: Request) => {
         { 'Retry-After': String(retryAfter) },
       );
     }
-    const userRow = reserved.message;
+    const turn = reserved.turn;
+    const userRow = reserved.turn.user_message;
     const remainingToday = reserved.remaining_today;
 
     // ---- context for the LLM (and for the UI badge) ----
@@ -277,6 +327,8 @@ Deno.serve(async (req: Request) => {
         .from('messages')
         .select('role, content')
         .eq('conversation_id', conversationId)
+        .neq('id', userRow.id)
+        .lte('created_at', userRow.created_at)
         .order('created_at', { ascending: false })
         .limit(HISTORY_TURNS),
       admin
@@ -463,14 +515,23 @@ Deno.serve(async (req: Request) => {
       return fit.turns;
     };
 
+    const turnArgs = {
+      store,
+      turn,
+      safetyReply: isDeterministic(intent) ? safetyResponse(intent) : null,
+      provider: groqProvider(isDeterministic(intent) ? [] : buildTurns()),
+      fallback: () => fallbackReply(ctx),
+      explicitRetry,
+      // Older apps (no turn id) cannot show a "Try again" state.
+      onUncertain: clientTurn ? 'recover' as const : 'fallback' as const,
+      startedAt: requestStarted,
+    };
+
     if (wantsStream) {
       return streamReply({
-        admin,
+        ...turnArgs,
         conversationId,
         intent,
-        safetyReply: isDeterministic(intent) ? safetyResponse(intent) : null,
-        turns: isDeterministic(intent) ? [] : buildTurns(),
-        fallback: () => fallbackReply(ctx),
         userRow,
         remainingToday,
         resetsAt: quotaResetsAt,
@@ -479,52 +540,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ---- intent routing: safety first, LLM second ----
-    let reply: string;
-    let model = 'safety-rules';
-    let degraded = false;
-
-    if (isDeterministic(intent)) {
-      reply = safetyResponse(intent);
-    } else {
-      const turns = buildTurns();
-
-      const llm = await callGroq(turns, {
-        maxTokens: 220,
-        temperature: 0.8,
-        timeoutMs: 12000,
-        retries: 1,
-        useFallbackModel: true,
-      });
-      const filtered = llm.ok && !leaksSystemPrompt(llm.text)
-        ? postFilter(llm.text)
-        : null;
-      if (filtered) {
-        reply = filtered;
-        model = llm.model ?? 'groq';
-      } else {
-        // Graceful, still-personal fallback when the model is unreachable.
-        reply = fallbackReply(ctx);
-        degraded = true;
-        model = `fallback(${llm.ok ? 'filtered' : llm.error ?? 'unknown'})`;
-        console.error('coach llm fallback', model);
-      }
-    }
-
-    // ---- persist the reply (the user's message was saved by the reservation) ----
-    const { data: aiRow, error: aiInsertError } = await admin
-      .from('messages')
-      .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
-      .select('id, content, created_at')
-      .single();
+    // ---- one JSON reply (older apps) ----
+    const result = await runTurn({
+      ...turnArgs,
+      sink: { send: () => undefined, gone: () => false },
+    });
+    logTurn(result.view, result.providerCalls, result.firstTextMs, result.replayed);
+    const aiRow = result.view.assistant_message;
     if (!aiRow) {
-      console.error('coach message insert', aiInsertError?.message);
-      return json({ error: 'storage_failed' }, 500);
+      return json({ error: 'reply_uncertain', turn: result.view }, 504);
     }
-
     return json(
       {
         conversation_id: conversationId,
+        turn_id: turn.turn_id,
         user_message: userRow,
         ai_message: aiRow,
         remaining_today: remainingToday,
@@ -532,10 +561,10 @@ Deno.serve(async (req: Request) => {
         context_used: contextUsed,
         suggestions: suggestions(ctx),
         intent,
-        model,
+        model: result.view.model ?? 'groq',
         // True when the model was unreachable and this is the rule-based
         // stand-in reply, so the app can say so.
-        degraded,
+        degraded: result.view.degraded,
       },
       200,
     );
@@ -549,15 +578,12 @@ Deno.serve(async (req: Request) => {
 
 // ---- streaming reply -------------------------------------------------------
 
-interface StreamArgs {
-  admin: SupabaseClient;
+type TurnArgs = Omit<Parameters<typeof runTurn>[0], 'sink'>;
+
+interface StreamArgs extends TurnArgs {
   conversationId: string;
   intent: string;
-  /** Rule-based answer (crisis, acute medical...). Never goes to the model. */
-  safetyReply: string | null;
-  turns: ChatTurn[];
-  fallback: () => string;
-  /** The user's message, already saved by coach_reserve_message. */
+  /** The user's message, already saved by coach_begin_turn. */
   userRow: SavedMessage;
   remainingToday: number;
   resetsAt: string;
@@ -573,41 +599,108 @@ interface SavedMessage {
   created_at: string;
 }
 
-/** Result of the coach_reserve_message RPC (migration 0045). */
+/** Result of the coach_begin_turn RPC (migration 0046). */
 interface CoachReservation {
   ok: boolean;
+  existing: boolean;
   sent_today: number;
   remaining_today: number;
   resets_at: string | null;
-  message?: SavedMessage;
+  turn?: TurnView & { user_message: SavedMessage };
+}
+
+/** Postgres-backed turn store; every call is scoped to the JWT's user. */
+function turnStore(admin: SupabaseClient, userId: string): TurnStore {
+  const rpc = async <T>(fn: string, args: Record<string, unknown>): Promise<T> => {
+    const { data, error } = await admin.rpc(fn, { p_user: userId, ...args });
+    if (error) throw new Error(`${fn}: ${error.message}`);
+    return data as T;
+  };
+  return {
+    claimProviderCall: (turnId, explicitRetry) =>
+      rpc<boolean>('coach_claim_provider_call', {
+        p_turn: turnId,
+        p_explicit_retry: explicitRetry,
+      }),
+    complete: (turnId, content, model, degraded, firstTextMs) =>
+      rpc<TurnView>('coach_complete_turn', {
+        p_turn: turnId,
+        p_content: content,
+        p_model: model,
+        p_degraded: degraded,
+        p_first_text_ms: firstTextMs,
+      }),
+    settle: (turnId, status, error) =>
+      rpc<TurnView>('coach_settle_turn', { p_turn: turnId, p_status: status, p_error: error }),
+    get: (turnId) => rpc<TurnView | null>('coach_get_turn', { p_turn: turnId }),
+  };
+}
+
+/** Groq, streamed. A timeout is not retried: it may already be billed. */
+function groqProvider(turns: ChatTurn[]): Provider {
+  return (signal) =>
+    streamGroq(turns, {
+      maxTokens: 220,
+      temperature: 0.8,
+      timeoutMs: 12000,
+      idleTimeoutMs: 8000,
+      retries: 1,
+      retryOnTimeout: false,
+      useFallbackModel: true,
+      signal,
+    });
+}
+
+function logTurn(view: TurnView, providerCalls: number, firstTextMs: number | null, replayed: boolean) {
+  console.log('coach turn', {
+    status: view.status,
+    provider_calls_total: view.provider_calls,
+    provider_calls_this_request: providerCalls,
+    first_text_ms: firstTextMs,
+    replayed,
+    degraded: view.degraded,
+  });
 }
 
 /**
  * Server-Sent Events:
- *   meta   { conversation_id, user_message, remaining_today, resets_at, ... }
+ *   meta   { conversation_id, turn_id, user_message, remaining_today, ... }
  *          sent once the user's message is saved (so it counts at once)
  *   delta  { text }  a piece of the reply, already safety-shaped
- *   done   { ai_message, text, model, degraded, remaining_today, resets_at }
+ *   turn   { turn_id, status, can_retry }  the turn is not answered (yet):
+ *          'generating' (another request is writing it), 'uncertain'
+ *          (provider timeout: show "Try again") or 'stopped'
+ *   done   { turn_id, ai_message, text, model, degraded, replayed, ... }
  *          text is the saved reply; the app shows it in place of the deltas
  *   error  { error }
- * If the app goes away (Stop, lost signal) the model call is aborted and
- * whatever was already written is saved, so the chat history matches what
- * the person saw.
+ * If the app goes away (lost signal) the reply is still generated and saved
+ * under the turn id, so reopening the app shows it. Stop is a separate
+ * { stop_turn } request; then only the words already shown are saved.
  */
 function streamReply(a: StreamArgs): Response {
   const encoder = new TextEncoder();
-  const groqAbort = new AbortController();
   let clientGone = false;
 
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (event: string, data: unknown) => {
-        if (clientGone) return;
-        try {
-          controller.enqueue(encoder.encode(sseFrame(event, data)));
-        } catch {
-          clientGone = true;
-        }
+      const sink: TurnSink = {
+        send(event, rawData) {
+          if (clientGone) return;
+          // The quota fields ride on every 'done', as before.
+          const data = event === 'done'
+            ? {
+              ...(rawData as Record<string, unknown>),
+              remaining_today: a.remainingToday,
+              resets_at: a.resetsAt,
+            }
+            : rawData;
+          try {
+            controller.enqueue(encoder.encode(sseFrame(event, data)));
+          } catch {
+            clientGone = true;
+          }
+        },
+        gone: () => clientGone,
       };
       const close = () => {
         if (clientGone) return;
@@ -619,105 +712,30 @@ function streamReply(a: StreamArgs): Response {
       };
 
       const work = (async () => {
-        // The user's message was saved by the quota reservation, before the
-        // stream opened, so a dropped stream cannot dodge the limit.
-        const userRow = a.userRow;
-        send('meta', {
+        sink.send('meta', {
           conversation_id: a.conversationId,
-          user_message: userRow,
+          turn_id: a.turn.turn_id,
+          user_message: a.userRow,
           remaining_today: a.remainingToday,
           resets_at: a.resetsAt,
           intent: a.intent,
           context_used: a.contextUsed,
           suggestions: a.suggestions,
         });
-
-        let reply: string | null;
-        let model = 'safety-rules';
-        let degraded = false;
-        if (a.safetyReply !== null) {
-          reply = a.safetyReply;
-          send('delta', { text: reply });
-        } else {
-          const shaper = new ReplyShaper();
-          let banned = false;
-          let llmError: string | null = null;
-          try {
-            for await (
-              const ev of streamGroq(a.turns, {
-                maxTokens: 220,
-                temperature: 0.8,
-                timeoutMs: 12000,
-                idleTimeoutMs: 8000,
-                retries: 1,
-                useFallbackModel: true,
-                signal: groqAbort.signal,
-              })
-            ) {
-              if (ev.type === 'start') {
-                model = ev.model;
-                continue;
-              }
-              const step = shaper.push(ev.text);
-              if (step.banned) {
-                banned = true;
-                break;
-              }
-              if (step.emit) send('delta', { text: step.emit });
-              if (step.full) break;
-            }
-          } catch (e) {
-            llmError = e instanceof Error ? e.message : 'unknown';
-          }
-          reply = banned ? null : shaper.finish();
-          if (reply && leaksSystemPrompt(reply)) {
-            // Echoed the system prompt: replaced by the fallback in 'done'.
-            banned = true;
-            reply = null;
-          }
-          if (clientGone) {
-            // Stopped or disconnected: keep only what was really written.
-            if (!reply) return;
-          } else if (!reply) {
-            reply = a.fallback();
-            degraded = true;
-            model = `fallback(${banned ? 'filtered' : llmError ?? 'empty'})`;
-            console.error('coach llm fallback', model);
-          }
-        }
-
-        const { data: aiRow, error: aiError } = await a.admin
-          .from('messages')
-          .insert({ conversation_id: a.conversationId, role: 'assistant', content: reply })
-          .select('id, content, created_at')
-          .single();
-        if (!aiRow) {
-          console.error('coach message insert', aiError?.message);
-          send('error', { error: 'storage_failed' });
-          close();
-          return;
-        }
-        send('done', {
-          ai_message: aiRow,
-          text: aiRow.content,
-          model,
-          degraded,
-          remaining_today: a.remainingToday,
-          resets_at: a.resetsAt,
-        });
+        const result = await runTurn({ ...a, sink });
+        logTurn(result.view, result.providerCalls, result.firstTextMs, result.replayed);
         close();
       })().catch((e) => {
         console.error('coach stream', e instanceof Error ? e.message : e);
-        send('error', { error: 'internal' });
+        sink.send('error', { error: 'storage_failed', turn_id: a.turn.turn_id });
         close();
       });
 
-      // Let the save finish even after the app hangs up.
+      // Let the reply finish and be saved even after the app hangs up.
       (globalThis as { EdgeRuntime?: EdgeRuntimeLike }).EdgeRuntime?.waitUntil(work);
     },
     cancel() {
       clientGone = true;
-      groqAbort.abort();
     },
   });
 

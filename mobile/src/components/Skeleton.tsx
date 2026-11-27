@@ -13,6 +13,7 @@ import Animated, {
   Easing,
   cancelAnimation,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -37,7 +38,13 @@ export interface SkeletonBlockProps {
 /** Shared 0..1 clock for every skeleton on screen. */
 function useShimmerClock(): SharedValue<number> {
   const progress = useSharedValue(0);
+  // Less motion asked for: the band holds still mid-block.
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
+    if (reduceMotion) {
+      progress.value = 0.5;
+      return;
+    }
     progress.value = 0;
     progress.value = withRepeat(
       withTiming(1, { duration: SWEEP_MS, easing: Easing.inOut(Easing.quad) }),
@@ -45,7 +52,7 @@ function useShimmerClock(): SharedValue<number> {
       false,
     );
     return () => cancelAnimation(progress);
-  }, [progress]);
+  }, [progress, reduceMotion]);
   return progress;
 }
 

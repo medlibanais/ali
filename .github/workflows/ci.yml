@@ -48,6 +48,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      # Avatar model files must match src/avatar/modelManifest.ts and stay
+      # under assets/avatar3d/budget.json. Growth fails the run until the
+      # budget is raised on purpose in the same PR.
+      - name: Avatar asset size budget
+        run: node scripts/avatar-assets.mjs --check
+
       # Any TypeScript error exits non-zero and fails the run.
       - name: Typecheck (npx tsc --noEmit)
         run: npx tsc --noEmit
@@ -71,6 +77,31 @@ jobs:
           test -f dist-check/_redirects
           test -f dist-check/.nojekyll
           grep -q '/index.html' dist-check/_redirects
+
+  # ------------------------------------------------------------------
+  # 1b. Edge Function unit tests (Deno). The Coach suite runs synthetic
+  #     English / French / Arabic conversations against mocked providers,
+  #     so it never makes a paid AI call.
+  # ------------------------------------------------------------------
+  deno-tests:
+    name: Edge Function tests (Deno, mocked AI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Typecheck the coach function
+        working-directory: supabase/functions
+        run: deno check --node-modules-dir=auto coach/index.ts
+
+      - name: deno test (no network to any AI provider)
+        env:
+          GROQ_API_KEY: ''
+        run: deno test --allow-env --allow-read --node-modules-dir=auto supabase/functions/_shared/__tests__/
 
   # ------------------------------------------------------------------
   # 2. API end-to-end tests (tests/e2e.ps1) against a local Supabase

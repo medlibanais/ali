@@ -44,9 +44,12 @@ import {
   isPendingMessage,
   LOW_MESSAGES_WARNING,
   MESSAGE_MAX_LENGTH,
+  recoverCoachTurn,
+  dismissRecovery,
   refreshCoachQuota,
   remainingMessages,
   sendChatMessage,
+  type SendArg,
   setMessageFeedback,
   startNewChat,
 } from '../store/slices/chatSlice';
@@ -313,8 +316,24 @@ export function CoachScreen() {
     onError: (error) => toast.showToast({ message: VOICE_ERROR_MESSAGES[error] }),
   });
 
+  // Load the chat, then pick up a message that was still waiting for its
+  // reply when the app lost signal or was closed (asks the server, never
+  // the AI). A message the AI never started on is sent again for free.
   useEffect(() => {
-    dispatch(fetchChatHistory());
+    let cancelled = false;
+    (async () => {
+      await dispatch(fetchChatHistory());
+      if (cancelled) return;
+      const recovered = await dispatch(recoverCoachTurn());
+      if (cancelled || !recoverCoachTurn.fulfilled.match(recovered)) return;
+      const r = recovered.payload;
+      if (r.kind === 'resume') {
+        dispatch(sendChatMessage({ text: r.recovery.text, turnId: r.recovery.turnId }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch]);
 
   const remaining = remainingMessages(chat);
@@ -324,16 +343,18 @@ export function CoachScreen() {
   const canStartNewChat =
     hasMessages && !chat.sending && !chat.startingNewChat && !chat.loadingHistory;
 
-  const send = async (text?: string) => {
+  const send = async (text?: string, turn?: { turnId: string; retry?: boolean }) => {
     const toSend = (text ?? draft).trim();
-    if (!toSend || chat.sending || remaining <= 0) {
+    // A resent turn is already counted, so it may go out at the limit.
+    if (!toSend || chat.sending || (remaining <= 0 && !turn)) {
       return;
     }
     // Drop any late dictation so it can't refill the cleared input.
     voice.cancel();
-    setDraft('');
+    if (!turn) setDraft('');
     // On failure the slice keeps the text and the banner offers a retry.
-    const running = dispatch(sendChatMessage(toSend));
+    const arg: SendArg = turn ? { text: toSend, ...turn } : toSend;
+    const running = dispatch(sendChatMessage(arg));
     inFlight.current = running;
     await running;
     if (inFlight.current === running) inFlight.current = null;
@@ -366,9 +387,21 @@ export function CoachScreen() {
 
   const retry = () => {
     const text = chat.failedText;
+    const turnId = chat.failedTurnId;
     if (!text) return;
     dispatch(chatErrorCleared());
-    send(text);
+    // Same turn id: if the first try did reach the server, nothing doubles.
+    send(text, turnId ? { turnId } : undefined);
+  };
+
+  const recovery = chat.recovery;
+  const recoverAction = () => {
+    if (!recovery || chat.sending) return;
+    if (recovery.status === 'uncertain') {
+      send(recovery.text, { turnId: recovery.turnId, retry: true });
+    } else {
+      dispatch(recoverCoachTurn());
+    }
   };
 
   const newChat = async () => {
@@ -548,6 +581,48 @@ export function CoachScreen() {
           <Txt variant="caption" color={colors.inkSoft}>
             {t('coach.youHaveLeft', { count: remaining })}
           </Txt>
+        </View>
+      ) : null}
+      {recovery ? (
+        <View
+          style={[styles.banner, styles.infoBanner]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID="coach-recovery"
+        >
+          <Txt variant="caption" color={colors.inkSoft} style={styles.errorText}>
+            {recovery.status === 'uncertain'
+              ? t('chatErrors.replyUncertain')
+              : t('chatErrors.replyPending')}
+          </Txt>
+          {recovery.status !== 'uncertain' || recovery.canRetry ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                recovery.status === 'uncertain'
+                  ? t('coach.tryAgainLabel')
+                  : t('coach.checkAgainLabel')
+              }
+              onPress={recoverAction}
+              disabled={chat.sending}
+              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+              testID="coach-recovery-action"
+            >
+              <Txt variant="bodySemi" color={colors.accent}>
+                {recovery.status === 'uncertain' ? t('coach.tryAgain') : t('coach.checkAgain')}
+              </Txt>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('coach.dismissLabel')}
+            onPress={() => dispatch(dismissRecovery())}
+            style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+          >
+            <Txt variant="bodySemi" color={colors.inkSoft}>
+              {t('coach.dismiss')}
+            </Txt>
+          </Pressable>
         </View>
       ) : null}
       {chat.error ? (
@@ -822,7 +897,8 @@ const styles = themed(() =>
       flex: 1,
     },
     retryButton: {
-      minHeight: 36,
+      minHeight: 44,
+      minWidth: 44,
       justifyContent: 'center',
       paddingStart: spacing.md,
     },
