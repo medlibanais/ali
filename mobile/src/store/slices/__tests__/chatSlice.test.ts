@@ -84,6 +84,7 @@ describe('new chat', () => {
       sendChatMessage.fulfilled(
         {
           conversationId: 'old-chat',
+          turnId: 't-1',
           userMessage: { id: 'u', role: 'user', content: 'hello', feedback: 0, timestamp: 't' },
           aiMessage: { id: 'a', role: 'assistant', content: 'ok', feedback: 0, timestamp: 't' },
           remainingToday: 15,
@@ -122,11 +123,11 @@ describe('streaming', () => {
     expect(remainingMessages(started)).toBe(5);
     expect(started.resetsAt).toBe('2026-11-16T00:00:00Z');
     const words = reducer(
-      reducer(started, chatSlice.actions.streamText('We ')),
-      chatSlice.actions.streamText('got this.'),
+      reducer(started, chatSlice.actions.streamText({ requestId: 'r3', text: 'We ' })),
+      chatSlice.actions.streamText({ requestId: 'r3', text: 'got this.' }),
     );
     expect(words.streaming).toEqual({ text: 'We got this.', phase: 'streaming' });
-    const reconnecting = reducer(words, chatSlice.actions.streamReconnecting());
+    const reconnecting = reducer(words, chatSlice.actions.streamReconnecting({ requestId: 'r3' }));
     expect(reconnecting.streaming?.phase).toBe('reconnecting');
   });
 
@@ -138,6 +139,7 @@ describe('streaming', () => {
       sendChatMessage.fulfilled(
         {
           conversationId: 'old-chat',
+          turnId: 't-2',
           userMessage: { id: 'u1', role: 'user', content: 'hello', feedback: 0, timestamp: 't' },
           aiMessage: { id: 'local-r4', role: 'assistant', content: 'We got', feedback: 0, timestamp: 't' },
           remainingToday: 5,

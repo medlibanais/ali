@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import {
   isSharedValue,
   useFrameCallback,
+  useReducedMotion,
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -98,11 +99,16 @@ export function blinkEyesAt(elapsed: number, double: boolean): number {
  * the UI thread. Breathing advances a phase by the current pace, so a
  * pace change never jumps mid-breath; blinking counts down to the next
  * blink and plays it, sometimes as a quick double blink.
+ *
+ * Off when the system asks for less motion (Android "Remove animations"):
+ * the avatar then holds still, eyes open, and draws no frames.
  */
 export function useAliveMotion(
   score: number | SharedValue<number> | undefined,
   animated: boolean,
 ): AliveMotion {
+  const reduceMotion = useReducedMotion();
+  const running = animated && !reduceMotion;
   const scoreValue = useScoreValue(score);
   const start = typeof score === 'number' ? score : 50;
   const breath = useSharedValue(0);
@@ -142,15 +148,15 @@ export function useAliveMotion(
   }, false);
 
   useEffect(() => {
-    frame.setActive(animated);
-    if (!animated) {
+    frame.setActive(running);
+    if (!running) {
       breath.value = 0;
       eyes.value = 1;
     }
     return () => frame.setActive(false);
     // frame and the shared values are stable for the component's life
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animated]);
+  }, [running]);
 
   return { breath, eyes };
 }
