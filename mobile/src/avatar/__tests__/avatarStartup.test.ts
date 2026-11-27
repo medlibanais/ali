@@ -7,6 +7,8 @@ const mockSaved: string[] = [];
 jest.mock('../renderCache', () => ({
   setCacheVersion: () => undefined,
   loadCachedRender: (key: string) => Promise.resolve(mockCached.get(key) ?? null),
+  loadPortrait: () => Promise.resolve(null),
+  pointPortrait: () => Promise.resolve(),
   saveCachedRender: (key: string) => {
     mockSaved.push(key);
     return Promise.resolve();
@@ -77,5 +79,28 @@ describe('render cache bounds', () => {
 
   it('never deletes the picture just saved', () => {
     expect(pickEvictions([{ name: 'big', time: 1, size: 9e9 }], 48, 1000)).toEqual([]);
+  });
+});
+
+describe('portrait slots', () => {
+  const { pickEvictions, parsePortraits, withPortrait } = jest.requireActual<typeof import('../renderCache')>('../renderCache');
+
+  it('never evicts a picture a portrait slot points at', () => {
+    const files = Array.from({ length: 50 }, (_, i) => ({ name: `f${i}`, time: i, size: 1000 }));
+    const out = pickEvictions(files, 48, 1e9, new Set(['f0']));
+    expect(out).toEqual(['f1', 'f2']);
+  });
+
+  it('reads only slot -> picture name pairs', () => {
+    expect(parsePortraits('{"u1:today|head|0":"abc123.png","bad":"../x","n":3}')).toEqual({ 'u1:today|head|0': 'abc123.png' });
+    expect(parsePortraits('not json')).toEqual({});
+    expect(parsePortraits(null)).toEqual({});
+  });
+
+  it('keeps the newest slots only', () => {
+    let index = {};
+    for (let i = 0; i < 12; i++) index = withPortrait(index, `u${i}`, `p${i}.png`);
+    expect(Object.keys(index)).toHaveLength(8);
+    expect(withPortrait(index, 'u11', 'new.png').u11).toBe('new.png');
   });
 });

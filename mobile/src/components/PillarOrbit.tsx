@@ -120,6 +120,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
   // SharedValue never changes identity, so the avatar never re-renders
   // for a score change.
   const lifeScore = useLifeScoreValue();
+  const userId = useAppSelector((state) => state.auth?.userId ?? null);
   const { t } = useTranslation();
   return (
     <>
@@ -132,7 +133,7 @@ const OrbitAvatar = memo(function OrbitAvatar({
             accessibilityLabel={name ? t('avatar.avatarOf', { name }) : t('avatar.yours')}
           />
         ) : (
-          <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} />
+          <AvatarView config={avatarConfig} size={size} mood={mood} score={lifeScore} portrait={userId ? `${userId}:today` : undefined} />
         )}
       </View>
       {level !== undefined ? (

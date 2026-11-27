@@ -48,6 +48,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      # Avatar model files must match src/avatar/modelManifest.ts and stay
+      # under assets/avatar3d/budget.json. Growth fails the run until the
+      # budget is raised on purpose in the same PR.
+      - name: Avatar asset size budget
+        run: node scripts/avatar-assets.mjs --check
+
       # Any TypeScript error exits non-zero and fails the run.
       - name: Typecheck (npx tsc --noEmit)
         run: npx tsc --noEmit
