@@ -7,7 +7,7 @@
 import EventSource from 'react-native-sse';
 import type { FunctionFailure } from './functionErrors';
 
-type CoachEvent = 'meta' | 'delta' | 'done';
+type CoachEvent = 'meta' | 'delta' | 'turn' | 'done';
 
 export interface StreamedRow {
   id: string;
@@ -17,6 +17,8 @@ export interface StreamedRow {
 
 export interface StreamMeta {
   conversation_id: string;
+  /** Echo of the turn id (older servers leave it out). */
+  turn_id?: string;
   user_message: StreamedRow;
   remaining_today: number;
   resets_at: string | null;
@@ -25,7 +27,10 @@ export interface StreamMeta {
 }
 
 export interface StreamDone {
+  turn_id?: string;
   ai_message: StreamedRow;
+  /** True when the server sent a reply it had already saved. */
+  replayed?: boolean;
   /** The saved reply; it replaces the text built from the deltas. */
   text: string;
   degraded: boolean;
@@ -33,10 +38,25 @@ export interface StreamDone {
   resets_at: string | null;
 }
 
+/**
+ * The server's `turn` event: the turn is not answered (yet).
+ *   generating  another request is writing it; ask again shortly
+ *   uncertain   the AI did not answer in time; only "Try again" calls again
+ *   stopped     the person tapped Stop before any word
+ */
+export interface StreamTurn {
+  turn_id: string;
+  status: 'reserved' | 'generating' | 'saved' | 'uncertain' | 'stopped';
+  can_retry: boolean;
+  provider_calls?: number;
+}
+
 export interface CoachStreamHandlers {
   onMeta: (meta: StreamMeta) => void;
   onDelta: (text: string) => void;
   onDone: (done: StreamDone) => void;
+  /** Ends the stream without a reply (see StreamTurn). */
+  onTurn?: (turn: StreamTurn) => void;
   /** Called once. `network` means the line dropped (or went silent). */
   onFailure: (failure: FunctionFailure) => void;
 }
@@ -45,6 +65,10 @@ export interface CoachStreamOptions {
   accessToken: string;
   message: string;
   conversationId: string | null;
+  /** Stable id of this message; resending it never counts twice. */
+  turnId?: string;
+  /** The person tapped "Try again" on an uncertain turn. */
+  retry?: boolean;
   /** No event for this long counts as a dropped connection. */
   idleTimeoutMs?: number;
 }
@@ -93,6 +117,8 @@ export function openCoachStream(
     body: JSON.stringify({
       message: options.message,
       stream: true,
+      ...(options.turnId ? { turn_id: options.turnId } : {}),
+      ...(options.retry ? { retry: true } : {}),
       ...(options.conversationId ? { conversation_id: options.conversationId } : {}),
     }),
     // A POST must never be replayed: that would send the message twice.
@@ -133,6 +159,16 @@ export function openCoachStream(
     const delta = parse<{ text?: unknown }>(event.data);
     if (typeof delta?.text === 'string' && !finished) handlers.onDelta(delta.text);
   });
+  es.addEventListener('turn', (event) => {
+    touch();
+    const turn = parse<StreamTurn>(event.data);
+    if (!turn || finished) return;
+    // 'generating' while another request writes it: keep listening.
+    if (turn.status === 'generating') return;
+    finish();
+    if (handlers.onTurn) handlers.onTurn(turn);
+    else handlers.onFailure({ kind: 'http', status: 504, code: 'reply_uncertain' });
+  });
   es.addEventListener('done', (event) => {
     const done = parse<StreamDone>(event.data);
     if (finished) return;
@@ -160,4 +196,58 @@ export function openCoachStream(
   });
 
   return { close: finish };
+}
+
+/** A turn as the server stores it (coach_turn_json, migration 0046). */
+export interface CoachTurnView extends StreamTurn {
+  conversation_id: string;
+  degraded: boolean;
+  user_message: StreamedRow | null;
+  assistant_message: StreamedRow | null;
+}
+
+async function postCoach(accessToken: string, body: unknown): Promise<Response> {
+  return fetch(functionsUrl(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Where a turn stands on the server. Never calls the AI.
+ *   view     the turn exists (it may be saved, running or uncertain)
+ *   missing  the server never got this message (safe to send it again)
+ *   null     could not ask (offline, server error)
+ */
+export async function fetchCoachTurn(
+  accessToken: string,
+  turnId: string,
+): Promise<{ view: CoachTurnView } | 'missing' | null> {
+  try {
+    const res = await postCoach(accessToken, { turn_status: turnId });
+    if (res.status === 404) {
+      const code = errorCode(await res.text());
+      // An older server without turns answers 4xx with another code.
+      return code === 'turn_not_found' ? 'missing' : null;
+    }
+    if (!res.ok) return null;
+    const body = (await res.json()) as { turn?: CoachTurnView };
+    return body.turn ? { view: body.turn } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Tells the server the person tapped Stop (best effort). */
+export async function stopCoachTurn(accessToken: string, turnId: string): Promise<void> {
+  try {
+    await postCoach(accessToken, { stop_turn: turnId });
+  } catch {
+    // Offline: the server saves the full reply instead.
+  }
 }
