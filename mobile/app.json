@@ -35,6 +35,12 @@
           "speechRecognitionPermission": "Allow GROW to use speech recognition."
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow GROW to use Face ID to unlock the app."
+        }
+      ],
       "expo-asset"
     ]
   }

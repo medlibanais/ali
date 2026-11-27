@@ -34,6 +34,7 @@ import PartyQuestScreen from '../screens/PartyQuestScreen';
 import PartyInviteScreen from '../screens/PartyInviteScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { useNotificationBanner } from '../features/notifications/api';
+import AppLockGate from '../features/appLock/AppLockGate';
 import { useRedeemPendingInvite } from '../features/friends/useInviteLinks';
 import MainTabs from './MainTabs';
 import type {
@@ -269,7 +270,11 @@ export function RootNavigator() {
         </View>
       );
     case 'ready':
-      return <AccountNavigator key={userId} />;
+      return (
+        <AppLockGate key={userId}>
+          <AccountNavigator />
+        </AppLockGate>
+      );
   }
 }
 
