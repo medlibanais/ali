@@ -100,3 +100,27 @@ export function logJsConsole(why: string): void {
     console.warn(`logcat failed: ${(e as Error).message.split('\n')[0]}`);
   }
 }
+
+/**
+ * Failure diagnostic that needs no idle app (Espresso does): what is using
+ * the CPU (by thread, to tell the app's UI thread from the WebView's
+ * renderer) and how long the app's recent frames took.
+ */
+export function logDeviceLoad(why: string): void {
+  try {
+    const top = adb(['shell', 'top', '-b', '-H', '-n', '1', '-m', '15', '-o', 'PID,TID,%CPU,CMD,NAME']);
+    console.warn(`[load ${why}] busiest threads:\n${top}`);
+  } catch (e) {
+    console.warn(`[load ${why}] top failed: ${(e as Error).message.split('\n')[0]}`);
+  }
+  try {
+    const gfx = adb(['shell', 'dumpsys', 'gfxinfo', APP_ID]);
+    const keep = gfx
+      .split('\n')
+      .filter((l) => /Total frames|Janky frames|percentile|Number (Slow|Missed|High|Frame deadline)|Window:/.test(l))
+      .slice(0, 30);
+    console.warn(`[load ${why}] frames:\n${keep.join('\n')}`);
+  } catch (e) {
+    console.warn(`[load ${why}] gfxinfo failed: ${(e as Error).message.split('\n')[0]}`);
+  }
+}
