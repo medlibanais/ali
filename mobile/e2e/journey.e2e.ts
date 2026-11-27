@@ -6,7 +6,7 @@
 import { expect as jestExpect } from '@jest/globals';
 import { by, device, element, expect, waitFor } from 'detox';
 import { ensureAppFocus, logDeviceLoad, logJsConsole, prepareEmulator } from './support/android';
-import { confirmEmail, readProfile, readTotalXp, signInAs } from './support/backend';
+import { findConfirmationCode, readProfile, readTotalXp, signInAs } from './support/backend';
 
 const RUN = Date.now().toString(36);
 const EMAIL = `e2e-${RUN}@grow.test`;
@@ -148,14 +148,9 @@ describe('New user journey', () => {
     await waitFor(element(by.id('verify-title'))).toBeVisible().withTimeout(LONG);
   });
 
-  it('confirms the email and signs in', async () => {
-    await confirmEmail(EMAIL);
-
-    await element(by.id('verify-back-to-sign-in')).tap();
-    await waitFor(element(by.id('login-email'))).toBeVisible().withTimeout(LONG);
-    await element(by.id('login-email')).replaceText(EMAIL);
-    await element(by.id('login-password')).replaceText(PASSWORD);
-    await element(by.id('login-password')).tapReturnKey();
+  it('confirms the email with the inbox code and signs in', async () => {
+    const code = await findConfirmationCode(EMAIL);
+    await element(by.id('verify-code')).replaceText(code);
 
     await waitFor(element(by.id('onboarding-step-1'))).toBeVisible().withTimeout(LONG);
   });

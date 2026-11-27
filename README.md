@@ -83,6 +83,14 @@ email testing (Mailpit) `http://127.0.0.1:54324`.
 On the Android emulator use `http://10.0.2.2:54321` as the URL in
 `mobile/.env` (a phone needs your laptop's LAN IP).
 
+### Email verification
+
+The signup screen accepts the six-digit code from the confirmation email or
+the confirmation link. Local Supabase loads
+`supabase/templates/confirmation.html` through `supabase/config.toml`. For
+a hosted project, apply the same HTML to **Authentication → Email Templates →
+Confirm signup** and keep the email OTP length at six digits.
+
 ## Verify everything
 
 ```powershell

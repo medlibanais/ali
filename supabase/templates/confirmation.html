@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verify your GROW email</title>
+  </head>
+  <body style="margin:0;padding:24px;background:#111312;color:#ecf3ee;font-family:Arial,sans-serif;">
+    <div style="box-sizing:border-box;margin:0 auto;max-width:480px;padding:28px;background:#1d2420;border:1px solid #39473e;border-radius:20px;">
+      <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;">Verify your GROW email</h1>
+      <p style="margin:0 0 20px;line-height:1.5;">Enter this six-digit code in GROW to finish creating your account.</p>
+      <p style="margin:0 0 20px;"><strong data-verification-code="true" style="display:inline-block;padding:12px 16px;border-radius:8px;background:#111312;color:#a8f1c1;font-family:monospace;font-size:26px;letter-spacing:4px;">{{ .Token }}</strong></p>
+      <p style="margin:0 0 16px;line-height:1.5;">You can also <a href="{{ .ConfirmationURL }}" style="color:#a8f1c1;">confirm your email with this link</a>.</p>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#beccc2;">If you didn’t sign up for GROW, you can ignore this email.</p>
+    </div>
+  </body>
+</html>

@@ -371,6 +371,12 @@
     "backToSignIn": "Back to sign in"
   },
   "verifyEmail": {
+    "codeSentTo": "Enter the six-digit code sent to {{email}}.",
+    "codeLabel": "Six-digit verification code",
+    "codeOrLink": "You can also use the confirmation link in the email.",
+    "invalidCode": "This code could not be verified. Check the digits or request a new code.",
+    "newCodeSent": "A new verification email is on its way. Check your spam folder if it doesn’t arrive.",
+    "verifyCode": "Verify email",
     "yourEmailIsVerified": "Your email is verified. Setting up your account…",
     "thatLinkIsInvalid": "That link is invalid or has expired. Request a new one below.",
     "signInAgainTo": "Sign in again to request a new link.",
